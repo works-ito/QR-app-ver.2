@@ -654,7 +654,20 @@ function flashScanFrame() {
   frame.classList.add("flash");
   setTimeout(function() { frame.classList.remove("flash"); }, 180);
 }
+function acknowledgeQrRead(decodedText) {
+  flashScanFrame();
+  playBeep("success");
 
+  if (navigator.vibrate) {
+    navigator.vibrate(80);
+  }
+
+  log(
+    "読取成功 ✔\n" +
+    "確認中...\n" +
+    decodedText
+  );
+}
 function scrollToElement(id) {
   setTimeout(function() {
     const el = document.getElementById(id);
@@ -1002,11 +1015,6 @@ async function startQuantityInput(itemCode) {
     document.getElementById("quantityValue").value = "";
     document.getElementById("quantityInputArea").style.display = "block";
 
-    flashScanFrame();
-    playBeep("success");
-
-    if (navigator.vibrate) navigator.vibrate(100);
-
     log("数量を入力してください");
     scrollToElement("quantityInputArea");
 
@@ -1131,7 +1139,7 @@ if (
 ) {
   const now = Date.now();
 
-  // 数量追加直後に、同じQRをカメラが再読取するのを防止
+  // 数量追加直後に同じQRを再読取するのを防止
   if (
     decodedText.toLowerCase() === lastQuantityCode.toLowerCase() &&
     now - lastQuantityCompletedAt < 2000
@@ -1139,6 +1147,10 @@ if (
     return;
   }
 
+  // 読み取れた瞬間に即反応
+  acknowledgeQrRead(decodedText);
+
+  // その後にGASへ問い合わせ
   startQuantityInput(decodedText);
   return;
 }
@@ -1151,7 +1163,10 @@ if (
   if (!validateRecDateBeforeSend()) {
     log("日付未入力のため送信を止めました");
     return;
-  }
+}
+
+  // 読み取れた瞬間に即反応
+  acknowledgeQrRead(decodedText);
 
   scannedSet.add(record.key);
   scannedRecords.push(record);
@@ -1171,10 +1186,7 @@ if (
     document.getElementById("memoArea").style.display = "none";
     document.getElementById("recSendArea").style.display = "none";
     document.getElementById("returnCaseArea").style.display = "none";
-  document.getElementById("recSendArea").style.display = "none";
-
-    playBeep("success");
-    if (navigator.vibrate) navigator.vibrate(100);
+    document.getElementById("recSendArea").style.display = "none";
 
     log(isRecMode()
       ? "REC読取中：最後に追記あり/なしを選んで送信してください"
