@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<title>QR連続読取</title>
+
+<style>
+body { font-family:sans-serif; font-size:22px; padding:20px; }
+button, select, input {
+  font-size:24px; padding:14px; width:100%;
+  margin-bottom:12px; box-sizing:border-box;
+}
+#status { color:blue; font-weight:bold; white-space:pre-wrap; margin:10px 0; }
+#lastRead {
+  color:green; font-size:20px; font-weight:bold;
+  margin:5px 0; min-height:26px; white-space:nowrap;
+}
+#cameraBox {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+}
+#video {
+  width:100%;
+  max-width:320px;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+}
+#scanFrame {
+  position:absolute;
+  left:25%;
+  top:25%;
+  width:50%;
+  height:50%;
+  pointer-events:none;
+}
+.corner {
+  position:absolute;
+  width:34px;
+  height:34px;
+  border-color:white;
+  border-style:solid;
+  border-width:0;
+  filter: drop-shadow(0 0 3px #000);
+}
+.corner.tl { left:0; top:0; border-left-width:5px; border-top-width:5px; }
+.corner.tr { right:0; top:0; border-right-width:5px; border-top-width:5px; }
+.corner.bl { left:0; bottom:0; border-left-width:5px; border-bottom-width:5px; }
+.corner.br { right:0; bottom:0; border-right-width:5px; border-bottom-width:5px; }
+#scanFrame.flash .corner {
+  animation: scanFlash 0.35s ease;
+}
+
+@keyframes scanFlash {
+  0% {
+    border-color:#ffffff;
+    filter:none;
+  }
+
+  25% {
+    border-color:#00ff00;
+    filter:drop-shadow(0 0 12px #00ff00);
+  }
+
+  50% {
+    border-color:#ffffff;
+    filter:none;
+  }
+
+  75% {
+    border-color:#00ff00;
+    filter:drop-shadow(0 0 12px #00ff00);
+  }
+
+  100% {
+    border-color:#ffffff;
+    filter:none;
+  }
+}
+#count { font-size:20px; font-weight:bold; margin:8px 0 4px; }
+#scanList { font-size:28px; line-height:1.5; margin-top:8px; white-space:pre-wrap; }
+.readItem { margin-bottom:4px; }
+canvas { display:none; }
+
+#memoArea {
+  display:none;
+  margin-top:20px;
+  padding:12px;
+  border:2px solid #333;
+  background:#fffbe6;
+}
+
+#returnCaseArea {
+  display:none;
+  margin-top:20px;
+  padding:12px;
+  border:2px solid #333;
+  background:#eef;
+}
+
+#shipmentPhotoArea {
+  display:none;
+  margin-top:20px;
+  padding:12px;
+  border:2px solid #333;
+  background:#eefaf0;
+}
+
+#shipmentPhotoArea p {
+  font-size:18px;
+  margin:6px 0 12px;
+}
+
+#shipmentPhotoPreview {
+  font-size:18px;
+  white-space:pre-wrap;
+  margin:8px 0;
+}
+
+textarea {
+  font-size:22px;
+  padding:12px;
+  width:100%;
+  height:100px;
+  box-sizing:border-box;
+  margin-bottom:12px;
+}
+</style>
+</head>
+
+<body>
+<h2>QR連続読取</h2>
+
+<select id="mode" onchange="toggleRecTarget()">
+  <option value="出庫">出庫</option>
+  <option value="出庫取消">出庫取消</option>
+  <option value="返却">返却</option>
+  <option value="修理中">修理</option>
+  <option value="完成機">完成機</option>
+  <option value="拠点移動">拠点移動</option>
+  <option value="校正中">校正中</option>
+  <option value="校正完了">校正完了</option>
+  <option value="交換完了">交換完了</option>
+</select>
+
+<div id="recTargetBox" style="display:none;">
+  <select id="recTarget">
+    <option value="騒音計">騒音計</option>
+    <option value="振動計">振動計</option>
+    <option value="内部USB">内部USB</option>
+  </select>
+</div>
+
+<select id="location">
+  <option value="本社">本社</option>
+  <option value="三郷">三郷</option>
+  <option value="メインファクトリー">メインファクトリー</option>
+</select>
+
+<select id="user">
+  <option value="" selected>担当者選択</option>
+  <option value="奥">奥</option>
+  <option value="滝島">滝島</option>
+  <option value="上野">上野</option>
+  <option value="見﨑">見﨑</option>
+  <option value="田之岡">田之岡</option>
+  <option value="篠塚">篠塚</option>
+  <option value="その他">その他</option>
+</select>
+
+<button id="startBtn" onclick="startQr()">カメラ起動</button>
+<button id="stopBtn" onclick="stopQr()" style="display:none;">停止</button>
+<button id="resetBtn" onclick="resetScan()" style="display:none;">読取リセット</button>
+<button id="undoBtn" onclick="undoLastScan()" style="display:none;">最後の読取取消</button>
+<button id="sendBatchBtn" onclick="sendBatchToSheet()" style="display:none;">読取分をまとめて送信</button>
+
+<div id="status">未クリック</div>
+<div id="lastRead"></div>
+
+<div id="cameraBox">
+  <video id="video" playsinline></video>
+  <div id="scanFrame">
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+  </div>
+</div>
+<canvas id="canvas"></canvas>
+
+<div id="count">読取件数：0件</div>
+<div id="scanList"></div>
+
+<div id="memoArea">
+  <div>追記対象：</div>
+  <div id="memoTarget" style="font-weight:bold; margin-bottom:10px;"></div>
+  <textarea id="memoText" placeholder="燃料不足・付属品未返却・破損あり等"></textarea>
+  <button onclick="sendMemo()">追記を保存</button>
+</div>
+
+<div id="returnCaseArea">
+  <div style="font-weight:bold; margin-bottom:10px;">返却案件の追記</div>
+
+  <label>
+    <input type="radio" name="returnMemoType" value="なし">
+    追記なし
+  </label><br>
+
+  <label>
+    <input type="radio" name="returnMemoType" value="あり">
+    追記あり
+  </label>
+
+  <textarea id="returnCaseMemo" placeholder="燃料不足・付属品不足・伝票写真あり等" style="display:none;"></textarea>
+
+  <button onclick="sendReturnBatchAfterMemo()">返却をまとめて送信</button>
+</div>
+<div id="shipmentPhotoArea">
+  <div style="font-weight:bold; margin-bottom:10px;">出庫写真の添付</div>
+  <p>1枚目は出庫伝票の撮影推奨。最大6枚まで。</p>
+
+  <button onclick="skipShipmentPhotos()">写真なしで完了</button>
+
+<input
+  type="file"
+  id="shipmentCameraInput"
+  accept="image/*"
+  capture="environment"
+  style="display:none;"
+  onchange="addShipmentCameraPhoto()"
+>
+
+<input
+  type="file"
+  id="shipmentLibraryInput"
+  accept="image/*"
+  multiple
+  style="display:none;"
+  onchange="addShipmentLibraryPhotos()"
+>
+
+<button onclick="chooseShipmentCamera()">カメラで1枚追加</button>
+<button onclick="chooseShipmentLibrary()">ライブラリから選ぶ</button>
+<button onclick="clearShipmentPhotos()">選択写真をクリア</button>
+  <div id="shipmentPhotoPreview"></div>
+
+  <button id="uploadShipmentPhotoBtn" onclick="uploadShipmentPhotos()" style="display:none;">
+    写真を保存
+  </button>
+</div>
+
+<script>
+const GAS_URL = "https://script.google.com/macros/s/AKfycbyx4OYpiyIgKOxLqBFkJIiTaJ0wSF6Hrp12Krkd7MNL996uySBdA6o-d2F4dkT95Be1Vw/exec";
+
+let stream = null;
+let scanning = false;
+let scannedSet = new Set();
+let lastScanned = "";
+let lastScanTime = 0;
+let lastItemForMemo = null;
+let loadingTimer = null;
+let loadingDots = 0;
+
+let batchLoadingTimer = null;
+let batchLoadingDots = 0;
+
+let pendingReturnItems = [];
+let pendingReturnCaseId = "";
+let pendingReturnMemoType = "";
+let pendingReturnMemo = "";
+let lastShipmentPhotoInfo = null;
+let selectedShipmentPhotos = [];
+  
+const SCAN_INTERVAL = 80;
+const FAST_MODES = ["出庫", "完成機", "返却", "修理中"];
+
+function isFastMode() {
+  return FAST_MODES.includes(document.getElementById("mode").value);
+}
+
+function log(msg) {
+  document.getElementById("status").innerText = msg;
+}
+
+function flashScanFrame() {
+  const frame = document.getElementById("scanFrame");
+  if (!frame) return;
+  frame.classList.add("flash");
+  setTimeout(function() {
+    frame.classList.remove("flash");
+  }, 180);
+}
+
+function startBatchLoading(message) {
+  stopBatchLoading();
+  batchLoadingDots = 0;
+
+  batchLoadingTimer = setInterval(function() {
+    batchLoadingDots = (batchLoadingDots + 1) % 4;
+    const dots = ".".repeat(batchLoadingDots);
+    log(message + dots);
+  }, 400);
+}
+
+function stopBatchLoading() {
+  if (batchLoadingTimer) {
+    clearInterval(batchLoadingTimer);
+    batchLoadingTimer = null;
+  }
+}
+
+function startMemoLoading(qrText) {
+  stopMemoLoading();
+  loadingDots = 0;
+
+  loadingTimer = setInterval(function() {
+    loadingDots = (loadingDots + 1) % 4;
+    const dots = ".".repeat(loadingDots);
+    document.getElementById("memoTarget").innerText =
+      "現在の追記対象：\n送信確認中" + dots + " / " + qrText;
+  }, 400);
+}
+
+function stopMemoLoading() {
+  if (loadingTimer) {
+    clearInterval(loadingTimer);
+    loadingTimer = null;
+  }
+}
+
+function saveSelections() {
+  localStorage.setItem("mode", document.getElementById("mode").value);
+  localStorage.setItem("location", document.getElementById("location").value);
+  localStorage.setItem("user", document.getElementById("user").value);
+  localStorage.setItem("recTarget", document.getElementById("recTarget").value);
+}
+
+function loadSelections() {
+  if (localStorage.getItem("mode")) {
+    document.getElementById("mode").value = localStorage.getItem("mode");
+  }
+  if (localStorage.getItem("location")) {
+    document.getElementById("location").value = localStorage.getItem("location");
+  }
+  if (localStorage.getItem("user")) {
+    document.getElementById("user").value = localStorage.getItem("user");
+  }
+  if (localStorage.getItem("recTarget")) {
+    document.getElementById("recTarget").value = localStorage.getItem("recTarget");
+  }
+
+  if (!["騒音計", "振動計", "内部USB"].includes(document.getElementById("recTarget").value)) {
+    document.getElementById("recTarget").value = "騒音計";
+  }
+}
+
+function toggleRecTarget() {
+  const mode = document.getElementById("mode").value;
+  const recModes = ["校正中", "校正完了", "交換完了"];
+  document.getElementById("recTargetBox").style.display =
+    recModes.includes(mode) ? "block" : "none";
+}
+
+function playBeep(type) {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.frequency.value = type === "success" ? 1600 : 220;
+    gain.gain.value = 0.8;
+
+    osc.start();
+    osc.stop(ctx.currentTime + 0.3);
+  } catch(e) {
+    console.log(e);
+  }
+}
+
+async function startQr() {
+  log("カメラ起動中...");
+
+  if (scanning) {
+    log("すでに起動中");
+    return;
+  }
+
+  try {
+    const video = document.getElementById("video");
+
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
+      },
+      audio: false
+    });
+
+    video.srcObject = stream;
+video.setAttribute("playsinline", true);
+await video.play();
+
+    log(video.videoWidth + " × " + video.videoHeight);
+    
+    const track = stream.getVideoTracks()[0];
+const caps = track.getCapabilities ? track.getCapabilities() : {};
+
+if (caps.zoom) {
+  const zoomValue = Math.min(1.5, caps.zoom.max);
+  await track.applyConstraints({
+    advanced: [{ zoom: zoomValue }]
+  });
+}
+    
+    scanning = true;
+
+    document.getElementById("startBtn").style.display = "none";
+    document.getElementById("stopBtn").style.display = "block";
+    document.getElementById("resetBtn").style.display = "block";
+
+    log("カメラ起動成功");
+    scanLoop();
+
+  } catch(err) {
+    log("カメラ起動失敗\n" + err);
+    scanning = false;
+  }
+}
+
+function scanLoop() {
+  if (!scanning) return;
+
+  requestAnimationFrame(scanLoop);
+
+  const now = Date.now();
+  if (now - lastScanTime < SCAN_INTERVAL) return;
+  lastScanTime = now;
+
+  const video = document.getElementById("video");
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+
+  if (video.readyState === video.HAVE_ENOUGH_DATA) {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    // 中央40%だけをQR解析対象にする
+    const sx = Math.floor(canvas.width * 0.25);
+    const sy = Math.floor(canvas.height * 0.25);
+    const sw = Math.floor(canvas.width * 0.5);
+    const sh = Math.floor(canvas.height * 0.5);
+
+    const imageData = ctx.getImageData(sx, sy, sw, sh);
+    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+      inversionAttempts: "dontInvert"
+    });
+
+    if (code && code.data) {
+      handleDecoded(code.data);
+    }
+  }
+}
+
+function isValidQrText(text) {
+  text = String(text).trim();
+
+  if (text.includes("entry.") && text.includes("=")) {
+    return true;
+  }
+
+  if (/^[A-Z0-9]{2,10}-[A-Z0-9]{1,10}$/.test(text)) {
+    return true;
+  }
+
+  return false;
+}
+
+function refreshScanDisplay(decodedText) {
+  document.getElementById("lastRead").innerText =
+    "読取成功 ✔ " + decodedText;
+
+  document.getElementById("count").innerText =
+    "読取件数：" + scannedSet.size + "件";
+
+  document.getElementById("scanList").innerHTML =
+    Array.from(scannedSet).reverse().map(function(item) {
+      return '<div class="readItem">' + item + '</div>';
+    }).join("");
+}
+
+function handleDecoded(decodedText) {
+  decodedText = String(decodedText).trim();
+
+  if (!isValidQrText(decodedText)) {
+    log("QR形式ではないため無視しました\n" + decodedText);
+    return;
+  }
+
+  if (scannedSet.has(decodedText)) return;
+
+  scannedSet.add(decodedText);
+  lastScanned = decodedText;
+
+  document.getElementById("undoBtn").style.display = "block";
+  refreshScanDisplay(decodedText);
+  flashScanFrame();
+
+  if (isFastMode()) {
+    document.getElementById("sendBatchBtn").style.display = "block";
+    document.getElementById("memoArea").style.display = "none";
+    document.getElementById("returnCaseArea").style.display = "none";
+
+    playBeep("success");
+    if (navigator.vibrate) {
+      navigator.vibrate(100);
+    }
+
+    log("読取中：最後にまとめて送信してください");
+    return;
+  }
+
+  sendToSheet(decodedText);
+  stopQr();
+}
+
+function stopQr() {
+  if (!scanning) {
+    log("まだ起動していません");
+    return;
+  }
+
+  scanning = false;
+
+  const video = document.getElementById("video");
+  video.pause();
+  video.srcObject = null;
+
+  if (stream) {
+    stream.getTracks().forEach(function(track) {
+      track.stop();
+    });
+    stream = null;
+  }
+
+  log("停止しました");
+
+  document.getElementById("startBtn").style.display = "block";
+  document.getElementById("stopBtn").style.display = "none";
+  document.getElementById("resetBtn").style.display = "none";
+}
+
+function resetScan() {
+  scannedSet.clear();
+  lastScanned = "";
+  pendingReturnItems = [];
+  pendingReturnCaseId = "";
+  pendingReturnMemoType = "";
+  pendingReturnMemo = "";
+
+  document.getElementById("count").innerText = "読取件数：0件";
+  document.getElementById("scanList").innerHTML = "";
+  document.getElementById("lastRead").innerText = "";
+  document.getElementById("sendBatchBtn").style.display = "none";
+  document.getElementById("sendBatchBtn").disabled = false;
+  document.getElementById("undoBtn").style.display = "none";
+  document.getElementById("returnCaseArea").style.display = "none";
+
+  document.getElementById("returnCaseMemo").value = "";
+  document.getElementById("returnCaseMemo").style.display = "none";
+  document.querySelectorAll('input[name="returnMemoType"]').forEach(function(radio) {
+    radio.checked = false;
+  });
+
+  log("読取履歴をリセットしました");
+}
+
+function undoLastScan() {
+  if (!lastScanned) {
+    log("取消できる読取がありません");
+    return;
+  }
+
+  scannedSet.delete(lastScanned);
+
+  document.getElementById("count").innerText =
+    "読取件数：" + scannedSet.size + "件";
+
+  document.getElementById("scanList").innerHTML =
+    Array.from(scannedSet).reverse().map(function(item) {
+      return '<div class="readItem">' + item + '</div>';
+    }).join("");
+
+  document.getElementById("lastRead").innerText =
+    "取消しました\n✖ " + lastScanned;
+
+  // すでに送信済みの通常モードだけ取消ログを送る。
+  // 出庫・完成機・返却は送信前の読みためなので取消ログは送らない。
+  if (!isFastMode()) {
+    sendUndoToSheet(lastScanned);
+  }
+
+  log("取消しました");
+
+  lastScanned = "";
+
+  if (scannedSet.size === 0) {
+    document.getElementById("undoBtn").style.display = "none";
+    document.getElementById("sendBatchBtn").style.display = "none";
+  }
+}
+
+async function sendBatchToSheet() {
+  const items = Array.from(scannedSet);
+
+  if (items.length === 0) {
+    alert("送信するQRがありません");
+    return;
+  }
+
+  if (!isFastMode()) {
+    alert("まとめて送信は出庫・完成機・返却・修理のみです");
+    return;
+  }
+
+  if (!document.getElementById("user").value) {
+    alert("担当者を選択してください");
+    return;
+  }
+
+  const mode = document.getElementById("mode").value;
+
+  if (mode === "返却") {
+    showReturnCaseArea(items);
+    return;
+  }
+
+  if (!confirm(mode + "を " + items.length + "件まとめて送信します。よろしいですか？")) {
+    return;
+  }
+
+  stopQr();
+  
+  document.getElementById("sendBatchBtn").disabled = true;
+  startBatchLoading("まとめて送信中");
+
+  let success = 0;
+  let failed = [];
+
+  for (const qrText of items) {
+    try {
+      const result = await sendFastItem(qrText);
+
+      if (result.ok) {
+        success++;
+      } else {
+        failed.push(qrText + "：" + result.message);
+      }
+    } catch (err) {
+      failed.push(qrText + "：" + err);
+    }
+  }
+
+  stopBatchLoading();
+  document.getElementById("sendBatchBtn").disabled = false;
+
+  if (failed.length > 0) {
+    alert("一部送信失敗\n成功：" + success + "件\n失敗：" + failed.length + "件\n\n" + failed.join("\n"));
+    log("一部送信失敗あり");
+    return;
+  }
+
+alert("まとめて送信完了\n" + success + "件");
+
+const sentItems = items.slice();
+const sentMode = mode;
+
+stopQr();
+resetScan();
+
+if (sentMode === "出庫") {
+  showShipmentPhotoArea(sentItems);
+} else {
+  log("送信完了。続けて読み取る場合は「カメラ起動」を押してください");
+}
+}
+
+function showReturnCaseArea(items) {
+  pendingReturnItems = items.slice();
+  pendingReturnCaseId = "RET-" + new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
+
+  document.getElementById("returnCaseArea").style.display = "block";
+  document.getElementById("sendBatchBtn").disabled = true;
+
+  log("返却追記を選択してください");
+}
+
+async function sendReturnBatchAfterMemo() {
+  const selected = document.querySelector('input[name="returnMemoType"]:checked');
+
+  if (!selected) {
+    alert("追記なし／追記ありを選択してください");
+    return;
+  }
+
+  pendingReturnMemoType = selected.value;
+  pendingReturnMemo = document.getElementById("returnCaseMemo").value.trim();
+
+  if (pendingReturnMemoType === "あり" && !pendingReturnMemo) {
+    alert("追記内容を入力してください");
+    return;
+  }
+
+  if (pendingReturnMemoType === "なし") {
+    pendingReturnMemo = "追記なし";
+  }
+
+  if (!confirm("返却を " + pendingReturnItems.length + "件まとめて送信します。よろしいですか？")) {
+    return;
+  }
+
+  const returnButton = document.querySelector("#returnCaseArea button");
+  returnButton.disabled = true;
+  startBatchLoading("返却まとめて送信中");
+
+  let success = 0;
+  let failed = [];
+
+  for (const qrText of pendingReturnItems) {
+    try {
+      const result = await sendFastItem(qrText, {
+        returnCaseId: pendingReturnCaseId,
+        returnMemoType: pendingReturnMemoType,
+        returnMemo: pendingReturnMemo
+      });
+
+      if (result.ok) {
+        success++;
+      } else {
+        failed.push(qrText + "：" + result.message);
+      }
+    } catch (err) {
+      failed.push(qrText + "：" + err);
+    }
+  }
+
+  stopBatchLoading();
+  returnButton.disabled = false;
+
+  if (failed.length > 0) {
+    alert("一部送信失敗\n成功：" + success + "件\n失敗：" + failed.length + "件\n\n" + failed.join("\n"));
+    log("一部送信失敗あり");
+    return;
+  }
+
+alert(
+  "返却まとめて送信完了\n" +
+  success +
+  "件\n\n案件追記：" +
+  pendingReturnMemo +
+  "\n\n続けて読み取る場合は『カメラ起動』を押してください"
+);
+
+stopQr();  
+resetScan();
+log("返却送信完了。続けて読み取る場合は『カメラ起動』を押してください");
+
+
+}
+
+function sendFastItem(qrText, extraData) {
+  const data = {
+    mode: document.getElementById("mode").value,
+    qr: qrText,
+    user: document.getElementById("user").value,
+    location: document.getElementById("location").value,
+    recTarget: document.getElementById("recTarget").value
+  };
+
+  if (extraData) {
+    Object.assign(data, extraData);
+  }
+
+  return fetch(GAS_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify(data)
+  }).then(function(response) {
+    return response.json();
+  });
+}
+function showShipmentPhotoArea(items) {
+  lastShipmentPhotoInfo = {
+    mode: "出庫",
+    ids: items.slice(),
+    user: document.getElementById("user").value,
+    location: document.getElementById("location").value,
+    createdAt: new Date().toISOString()
+  };
+
+  selectedShipmentPhotos = [];
+
+  document.getElementById("shipmentPhotoArea").style.display = "block";
+  document.getElementById("shipmentPhotoPreview").innerText =
+    "出庫送信完了。\n1枚目は出庫伝票推奨。\nカメラで1枚ずつ追加、またはライブラリから最大6枚選択できます。";
+
+  document.getElementById("uploadShipmentPhotoBtn").style.display = "none";
+  document.getElementById("uploadShipmentPhotoBtn").disabled = false;
+  document.getElementById("shipmentCameraInput").value = "";
+  document.getElementById("shipmentLibraryInput").value = "";
+
+  log("出庫送信完了。写真添付を選択してください");
+}
+
+function chooseShipmentCamera() {
+  document.getElementById("shipmentCameraInput").click();
+}
+
+function chooseShipmentLibrary() {
+  document.getElementById("shipmentLibraryInput").click();
+}
+
+function addShipmentCameraPhoto() {
+  const input = document.getElementById("shipmentCameraInput");
+  const files = Array.from(input.files || []);
+
+  if (files.length === 0) return;
+
+  addShipmentPhotosToList(files);
+
+  // 同じ撮影ボタンを続けて使えるようにリセット
+  input.value = "";
+}
+
+function addShipmentLibraryPhotos() {
+  const input = document.getElementById("shipmentLibraryInput");
+  const files = Array.from(input.files || []);
+
+  if (files.length === 0) return;
+
+  addShipmentPhotosToList(files);
+
+  // 同じ写真を再選択できるようにリセット
+  input.value = "";
+}
+
+function addShipmentPhotosToList(files) {
+  if (selectedShipmentPhotos.length + files.length > 6) {
+    alert("写真は最大6枚までです。\n現在：" + selectedShipmentPhotos.length + "枚");
+    return;
+  }
+
+  files.forEach(function(file) {
+    selectedShipmentPhotos.push(file);
+  });
+
+  updateShipmentPhotoPreview();
+}
+
+function updateShipmentPhotoPreview() {
+  const count = selectedShipmentPhotos.length;
+
+  if (count === 0) {
+    document.getElementById("shipmentPhotoPreview").innerText =
+      "写真はまだ選択されていません。";
+    document.getElementById("uploadShipmentPhotoBtn").style.display = "none";
+    return;
+  }
+
+  document.getElementById("shipmentPhotoPreview").innerText =
+    count + "枚追加済み\n最大6枚まで。1枚のコラージュ画像にして保存します。";
+
+  document.getElementById("uploadShipmentPhotoBtn").style.display = "block";
+}
+
+function clearShipmentPhotos() {
+  selectedShipmentPhotos = [];
+
+  document.getElementById("shipmentCameraInput").value = "";
+  document.getElementById("shipmentLibraryInput").value = "";
+
+  updateShipmentPhotoPreview();
+}
+
+function skipShipmentPhotos() {
+  document.getElementById("shipmentPhotoArea").style.display = "none";
+  document.getElementById("shipmentCameraInput").value = "";
+  document.getElementById("shipmentLibraryInput").value = "";
+  document.getElementById("shipmentPhotoPreview").innerText = "";
+  document.getElementById("uploadShipmentPhotoBtn").style.display = "none";
+  document.getElementById("uploadShipmentPhotoBtn").disabled = false;
+
+  selectedShipmentPhotos = [];
+  lastShipmentPhotoInfo = null;
+
+  log("写真なしで完了しました。続けて読み取る場合は「カメラ起動」を押してください");
+}
+
+async function uploadShipmentPhotos() {
+  const files = selectedShipmentPhotos.slice();
+
+  if (!lastShipmentPhotoInfo) {
+    alert("出庫情報がありません");
+    return;
+  }
+
+  if (files.length === 0) {
+    alert("写真を選択してください");
+    return;
+  }
+
+  if (files.length > 6) {
+    alert("写真は最大6枚までです");
+    return;
+  }
+
+  const btn = document.getElementById("uploadShipmentPhotoBtn");
+  btn.disabled = true;
+  log("写真をコラージュ化しています...");
+
+  try {
+    const collageBase64 = await makeShipmentCollage(files, lastShipmentPhotoInfo);
+
+    log("出庫写真を保存中...");
+
+    const result = await fetch(GAS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({
+        action: "saveShipmentPhoto",
+        photoBase64: collageBase64,
+        photoInfo: lastShipmentPhotoInfo
+      })
+    }).then(function(response) {
+      return response.json();
+    });
+
+    if (!result.ok) {
+      alert("写真保存失敗\n" + result.message);
+      log("写真保存失敗");
+      btn.disabled = false;
+      return;
+    }
+
+    alert("出庫写真を保存しました");
+
+    document.getElementById("shipmentPhotoArea").style.display = "none";
+    document.getElementById("shipmentCameraInput").value = "";
+    document.getElementById("shipmentLibraryInput").value = "";
+    document.getElementById("shipmentPhotoPreview").innerText = "";
+    btn.style.display = "none";
+    btn.disabled = false;
+
+    selectedShipmentPhotos = [];
+    lastShipmentPhotoInfo = null;
+
+    log("写真保存完了。続けて読み取る場合は「カメラ起動」を押してください");
+
+  } catch (err) {
+    alert("写真保存エラー\n" + err);
+    log("写真保存エラー");
+    btn.disabled = false;
+  }
+}
+
+function makeShipmentCollage(files, info) {
+  return new Promise(async function(resolve) {
+    const images = [];
+
+    for (const file of files) {
+      const img = await loadPhotoImage(file);
+      images.push(img);
+    }
+
+    const cols = 3;
+    const rows = 2;
+    const cellW = 1100;
+    const cellH = 825;
+    const headerH = 180;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = cols * cellW;
+    canvas.height = rows * cellH + headerH;
+
+    const ctx = canvas.getContext("2d");
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "#000000";
+    ctx.font = "38px sans-serif";
+    ctx.fillText("出庫写真", 20, 48);
+
+    ctx.font = "28px sans-serif";
+    ctx.fillText("日時：" + new Date().toLocaleString("ja-JP"), 20, 88);
+    ctx.fillText("担当：" + (info.user || ""), 20, 128);
+
+    const idText = (info.ids || []).join(" ");
+    ctx.fillText("QR：" + idText.slice(0, 78), 520, 88);
+    if (idText.length > 78) {
+      ctx.fillText(idText.slice(78, 156), 520, 128);
+    }
+
+    for (let i = 0; i < 6; i++) {
+      const x = (i % cols) * cellW;
+      const y = Math.floor(i / cols) * cellH + headerH;
+
+      ctx.strokeStyle = "#cccccc";
+      ctx.strokeRect(x, y, cellW, cellH);
+
+      ctx.fillStyle = "#f5f5f5";
+      ctx.fillRect(x + 1, y + 1, cellW - 2, cellH - 2);
+
+      if (images[i]) {
+        drawImageCover(ctx, images[i], x, y, cellW, cellH);
+      }
+
+      ctx.fillStyle = "rgba(0,0,0,0.65)";
+      ctx.fillRect(x + 10, y + 10, 92, 44);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "30px sans-serif";
+      ctx.fillText((i + 1) + "枚目", x + 18, y + 42);
+    }
+
+    resolve(canvas.toDataURL("image/jpeg", 0.92));
+  });
+}
+
+function loadPhotoImage(file) {
+  return new Promise(function(resolve) {
+    const reader = new FileReader();
+
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onload = function() {
+        resolve(img);
+      };
+      img.src = e.target.result;
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
+
+function drawImageCover(ctx, img, x, y, w, h) {
+  const scale = Math.max(w / img.width, h / img.height);
+  const nw = img.width * scale;
+  const nh = img.height * scale;
+  const nx = x + (w - nw) / 2;
+  const ny = y + (h - nh) / 2;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+  ctx.drawImage(img, nx, ny, nw, nh);
+  ctx.restore();
+}
+function sendToSheet(qrText) {
+  lastItemForMemo = {
+    管理番号: qrText,
+    管理区分: "",
+    機種表示: "送信確認中",
+    送信ID: ""
+  };
+
+  document.getElementById("memoTarget").innerText =
+    "現在の追記対象：\n送信確認中 / " + qrText;
+
+  startMemoLoading(qrText);
+
+  document.getElementById("memoText").value = "";
+  document.getElementById("memoText").disabled = false;
+  document.querySelector("#memoArea button").disabled = true;
+  document.getElementById("memoArea").style.display = "block";
+
+  const data = {
+    mode: document.getElementById("mode").value,
+    qr: qrText,
+    user: document.getElementById("user").value,
+    location: document.getElementById("location").value,
+    recTarget: document.getElementById("recTarget").value
+  };
+
+  fetch(GAS_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify(data)
+  })
+  .then(function(response) {
+    return response.json();
+  })
+  .then(function(result) {
+    if (!result.ok) {
+      alert("送信失敗\n" + result.message);
+      return;
+    }
+
+    if (result.lastItem) {
+      stopMemoLoading();
+      lastItemForMemo = result.lastItem;
+
+      document.getElementById("memoTarget").innerText =
+        "現在の追記対象：\n" +
+        lastItemForMemo.機種表示 + " / " + lastItemForMemo.管理番号;
+
+      document.getElementById("memoText").value = "";
+      document.getElementById("memoText").disabled = false;
+      document.querySelector("#memoArea button").disabled = false;
+      document.getElementById("memoArea").style.display = "block";
+    }
+  })
+  .catch(function(err) {
+    stopMemoLoading();
+    alert("送信エラー\n" + err);
+  });
+
+  playBeep("success");
+
+  if (navigator.vibrate) {
+    navigator.vibrate(100);
+  }
+
+  log("読取成功");
+}
+
+function sendMemo() {
+  const memoTextArea = document.getElementById("memoText");
+  const memo = memoTextArea.value.trim();
+
+  if (!lastItemForMemo) {
+    alert("追記対象がありません");
+    return;
+  }
+
+  if (!memo) {
+    alert("追記内容を入力してください");
+    return;
+  }
+
+  const savedItem = lastItemForMemo;
+  const savedTarget = savedItem.機種表示 + " / " + savedItem.管理番号;
+
+  const data = {
+    action: "addMemo",
+    kanriNo: savedItem.管理番号,
+    kubun: savedItem.管理区分,
+    kishu: savedItem.機種表示,
+    sendId: savedItem.送信ID,
+    memo: memo,
+    user: document.getElementById("user").value
+  };
+
+  memoTextArea.disabled = true;
+  document.querySelector("#memoArea button").disabled = true;
+  log("追記保存中...");
+
+  fetch(GAS_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify(data)
+  })
+  .then(function(response) {
+    return response.json();
+  })
+  .then(function(result) {
+    if (result.ok) {
+      stopMemoLoading();
+
+      alert("追記を保存しました\n" + savedTarget);
+
+      memoTextArea.value = "";
+      memoTextArea.blur();
+
+      document.getElementById("memoText").disabled = true;
+      document.getElementById("memoTarget").innerText =
+        "追記保存済：" + savedTarget + "\n次のQRを読んでください";
+
+      log("追記保存済\n次のQRを読んでください");
+
+      lastItemForMemo = null;
+      document.querySelector("#memoArea button").disabled = false;
+
+    } else {
+      stopMemoLoading();
+
+      memoTextArea.disabled = false;
+      document.querySelector("#memoArea button").disabled = false;
+
+      alert("追記保存失敗\n" + result.message);
+      log("追記保存失敗");
+    }
+  })
+  .catch(function(err) {
+    memoTextArea.disabled = false;
+    document.querySelector("#memoArea button").disabled = false;
+
+    alert("追記保存エラー\n" + err);
+    log("追記保存エラー");
+  });
+}
+
+function restartQrCamera() {
+  scanning = false;
+
+  const video = document.getElementById("video");
+
+  if (video) {
+    video.pause();
+    video.srcObject = null;
+  }
+
+  if (stream) {
+    stream.getTracks().forEach(function(track) {
+      track.stop();
+    });
+    stream = null;
+  }
+
+  setTimeout(function() {
+    startQr();
+  }, 300);
+}
+
+function sendUndoToSheet(qrText) {
+  const data = {
+    mode: "取消",
+    qr: qrText,
+    user: document.getElementById("user").value,
+    location: document.getElementById("location").value,
+    recTarget: document.getElementById("recTarget").value
+  };
+
+  fetch(GAS_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify(data)
+  });
+}
+
+document.getElementById("mode").addEventListener("change", saveSelections);
+document.getElementById("location").addEventListener("change", saveSelections);
+document.getElementById("user").addEventListener("change", saveSelections);
+document.getElementById("recTarget").addEventListener("change", saveSelections);
+
+document.querySelectorAll('input[name="returnMemoType"]').forEach(function(radio) {
+  radio.addEventListener("change", function() {
+    const memoBox = document.getElementById("returnCaseMemo");
+
+    if (this.value === "あり") {
+      memoBox.style.display = "block";
+    } else {
+      memoBox.style.display = "none";
+      memoBox.value = "";
+    }
+  });
+});
+
+loadSelections();
+toggleRecTarget();
+</script>
+</body>
+</html>

@@ -1,1 +1,1 @@
-# QR-app-ver.2
+# qr-test
