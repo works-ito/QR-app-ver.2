@@ -150,6 +150,84 @@ textarea {
   text-align:center;
   font-weight:bold;
 }
+
+/* ===== ver.2 ホーム画面 ===== */
+
+#mainScanButtonArea {
+  margin: 20px 0 16px;
+}
+
+#startBtn {
+  background: #1677ff;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 28px;
+  font-weight: bold;
+  min-height: 72px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.18);
+}
+
+#startBtn:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+}
+
+#settingsPanel {
+  margin-bottom: 16px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: #f7f7f7;
+  overflow: hidden;
+}
+
+#settingsPanel summary {
+  padding: 13px 14px;
+  font-size: 17px;
+  font-weight: bold;
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+#settingsContent {
+  padding: 0 12px 12px;
+}
+
+#settingsContent label {
+  display: block;
+  font-size: 15px;
+  font-weight: bold;
+  margin: 8px 0 5px;
+  color: #444;
+}
+
+#settingsContent select {
+  margin-bottom: 8px;
+}
+
+#topSelectors {
+  display: block;
+}
+
+#currentBatchArea {
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+}
+
+#currentBatchTitle {
+  font-size: 17px;
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+
+#count {
+  margin: 0;
+  font-size: 20px;
+}
+  
 </style>
 </head>
 
@@ -165,51 +243,73 @@ textarea {
   WORKS Co., Ltd.
 </div>
 
-<div id="topSelectors">
-<select id="mode" onchange="toggleRecTarget()">
-  <option value="出庫">出庫</option>
-  <option value="出庫取消">出庫取消</option>
-  <option value="返却">返却</option>
-  <option value="修理中">修理</option>
-  <option value="完成機">完成機</option>
-  <option value="拠点移動">拠点移動</option>
-  <option value="校正中">校正中</option>
-  <option value="校正完了">校正完了</option>
-  <option value="交換完了">交換完了</option>
-</select>
-
-<select id="location">
-  <option value="本社">本社</option>
-  <option value="三郷">三郷</option>
-  <option value="MF">MF</option>
-</select>
-
-<select id="user">
-  <option value="" selected>担当者選択</option>
-  <option value="奥">奥</option>
-  <option value="滝島">滝島</option>
-  <option value="上野">上野</option>
-  <option value="見﨑">見﨑</option>
-  <option value="田之岡">田之岡</option>
-  <option value="篠塚">篠塚</option>
-  <option value="その他">その他</option>
-</select>
+<div id="mainScanButtonArea">
+  <button id="startBtn" onclick="startQr()">QRを読み取る</button>
 </div>
 
-<div id="recTargetBox" style="display:none;">
-  <select id="recTarget">
-    <option value="騒音計">騒音計</option>
-    <option value="振動計">振動計</option>
-    <option value="内部USB">内部USB</option>
-  </select>
+<details id="settingsPanel">
+  <summary>設定</summary>
+
+  <div id="settingsContent">
+
+    <div id="topSelectors">
+
+      <label for="mode">作業区分</label>
+      <select id="mode" onchange="toggleRecTarget()">
+        <option value="出庫">出庫</option>
+        <option value="出庫取消">出庫取消</option>
+        <option value="返却">返却</option>
+        <option value="修理中">修理</option>
+        <option value="完成機">完成機</option>
+        <option value="拠点移動">拠点移動</option>
+        <option value="校正中">校正中</option>
+        <option value="校正完了">校正完了</option>
+        <option value="交換完了">交換完了</option>
+      </select>
+
+      <label for="location">拠点</label>
+      <select id="location">
+        <option value="本社">本社</option>
+        <option value="三郷">三郷</option>
+        <option value="MF">MF</option>
+      </select>
+
+      <label for="user">担当者</label>
+      <select id="user">
+        <option value="" selected>担当者選択</option>
+        <option value="奥">奥</option>
+        <option value="滝島">滝島</option>
+        <option value="上野">上野</option>
+        <option value="見﨑">見﨑</option>
+        <option value="田之岡">田之岡</option>
+        <option value="篠塚">篠塚</option>
+        <option value="その他">その他</option>
+      </select>
+
+    </div>
+
+    <div id="recTargetBox" style="display:none;">
+      <label for="recTarget">REC対象</label>
+      <select id="recTarget">
+        <option value="騒音計">騒音計</option>
+        <option value="振動計">振動計</option>
+        <option value="内部USB">内部USB</option>
+      </select>
+    </div>
+
+    <div id="recDateBox" style="display:none;">
+      <label id="recDateLabel" for="recDate">校正実施日</label>
+      <input type="date" id="recDate">
+    </div>
+
+  </div>
+</details>
+
+<div id="currentBatchArea">
+  <div id="currentBatchTitle">現在のまとめ</div>
+  <div id="count">読取件数：0件</div>
 </div>
 
-<div id="recDateBox" style="display:none;">
-  <label id="recDateLabel" for="recDate">校正実施日</label>
-  <input type="date" id="recDate">
-</div>
-
-<button id="startBtn" onclick="startQr()">カメラ起動</button>
 <button id="stopBtn" onclick="stopQr()" style="display:none;">停止</button>
 <button id="resetBtn" onclick="resetScan()" style="display:none;">読取リセット</button>
 <button id="undoBtn" onclick="undoLastScan()" style="display:none;">最後の読取取消</button>
@@ -232,7 +332,6 @@ textarea {
 
 <canvas id="canvas"></canvas>
 
-<div id="count">読取件数：0件</div>
 <div id="scanList"></div>
 <div id="quantityInputArea">
   <div id="quantityItemName"></div>
