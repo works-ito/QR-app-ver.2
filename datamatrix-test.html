@@ -453,7 +453,22 @@ let lastPendingSendId = "";
 let pendingQuantityItem = null;
 let lastQuantityCode = "";
 let lastQuantityCompletedAt = 0;
-  
+// ===== ver.2 起動時一括取得データ =====
+
+let appInitialDataLoaded = false;
+let appInitialDataLoading = false;
+let appInitialDataError = "";
+
+let individualItems = [];
+let simpleItems = [];
+let recItems = [];
+let quantityItems = [];
+
+// QR・管理ID・品目コードから即検索するための索引
+let individualItemMap = new Map();
+let simpleItemMap = new Map();
+let recItemMap = new Map();
+let quantityItemMap = new Map();
 const SCAN_INTERVAL = 120;
 const CROP_RATIO = 0.55;
 const FAST_MODES = [
@@ -478,6 +493,272 @@ function isRecMode() {
 
 function log(msg) {
   document.getElementById("status").innerText = msg;
+}
+/**
+ * ver.2
+ * アプリ起動時に4シートの現在データを一括取得する
+ *
+ * 現段階では、取得失敗しても既存アプリの動作を止めない。
+ */
+async function loadAppInitialData() {
+  if (appInitialDataLoading) return false;
+
+  appInitialDataLoading = true;
+  appInitialDataLoaded = false;
+  appInitialDataError = "";
+
+  log("現在状態を取得中...");
+
+  try {
+    const response = await fetch(GAS_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/plain"
+      },
+      body: JSON.stringify({
+        action: "getAppInitialData"
+      })
+    });
+
+    const text = await response.text();
+
+    let result;
+
+    try {
+      result = JSON.parse(text);
+    } catch (parseError) {
+      throw new Error(
+        "初期データの解析に失敗しました\n" +
+        text.slice(0, 200)
+      );
+    }
+
+    /*
+     * GAS側の返却形式が
+     * success: true
+     * または
+     * ok: true
+     * のどちらでも受け取れるようにする
+     */
+    if (!result.success && !result.ok) {
+      throw new Error(
+        result.error ||
+        result.message ||
+        "初期データを取得できませんでした"
+      );
+    }
+
+    individualItems = Array.isArray(result.individualItems)
+      ? result.individualItems
+      : [];
+
+    simpleItems = Array.isArray(result.simpleItems)
+      ? result.simpleItems
+      : [];
+
+    recItems = Array.isArray(result.recItems)
+      ? result.recItems
+      : [];
+
+    quantityItems = Array.isArray(result.quantityItems)
+      ? result.quantityItems
+      : [];
+
+    buildAppInitialDataMaps();
+
+    appInitialDataLoaded = true;
+    appInitialDataError = "";
+
+    console.log("起動時一括取得完了", {
+      individual: individualItems.length,
+      simple: simpleItems.length,
+      rec: recItems.length,
+      quantity: quantityItems.length
+    });
+
+    log(
+      "現在状態取得完了\n" +
+      "個体：" + individualItems.length + "件\n" +
+      "簡易個体：" + simpleItems.length + "件\n" +
+      "REC：" + recItems.length + "件\n" +
+      "数量管理品：" + quantityItems.length + "件"
+    );
+
+    return true;
+
+  } catch (error) {
+    appInitialDataLoaded = false;
+    appInitialDataError = String(
+      error && error.message
+        ? error.message
+        : error
+    );
+
+    console.error("loadAppInitialData error:", error);
+
+    /*
+     * 月曜日にGAS側を実装するまで、ここへ入る。
+     * 既存アプリはそのまま使用可能。
+     */
+    log(
+      "現在状態の一括取得は未接続です\n" +
+      "既存機能で起動します"
+    );
+
+    return false;
+
+  } finally {
+    appInitialDataLoading = false;
+  }
+}
+
+
+/**
+ * 取得した配列から検索用Mapを作成する
+ */
+function buildAppInitialDataMaps() {
+  individualItemMap = createItemMap(
+    individualItems,
+    [
+      "管理ID",
+      "管理番号",
+      "QR",
+      "qr",
+      "id"
+    ]
+  );
+
+  simpleItemMap = createItemMap(
+    simpleItems,
+    [
+      "管理ID",
+      "管理番号",
+      "QR",
+      "qr",
+      "id"
+    ]
+  );
+
+  recItemMap = createItemMap(
+    recItems,
+    [
+      "管理ID",
+      "管理番号",
+      "QR",
+      "qr",
+      "id"
+    ]
+  );
+
+  quantityItemMap = createItemMap(
+    quantityItems,
+    [
+      "品目コード",
+      "itemCode",
+      "商品コード",
+      "コード"
+    ]
+  );
+}
+
+
+/**
+ * 見出し名の候補から検索キーを取得し、Mapへ変換する
+ */
+function createItemMap(items, keyCandidates) {
+  const map = new Map();
+
+  items.forEach(function(item) {
+    const key = getFirstItemValue(item, keyCandidates);
+
+    if (!key) return;
+
+    const normalizedKey = normalizeLookupKey(key);
+
+    if (!normalizedKey) return;
+
+    map.set(normalizedKey, item);
+  });
+
+  return map;
+}
+
+
+/**
+ * 複数の見出し候補から最初に見つかった値を返す
+ */
+function getFirstItemValue(item, keyCandidates) {
+  if (!item || typeof item !== "object") return "";
+
+  for (let i = 0; i < keyCandidates.length; i++) {
+    const key = keyCandidates[i];
+
+    if (
+      Object.prototype.hasOwnProperty.call(item, key) &&
+      item[key] !== null &&
+      item[key] !== undefined &&
+      String(item[key]).trim() !== ""
+    ) {
+      return String(item[key]).trim();
+    }
+  }
+
+  return "";
+}
+
+
+/**
+ * QR検索用のキーを統一する
+ */
+function normalizeLookupKey(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase();
+}
+
+
+/**
+ * 個体・簡易個体・RECを一括検索する
+ */
+function findManagedItemLocal(qrText) {
+  const key = normalizeLookupKey(qrText);
+
+  if (!key) return null;
+
+  if (individualItemMap.has(key)) {
+    return {
+      managementType: "individual",
+      item: individualItemMap.get(key)
+    };
+  }
+
+  if (simpleItemMap.has(key)) {
+    return {
+      managementType: "simple",
+      item: simpleItemMap.get(key)
+    };
+  }
+
+  if (recItemMap.has(key)) {
+    return {
+      managementType: "rec",
+      item: recItemMap.get(key)
+    };
+  }
+
+  return null;
+}
+
+
+/**
+ * 数量管理品マスタをローカル検索する
+ */
+function findQuantityItemLocal(itemCode) {
+  const key = normalizeLookupKey(itemCode);
+
+  if (!key) return null;
+
+  return quantityItemMap.get(key) || null;
 }
 let currentVersion = null;
 let pendingAutoReload = false;
@@ -2379,7 +2660,17 @@ document.querySelectorAll('input[name="recMemoType"]').forEach(function(radio) {
 loadSelections();
 toggleRecTarget();
 checkAppVersion();
+
+/*
+ * ver.2
+ * ページ起動時に現在状態を一括取得する
+ *
+ * GAS側がまだ未実装でも、既存機能は止まらない。
+ */
+loadAppInitialData();
+
 setInterval(checkAppVersion, 10000);
+
 document.addEventListener("visibilitychange", function () {
 
   if (document.visibilityState === "hidden") {
