@@ -1530,24 +1530,28 @@ if (
     managedResult = findManagedItemLocal(decodedText);
 
     if (!managedResult) {
-      playBeep("error");
+  playBeep("error");
 
-      if (navigator.vibrate) {
-        navigator.vibrate([120, 80, 120]);
-      }
+  if (navigator.vibrate) {
+    navigator.vibrate([120, 80, 120]);
+  }
 
-      alert(
-        "管理マスタに登録されていません\n\n" +
-        decodedText
-      );
+  // 同じQRを連続認識しないよう、先にカメラを停止
+  stopQr();
 
-      log(
-        "未登録の管理ID\n" +
-        decodedText
-      );
+  alert(
+    "管理マスタに登録されていません\n\n" +
+    decodedText
+  );
 
-      return;
-    }
+  log(
+    "未登録の管理ID\n" +
+    decodedText +
+    "\n\n再度読み取る場合は「QRを読み取る」を押してください"
+  );
+
+  return;
+}
 
     /*
      * 校正中・校正完了・交換完了はREC管理品だけ受付。
