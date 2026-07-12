@@ -1260,78 +1260,96 @@ function isValidQrText(text) {
   return false;
 }
 
-async function startQuantityInput(itemCode) {
+function startQuantityInput(itemCode) {
   if (scanBusy) return;
 
   scanBusy = true;
+
+  if (!appInitialDataLoaded) {
+    playBeep("error");
+
+    alert(
+      "在庫データの取得が完了していません。\n" +
+      "アプリを再読み込みしてください"
+    );
+
+    log("在庫データ未取得");
+    scanBusy = false;
+    return;
+  }
+
   log("数量管理品を確認中...\n" + itemCode);
 
-  try {
-    const response = await fetch(GAS_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain" },
-      body: JSON.stringify({
-        action: "getQuantityItem",
-        itemCode: itemCode
-      })
-    });
+  const item = findQuantityItemLocal(itemCode);
 
-    const text = await response.text();
+  if (!item) {
+    playBeep("error");
 
-    let result;
-    try {
-      result = JSON.parse(text);
-    } catch (e) {
-      throw new Error(
-        "数量管理品の確認結果を取得できませんでした\n" +
-        text.slice(0, 200)
-      );
-    }
+    alert(
+      "数量管理品マスタに登録されていません\n\n" +
+      itemCode
+    );
 
-    if (!result.ok || !result.item) {
-      playBeep("error");
-      alert(
-        "数量管理品マスタに登録されていません\n\n" +
-        itemCode
-      );
-      log("未登録の数量管理品コード\n" + itemCode);
-      scanBusy = false;
-      return;
-    }
-
-    pendingQuantityItem = {
-      itemCode: result.item.itemCode || itemCode,
-      displayName: result.item.displayName || "",
-      category: result.item.category || "",
-      unit: result.item.unit || "",
-      mode: document.getElementById("mode").value,
-      user: document.getElementById("user").value,
-      location: document.getElementById("location").value
-    };
-
-    document.getElementById("quantityItemName").innerText =
-      pendingQuantityItem.displayName;
-
-    document.getElementById("quantityItemInfo").innerText =
-      "品目コード：" + pendingQuantityItem.itemCode +
-      "\n区分：" + pendingQuantityItem.category +
-      "　単位：" + pendingQuantityItem.unit;
-
-    document.getElementById("quantityValue").value = "";
-    document.getElementById("quantityInputArea").style.display = "block";
-
-    log("数量を入力してください");
-    scrollToElement("quantityInputArea");
-
-    setTimeout(function() {
-      document.getElementById("quantityValue").focus();
-    }, 400);
-
-  } catch (err) {
-    alert("数量管理品確認エラー\n" + err);
-    log("数量管理品確認エラー");
+    log("未登録の数量管理品コード\n" + itemCode);
     scanBusy = false;
+    return;
   }
+
+  const normalizedItemCode =
+    getFirstItemValue(item, [
+      "品目コード",
+      "itemCode",
+      "商品コード",
+      "コード"
+    ]) || itemCode;
+
+  const displayName =
+    getFirstItemValue(item, [
+      "表示名",
+      "品名",
+      "商品名",
+      "displayName"
+    ]);
+
+  const category =
+    getFirstItemValue(item, [
+      "区分",
+      "category"
+    ]);
+
+  const unit =
+    getFirstItemValue(item, [
+      "単位",
+      "unit"
+    ]);
+
+  pendingQuantityItem = {
+    itemCode: normalizedItemCode,
+    displayName: displayName,
+    category: category,
+    unit: unit,
+    mode: document.getElementById("mode").value,
+    user: document.getElementById("user").value,
+    location: document.getElementById("location").value
+  };
+
+  document.getElementById("quantityItemName").innerText =
+    pendingQuantityItem.displayName || pendingQuantityItem.itemCode;
+
+  document.getElementById("quantityItemInfo").innerText =
+    "品目コード：" + pendingQuantityItem.itemCode +
+    "\n区分：" + pendingQuantityItem.category +
+    "　単位：" + pendingQuantityItem.unit;
+
+  document.getElementById("quantityValue").value = "";
+  document.getElementById("quantityInputArea").style.display = "block";
+
+  log("数量を入力してください");
+  scrollToElement("quantityInputArea");
+
+  setTimeout(function() {
+    document.getElementById("quantityValue").focus();
+  }, 400);
 }
 
 function addQuantityItem() {
