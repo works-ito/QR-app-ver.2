@@ -509,7 +509,7 @@ async function loadAppInitialData() {
   appInitialDataLoaded = false;
   appInitialDataError = "";
 
-  startInitialDataLoading("在庫データ取得中");
+  startInitialDataLoading("最新在庫データ取得中");
 
   try {
     const response = await fetch(GAS_URL, {
