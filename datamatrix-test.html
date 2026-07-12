@@ -433,6 +433,8 @@ let loadingTimer = null;
 let loadingDots = 0;
 let batchLoadingTimer = null;
 let batchLoadingDots = 0;
+let initialLoadingTimer = null;
+let initialLoadingDots = 0;
 
 let pendingReturnItems = [];
 let pendingReturnCaseId = "";
@@ -575,7 +577,7 @@ async function loadAppInitialData() {
       rec: recItems.length,
       quantity: quantityItems.length
     });
-
+stopInitialDataLoading();
     log(
     "在庫データ確認完了\n" +
     "QRを読み取ってください"
@@ -597,6 +599,7 @@ async function loadAppInitialData() {
      * 月曜日にGAS側を実装するまで、ここへ入る。
      * 既存アプリはそのまま使用可能。
      */
+　　　stopInitialDataLoading();
     log(
       "現在状態の一括取得は未接続です\n" +
       "既存機能で起動します"
@@ -953,7 +956,31 @@ function scrollToElement(id) {
     el.scrollIntoView({ behavior: "smooth", block: "start" });
   }, 300);
 }
+function startInitialDataLoading() {
+  stopInitialDataLoading();
 
+  initialLoadingDots = 0;
+
+  initialLoadingTimer = setInterval(function () {
+
+    initialLoadingDots = (initialLoadingDots + 1) % 4;
+
+    log(
+      "最新在庫データ取得中" +
+      ".".repeat(initialLoadingDots)
+    );
+
+  }, 400);
+}
+
+function stopInitialDataLoading() {
+
+  if (initialLoadingTimer) {
+    clearInterval(initialLoadingTimer);
+    initialLoadingTimer = null;
+  }
+
+}
 function startBatchLoading(message) {
   stopBatchLoading();
   batchLoadingDots = 0;
