@@ -885,11 +885,32 @@ function makeScanKey(qrText) {
   return item;
 }
   
-function makeScanRecord(qrText) {
+function makeScanRecord(qrText, managedResult) {
   const mode = document.getElementById("mode").value;
   const recTarget = document.getElementById("recTarget").value;
   const key = makeScanKey(qrText);
-  const isRec = REC_MODES.includes(mode);
+  const isRecModeSelected = REC_MODES.includes(mode);
+
+  let managementType = "";
+  let managedItem = null;
+  let displayName = qrText;
+
+  if (managedResult) {
+    managementType = managedResult.managementType || "";
+    managedItem = managedResult.item || null;
+
+    if (managedItem) {
+      displayName =
+        getFirstItemValue(managedItem, [
+          "機種表示",
+          "表示名",
+          "機種名",
+          "品名",
+          "商品名",
+          "displayName"
+        ]) || qrText;
+    }
+  }
 
   return {
     key: key,
@@ -898,10 +919,20 @@ function makeScanRecord(qrText) {
     user: document.getElementById("user").value,
     location: document.getElementById("location").value,
     recTarget: recTarget,
+
     recDate: shouldRequireRecDate()
       ? document.getElementById("recDate").value
       : "",
-    displayText: isRec ? (qrText + " / " + recTarget) : qrText
+
+    recordType: "managed",
+    managementType: managementType,
+    managedItem: managedItem,
+
+    displayName: displayName,
+
+    displayText: isRecModeSelected
+      ? displayName + " / " + qrText + " / " + recTarget
+      : displayName + " / " + qrText
   };
 }
 
@@ -1410,9 +1441,6 @@ function addQuantityItem() {
 
   pendingQuantityItem = null;
   scanBusy = false;
-  
-  pendingQuantityItem = null;
-  scanBusy = false;
 
   document.getElementById("quantityInputArea").style.display = "none";
   document.getElementById("quantityValue").value = "";
@@ -1478,45 +1506,133 @@ if (
   return;
 }
 
-  // ここから下は既存の個体管理系処理
-  const record = makeScanRecord(decodedText);
+    // ===== ここから個体・簡易個体・RECのローカル判定 =====
 
-  if (scannedSet.has(record.key)) return;
+  if (!appInitialDataLoaded) {
+    playBeep("error");
+
+    alert(
+      "在庫データの取得が完了していません。\n" +
+      "アプリを再読み込みしてください"
+    );
+
+    log("在庫データ未取得");
+    return;
+  }
+
+  /*
+   * 旧Googleフォーム形式は、従来処理を維持する。
+   * 管理ID形式のQRだけローカルMapで検索する。
+   */
+  let managedResult = null;
+
+  if (isManagedId(decodedText)) {
+    managedResult = findManagedItemLocal(decodedText);
+
+    if (!managedResult) {
+      playBeep("error");
+
+      if (navigator.vibrate) {
+        navigator.vibrate([120, 80, 120]);
+      }
+
+      alert(
+        "管理マスタに登録されていません\n\n" +
+        decodedText
+      );
+
+      log(
+        "未登録の管理ID\n" +
+        decodedText
+      );
+
+      return;
+    }
+
+    /*
+     * 校正中・校正完了・交換完了はREC管理品だけ受付。
+     */
+    if (
+      isRecMode() &&
+      managedResult.managementType !== "rec"
+    ) {
+      playBeep("error");
+
+      if (navigator.vibrate) {
+        navigator.vibrate([120, 80, 120]);
+      }
+
+      alert(
+        "この作業区分ではREC管理品だけ読み取れます\n\n" +
+        decodedText
+      );
+
+      log(
+        "REC管理品ではありません\n" +
+        decodedText
+      );
+
+      return;
+    }
+  }
+
+  const record = makeScanRecord(
+    decodedText,
+    managedResult
+  );
+
+  if (scannedSet.has(record.key)) {
+    return;
+  }
 
   if (!validateRecDateBeforeSend()) {
-    log("日付未入力のため送信を止めました");
+    log("日付未入力のため読取を止めました");
     return;
-}
+  }
 
-  // 読み取れた瞬間に即反応
+  // ローカル判定完了後、即時に成功反応
   acknowledgeQrRead(decodedText);
 
   scannedSet.add(record.key);
   scannedRecords.push(record);
+
   lastScanned = record.key;
   lastScannedRecord = record;
 
   document.getElementById("undoBtn").style.display = "block";
-  updateScanDisplay("読取成功 ✔ " + record.displayText);
-  flashScanFrame();
+
+  updateScanDisplay(
+    "読取成功 ✔ " +
+    record.displayText
+  );
 
   if (isFastMode() || isRecMode()) {
     document.getElementById("sendBatchBtn").style.display = "block";
     document.getElementById("sendBatchBtn").disabled = false;
+
     document.getElementById("sendBatchBtn").innerText =
-      isRecMode() ? "REC読取分を送信" : "読取分をまとめて送信";
+      isRecMode()
+        ? "REC読取分を送信"
+        : "読取分をまとめて送信";
 
     document.getElementById("memoArea").style.display = "none";
     document.getElementById("recSendArea").style.display = "none";
     document.getElementById("returnCaseArea").style.display = "none";
-    document.getElementById("recSendArea").style.display = "none";
 
-    log(isRecMode()
-      ? "REC読取中：最後に追記あり/なしを選んで送信してください"
-      : "読取中：最後にまとめて送信してください");
+    log(
+      isRecMode()
+        ? "REC読取中：最後に追記あり／なしを選んで送信してください"
+        : "読取中：最後にまとめて送信してください"
+    );
+
     return;
   }
 
+  /*
+   * 現在の作業区分はすべてFAST_MODESまたはREC_MODESなので、
+   * 基本的にはここへ来ない。
+   * 旧処理との互換性維持用。
+   */
   sendToSheet(decodedText);
   stopQr();
 }
@@ -1916,7 +2032,11 @@ function buildBatchRecordData(record) {
     user: record.user,
     location: record.location,
     recTarget: record.recTarget || "",
-    recDate: record.recDate || ""
+    recDate: record.recDate || "",
+
+    recordType: record.recordType || "",
+    managementType: record.managementType || "",
+    displayName: record.displayName || ""
   };
 
   if (record.recordType === "quantity") {
