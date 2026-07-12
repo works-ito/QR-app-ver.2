@@ -498,7 +498,107 @@ function isFastMode() {
 function isRecMode() {
   return REC_MODES.includes(document.getElementById("mode").value);
 }
+/**
+ * 現在状態と選択中の作業区分から、
+ * ローカルで状態遷移を判定する。
+ */
+function validateStateTransition(currentState, mode) {
+  const state = String(currentState || "").trim();
+  const action = String(mode || "").trim();
 
+  /*
+   * 状態が取得できない機械は、現段階では止めない。
+   * マスタ・状況データの未整備で現場作業が止まるのを防ぐ。
+   */
+  if (!state) {
+    return {
+      ok: true,
+      warning: true,
+      message: "現在状態を取得できませんでした"
+    };
+  }
+
+  /*
+   * 出庫
+   *
+   * ワークスでは出庫前点検を必ず行うため、
+   * 未点検・修理中からでも出庫登録を許可する。
+   * 二重出庫だけは必ず停止する。
+   */
+  if (action === "出庫") {
+    if (state === "出庫" || state === "出庫中") {
+      return {
+        ok: false,
+        warning: false,
+        message:
+          "この機械はすでに出庫中です。\n" +
+          "二重出庫の可能性があるため登録できません。"
+      };
+    }
+
+    return {
+      ok: true,
+      warning: false,
+      message: ""
+    };
+  }
+
+  /*
+   * 返却
+   *
+   * 出庫中の機械だけ返却を受け付ける。
+   */
+  if (action === "返却") {
+    if (state !== "出庫" && state !== "出庫中") {
+      return {
+        ok: false,
+        warning: false,
+        message:
+          "この機械は出庫中ではありません。\n" +
+          "現在状態が「" + state + "」のため返却登録できません。"
+      };
+    }
+
+    return {
+      ok: true,
+      warning: false,
+      message: ""
+    };
+  }
+
+  /*
+   * 出庫取消
+   *
+   * 現在状態が出庫中の場合だけ受け付ける。
+   */
+  if (action === "出庫取消") {
+    if (state !== "出庫" && state !== "出庫中") {
+      return {
+        ok: false,
+        warning: false,
+        message:
+          "この機械は出庫中ではありません。\n" +
+          "現在状態が「" + state + "」のため出庫取消できません。"
+      };
+    }
+
+    return {
+      ok: true,
+      warning: false,
+      message: ""
+    };
+  }
+
+  /*
+   * 修理中・完成機・拠点移動・REC処理は、
+   * まずは既存運用を優先して許可する。
+   */
+  return {
+    ok: true,
+    warning: false,
+    message: ""
+  };
+}
 function log(msg) {
   document.getElementById("status").innerText = msg;
 }
@@ -1646,12 +1746,61 @@ currentState =
   }
 
   if (!validateRecDateBeforeSend()) {
-    log("日付未入力のため読取を止めました");
-    return;
+  log("日付未入力のため読取を止めました");
+  return;
+}
+
+/*
+ * 個体・簡易個体・REC管理品の現在状態を、
+ * 端末内データだけで即時判定する。
+ */
+const selectedMode =
+  document.getElementById("mode").value;
+
+const stateCheck =
+  validateStateTransition(
+    currentState,
+    selectedMode
+  );
+
+if (!stateCheck.ok) {
+  stopQrForError();
+
+  playBeep("error");
+
+  if (navigator.vibrate) {
+    navigator.vibrate([120, 80, 120]);
   }
 
-  // ローカル判定完了後、即時に成功反応
-  acknowledgeQrRead(decodedText);
+  alert(
+    stateCheck.message +
+    "\n\n管理ID：" +
+    decodedText +
+    "\n現在状態：" +
+    (currentState || "状態なし") +
+    "\n作業区分：" +
+    selectedMode
+  );
+
+  log(
+    "状態判定エラー\n" +
+    decodedText +
+    "\n現在状態：" +
+    (currentState || "状態なし") +
+    "\n作業区分：" +
+    selectedMode +
+    "\n\n再度読み取る場合は「QRを読み取る」を押してください"
+  );
+
+  setTimeout(function() {
+    scanBusy = false;
+  }, 300);
+
+  return;
+}
+
+// ローカル状態判定に通った後で成功反応
+acknowledgeQrRead(decodedText);
 
   scannedSet.add(record.key);
   scannedRecords.push(record);
