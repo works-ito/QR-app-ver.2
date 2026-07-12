@@ -953,8 +953,8 @@ function makeScanRecord(qrText, managedResult) {
     displayName: displayName,
 
     displayText: isRecModeSelected
-      ? displayName + " / " + qrText + " / " + recTarget
-      : displayName + " / " + qrText
+  ? qrText + " / " + recTarget
+  : qrText
   };
 }
 
