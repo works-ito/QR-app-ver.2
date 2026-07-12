@@ -306,14 +306,12 @@ textarea {
 </details>
 
 <div id="currentBatchArea">
-  <div id="currentBatchTitle">現在のまとめ</div>
   <div id="count">読取件数：0件</div>
 </div>
 
 <button id="stopBtn" onclick="stopQr()" style="display:none;">停止</button>
 <button id="resetBtn" onclick="resetScan()" style="display:none;">読取リセット</button>
 <button id="undoBtn" onclick="undoLastScan()" style="display:none;">最後の読取取消</button>
-<button id="sendBatchBtn" onclick="sendBatchToSheet()" style="display:none;">読取分をまとめて送信</button>
 <button id="cancelLastSendBtn" onclick="cancelLastSend()" style="display:none; background:#ffe0e0;">
   直前送信を取消
 </button>
@@ -329,6 +327,14 @@ textarea {
     <div class="corner br"></div>
   </div>
 </div>
+
+<button
+  id="sendBatchBtn"
+  onclick="sendBatchToSheet()"
+  style="display:none;"
+>
+  読取分をまとめて送信
+</button>
 
 <canvas id="canvas"></canvas>
 
