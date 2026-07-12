@@ -1590,6 +1590,23 @@ if (
 
   return;
 }
+const currentState =
+  getFirstItemValue(
+    managedResult.item,
+    [
+      "現在状態",
+      "状態",
+      "作業区分",
+      "status"
+    ]
+  );
+
+console.log(
+  "現在状態確認",
+  decodedText,
+  currentState,
+  managedResult.item
+);
 }
     /*
      * 校正中・校正完了・交換完了はREC管理品だけ受付。
