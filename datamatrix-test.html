@@ -617,38 +617,9 @@ stopInitialDataLoading();
  * 取得した配列から検索用Mapを作成する
  */
 function buildAppInitialDataMaps() {
-  individualItemMap = createItemMap(
-    individualItems,
-    [
-      "管理ID",
-      "管理番号",
-      "QR",
-      "qr",
-      "id"
-    ]
-  );
-
-  simpleItemMap = createItemMap(
-    simpleItems,
-    [
-      "管理ID",
-      "管理番号",
-      "QR",
-      "qr",
-      "id"
-    ]
-  );
-
-  recItemMap = createItemMap(
-    recItems,
-    [
-      "管理ID",
-      "管理番号",
-      "QR",
-      "qr",
-      "id"
-    ]
-  );
+  individualItemMap = createManagedItemMap(individualItems);
+simpleItemMap = createManagedItemMap(simpleItems);
+recItemMap = createManagedItemMap(recItems);
 
   quantityItemMap = createItemMap(
     quantityItems,
@@ -682,7 +653,49 @@ function createItemMap(items, keyCandidates) {
 
   return map;
 }
+function createManagedItemMap(items) {
+  const map = new Map();
 
+  items.forEach(function(item) {
+    if (!item || typeof item !== "object") return;
+
+    let managedId = getFirstItemValue(item, [
+      "管理ID",
+      "管理ＩＤ",
+      "管理Id",
+      "管理id",
+      "管理番号",
+      "QR",
+      "qr",
+      "id"
+    ]);
+
+    /*
+     * 見出し名で取得できなかった場合、
+     * オブジェクト内から管理ID形式の値を探す。
+     */
+    if (!managedId) {
+      const values = Object.values(item);
+
+      for (let i = 0; i < values.length; i++) {
+        const value = String(values[i] || "").trim();
+
+        if (isManagedId(value)) {
+          managedId = value;
+          break;
+        }
+      }
+    }
+
+    const normalizedKey = normalizeLookupKey(managedId);
+
+    if (!normalizedKey) return;
+
+    map.set(normalizedKey, item);
+  });
+
+  return map;
+}
 
 /**
  * 複数の見出し候補から最初に見つかった値を返す
@@ -712,7 +725,10 @@ function getFirstItemValue(item, keyCandidates) {
  */
 function normalizeLookupKey(value) {
   return String(value || "")
+    .normalize("NFKC")
     .trim()
+    .replace(/[‐-‒–—―ー−]/g, "-")
+    .replace(/\s+/g, "")
     .toLowerCase();
 }
 
@@ -1530,14 +1546,26 @@ if (
     managedResult = findManagedItemLocal(decodedText);
 
     if (!managedResult) {
+  stopQrForError();
+
   playBeep("error");
 
   if (navigator.vibrate) {
     navigator.vibrate([120, 80, 120]);
   }
 
-  // 同じQRを連続認識しないよう、先にカメラを停止
-  stopQr();
+  const normalizedReadKey = normalizeLookupKey(decodedText);
+
+  console.log("未登録管理ID確認", {
+    decodedText: decodedText,
+    normalizedReadKey: normalizedReadKey,
+    individualHas: individualItemMap.has(normalizedReadKey),
+    simpleHas: simpleItemMap.has(normalizedReadKey),
+    recHas: recItemMap.has(normalizedReadKey),
+    individualMapSize: individualItemMap.size,
+    simpleMapSize: simpleItemMap.size,
+    recMapSize: recItemMap.size
+  });
 
   alert(
     "管理マスタに登録されていません\n\n" +
@@ -1550,6 +1578,10 @@ if (
     "\n\n再度読み取る場合は「QRを読み取る」を押してください"
   );
 
+  setTimeout(function() {
+    scanBusy = false;
+  }, 300);
+
   return;
 }
 
@@ -1560,14 +1592,13 @@ if (
   isRecMode() &&
   managedResult.managementType !== "rec"
 ) {
+  stopQrForError();
+
   playBeep("error");
 
   if (navigator.vibrate) {
     navigator.vibrate([120, 80, 120]);
   }
-
-  // 同じQRを連続認識しないよう、先にカメラを停止
-  stopQr();
 
   alert(
     "この作業区分ではREC管理品だけ読み取れます\n\n" +
@@ -1580,8 +1611,11 @@ if (
     "\n\n再度読み取る場合は「QRを読み取る」を押してください"
   );
 
+  setTimeout(function() {
+    scanBusy = false;
+  }, 300);
+
   return;
-}
   }
 
   const record = makeScanRecord(
@@ -1673,7 +1707,46 @@ function stopQr() {
   document.getElementById("stopBtn").style.display = "none";
   document.getElementById("resetBtn").style.display = "none";
 }
+function stopQrForError() {
+  /*
+   * 最初にロックする。
+   * 停止直前にZXingのコールバックが重なっても再処理させない。
+   */
+  scanBusy = true;
+  scanning = false;
 
+  if (codeReader) {
+    try {
+      codeReader.reset();
+    } catch (e) {
+      console.log("codeReader reset error", e);
+    }
+
+    codeReader = null;
+  }
+
+  const video = document.getElementById("video");
+
+  if (video) {
+    try {
+      video.pause();
+    } catch (e) {}
+
+    video.srcObject = null;
+  }
+
+  if (stream) {
+    stream.getTracks().forEach(function(track) {
+      track.stop();
+    });
+
+    stream = null;
+  }
+
+  document.getElementById("startBtn").style.display = "block";
+  document.getElementById("stopBtn").style.display = "none";
+  document.getElementById("resetBtn").style.display = "none";
+}
 function resetScan() {
   scannedSet.clear();
   scannedRecords = [];
