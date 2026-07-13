@@ -269,27 +269,60 @@ textarea {
   <button id="startBtn" onclick="startQr()">QRを読み取る</button>
 </div>
 
-<details id="settingsPanel">
-  <summary>設定</summary>
+<details id="settingsPanel" style="display:none;">
+  <summary>読取設定</summary>
 
   <div id="settingsContent">
+
+    <div
+      id="detectedManagementArea"
+      style="
+        margin:8px 0 14px;
+        padding:12px;
+        border:2px solid #1677ff;
+        border-radius:8px;
+        background:#eef6ff;
+      "
+    >
+      <div
+        style="
+          font-size:15px;
+          font-weight:bold;
+          color:#555;
+          margin-bottom:4px;
+        "
+      >
+        最初に読み取った管理区分
+      </div>
+
+      <div
+        id="detectedManagementType"
+        style="
+          font-size:26px;
+          font-weight:bold;
+          color:#005fcc;
+        "
+      >
+        未判定
+      </div>
+
+      <div
+        id="detectedFirstQr"
+        style="
+          margin-top:6px;
+          font-size:16px;
+          color:#444;
+          word-break:break-all;
+        "
+      ></div>
+    </div>
 
     <div id="topSelectors">
 
       <label for="mode">作業区分</label>
       <select id="mode" onchange="toggleRecTarget()">
-  <option value="出庫">出庫</option>
-  <option value="出庫取消">出庫取消</option>
-  <option value="返却">返却</option>
-  <option value="修理中">修理</option>
-  <option value="完成機">完成機</option>
-  <option value="拠点移動">拠点移動</option>
-  <option value="校正中">校正中</option>
-  <option value="校正完了">校正完了</option>
-  <option value="交換完了">交換完了</option>
-  <option value="入庫">入庫</option>
-  <option value="廃棄">廃棄</option>
-</select>
+        <option value="">作業区分を選択</option>
+      </select>
 
       <label for="location">拠点</label>
       <select id="location">
@@ -325,6 +358,38 @@ textarea {
       <label id="recDateLabel" for="recDate">校正実施日</label>
       <input type="date" id="recDate">
     </div>
+
+    <button
+      id="beginBatchScanBtn"
+      type="button"
+      onclick="beginBatchScan()"
+      style="
+        margin-top:14px;
+        background:#1677ff;
+        color:#fff;
+        border:none;
+        border-radius:10px;
+        font-size:25px;
+        font-weight:bold;
+        min-height:64px;
+      "
+    >
+      この設定でまとめ読取開始
+    </button>
+
+    <button
+      id="cancelSetupBtn"
+      type="button"
+      onclick="cancelScanSetup()"
+      style="
+        background:#eee;
+        color:#333;
+        border:1px solid #aaa;
+        border-radius:8px;
+      "
+    >
+      最初からやり直す
+    </button>
 
   </div>
 </details>
@@ -1526,15 +1591,320 @@ function saveSelections() {
 }
 
 function loadSelections() {
-  document.getElementById("mode").value = "出庫";
-  if (localStorage.getItem("location")) document.getElementById("location").value = localStorage.getItem("location");
-  if (localStorage.getItem("user")) document.getElementById("user").value = localStorage.getItem("user");
-  if (localStorage.getItem("recTarget")) document.getElementById("recTarget").value = localStorage.getItem("recTarget");
+  /*
+   * ver.2では、作業区分は最初のQR判定後に表示する。
+   * そのため、起動時には作業区分を復元しない。
+   */
+  document.getElementById("mode").innerHTML =
+    '<option value="">作業区分を選択</option>';
 
-  if (!["騒音計", "振動計", "内部USB"].includes(document.getElementById("recTarget").value)) {
+  document.getElementById("mode").value = "";
+
+  if (localStorage.getItem("location")) {
+    document.getElementById("location").value =
+      localStorage.getItem("location");
+  }
+
+  if (localStorage.getItem("user")) {
+    document.getElementById("user").value =
+      localStorage.getItem("user");
+  }
+
+  if (localStorage.getItem("recTarget")) {
+    document.getElementById("recTarget").value =
+      localStorage.getItem("recTarget");
+  }
+
+  if (
+    !["騒音計", "振動計", "内部USB"].includes(
+      document.getElementById("recTarget").value
+    )
+  ) {
     document.getElementById("recTarget").value = "騒音計";
   }
+
   ensureRecDateDefault();
+}
+
+
+/**
+ * 管理区分に応じて、選択できる作業区分を作成する。
+ */
+function populateModeOptions(managementType) {
+  const modeSelect = document.getElementById("mode");
+
+  const allowedModes =
+    ALLOWED_MODES_BY_MANAGEMENT_TYPE[managementType] || [];
+
+  modeSelect.innerHTML =
+    '<option value="">作業区分を選択</option>';
+
+  allowedModes.forEach(function(mode) {
+    const option = document.createElement("option");
+
+    option.value = mode;
+    option.textContent =
+      mode === "修理中"
+        ? "修理"
+        : mode;
+
+    modeSelect.appendChild(option);
+  });
+
+  modeSelect.value = "";
+
+  toggleRecTarget();
+}
+
+
+/**
+ * 最初のQRから管理区分を判定した後、
+ * 作業区分・拠点・担当者の設定画面へ移動する。
+ */
+function enterSetupPhase(options) {
+  const data = options || {};
+
+  scanWorkflowPhase = SCAN_PHASE_SETUP;
+
+  detectedManagementType =
+    String(data.managementType || "").trim();
+
+  detectedManagementTypeLabel =
+    MANAGEMENT_TYPE_LABELS[detectedManagementType] ||
+    detectedManagementType ||
+    "不明";
+
+  firstDetectedQrText =
+    String(data.qrText || "").trim();
+
+  firstDetectedManagedResult =
+    data.managedResult || null;
+
+  firstDetectedQuantityItem =
+    data.quantityItem || null;
+
+  firstDetectedCurrentState =
+    String(data.currentState || "").trim();
+
+  /*
+   * 管理区分判定が終わった時点で、
+   * 一度カメラを停止する。
+   */
+  if (scanning) {
+    stopQr();
+  }
+
+  scanBusy = false;
+
+  document.getElementById("startBtn").style.display = "none";
+  document.getElementById("stopBtn").style.display = "none";
+  document.getElementById("resetBtn").style.display = "none";
+
+  document.getElementById(
+    "detectedManagementType"
+  ).innerText = detectedManagementTypeLabel;
+
+  document.getElementById(
+    "detectedFirstQr"
+  ).innerText =
+    "読取QR：" + firstDetectedQrText;
+
+  populateModeOptions(detectedManagementType);
+
+  const settingsPanel =
+    document.getElementById("settingsPanel");
+
+  settingsPanel.style.display = "block";
+  settingsPanel.open = true;
+
+  log(
+    "管理区分：" +
+    detectedManagementTypeLabel +
+    "\n作業区分・拠点・担当者を選択してください"
+  );
+
+  scrollToElement("settingsPanel");
+}
+
+
+/**
+ * 選択された作業区分から、
+ * まとめ読取中の管理区分制限を決定する。
+ */
+function determineManagementRestriction(mode) {
+  if (REC_MODES.includes(mode)) {
+    return "rec";
+  }
+
+  if (QUANTITY_ONLY_MODES.includes(mode)) {
+    return "quantity";
+  }
+
+  if (mode === "修理中") {
+    return "managed";
+  }
+
+  /*
+   * 共通作業区分は管理区分を固定しない。
+   * 個体・簡易個体・REC・数量管理を混在可能とする。
+   */
+  if (COMMON_MODES.includes(mode)) {
+    return "";
+  }
+
+  return "";
+}
+
+
+/**
+ * 設定内容を確定し、最初のQRを1件目として処理した後、
+ * まとめ読取を開始する。
+ */
+function beginBatchScan() {
+  if (scanWorkflowPhase !== SCAN_PHASE_SETUP) {
+    alert("最初にQRを読み取ってください");
+    return;
+  }
+
+  const mode =
+    document.getElementById("mode").value;
+
+  const location =
+    document.getElementById("location").value;
+
+  const user =
+    document.getElementById("user").value;
+
+  if (!mode) {
+    alert("作業区分を選択してください");
+    document.getElementById("mode").focus();
+    return;
+  }
+
+  if (!location) {
+    alert("拠点を選択してください");
+    document.getElementById("location").focus();
+    return;
+  }
+
+  if (!user) {
+    alert("担当者を選択してください");
+    document.getElementById("user").focus();
+    return;
+  }
+
+  if (!validateRecDateBeforeSend()) {
+    return;
+  }
+
+  activeManagementRestriction =
+    determineManagementRestriction(mode);
+
+  saveSelections();
+
+  scanWorkflowPhase = SCAN_PHASE_BATCH;
+
+  const settingsPanel =
+    document.getElementById("settingsPanel");
+
+  settingsPanel.open = false;
+  settingsPanel.style.display = "none";
+
+  document.getElementById("startBtn").style.display = "none";
+  document.getElementById("stopBtn").style.display = "none";
+  document.getElementById("resetBtn").style.display = "none";
+
+  const firstQr = firstDetectedQrText;
+
+  scanBusy = false;
+
+  log(
+    "設定完了\n" +
+    "作業区分：" +
+    mode +
+    "\n最初のQRを登録しています"
+  );
+
+  /*
+   * 最初の管理区分判定に使用したQRを、
+   * まとめ読取の1件目として再処理する。
+   */
+  handleDecoded(firstQr);
+
+  /*
+   * 数量管理品の場合は、数量入力完了後に
+   * カメラを再開するため、ここでは起動しない。
+   */
+  if (pendingQuantityItem) {
+    return;
+  }
+
+  /*
+   * 状態判定エラー等でdetectへ戻された場合は、
+   * カメラを起動しない。
+   */
+  if (scanWorkflowPhase !== SCAN_PHASE_BATCH) {
+    return;
+  }
+
+  setTimeout(function() {
+    startQr();
+  }, 300);
+}
+
+
+/**
+ * 設定画面を取消し、
+ * 最初のQR読取からやり直す。
+ */
+function cancelScanSetup() {
+  if (scanning) {
+    stopQr();
+  }
+
+  scanWorkflowPhase = SCAN_PHASE_DETECT;
+
+  detectedManagementType = "";
+  detectedManagementTypeLabel = "";
+  firstDetectedQrText = "";
+  firstDetectedManagedResult = null;
+  firstDetectedQuantityItem = null;
+  firstDetectedCurrentState = "";
+
+  activeManagementRestriction = "";
+
+  pendingQuantityItem = null;
+  scanBusy = false;
+
+  document.getElementById(
+    "detectedManagementType"
+  ).innerText = "未判定";
+
+  document.getElementById(
+    "detectedFirstQr"
+  ).innerText = "";
+
+  document.getElementById("mode").innerHTML =
+    '<option value="">作業区分を選択</option>';
+
+  document.getElementById("mode").value = "";
+
+  toggleRecTarget();
+
+  const settingsPanel =
+    document.getElementById("settingsPanel");
+
+  settingsPanel.open = false;
+  settingsPanel.style.display = "none";
+
+  document.getElementById("startBtn").style.display = "block";
+  document.getElementById("stopBtn").style.display = "none";
+  document.getElementById("resetBtn").style.display = "none";
+
+  log(
+    "設定を取り消しました\n" +
+    "最初のQRを読み取ってください"
+  );
 }
 
 function toggleRecTarget() {
