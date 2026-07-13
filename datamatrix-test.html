@@ -2322,7 +2322,10 @@ function addQuantityItem() {
     document.getElementById("quantityValue").value
   );
 
-  if (!Number.isInteger(quantity) || quantity <= 0) {
+  if (
+    !Number.isInteger(quantity) ||
+    quantity <= 0
+  ) {
     alert("数量を1以上の整数で入力してください");
     return;
   }
@@ -2344,6 +2347,8 @@ function addQuantityItem() {
     location: item.location,
 
     recordType: "quantity",
+    managementType: "quantity",
+
     itemCode: item.itemCode,
     displayName: item.displayName,
     category: item.category,
@@ -2354,10 +2359,10 @@ function addQuantityItem() {
     recDate: "",
 
     displayText:
-      item.displayName +
+      (item.displayName || item.itemCode) +
       " × " +
       quantity +
-      item.unit
+      (item.unit || "")
   };
 
   scannedRecords.push(record);
@@ -2365,27 +2370,67 @@ function addQuantityItem() {
 
   lastScanned = record.key;
   lastScannedRecord = record;
+
   lastQuantityCode = item.itemCode;
   lastQuantityCompletedAt = Date.now();
 
   pendingQuantityItem = null;
   scanBusy = false;
 
-  document.getElementById("quantityInputArea").style.display = "none";
-  document.getElementById("quantityValue").value = "";
+  document.getElementById(
+    "quantityInputArea"
+  ).style.display = "none";
 
-  document.getElementById("undoBtn").style.display = "block";
-  document.getElementById("sendBatchBtn").style.display = "block";
-  document.getElementById("sendBatchBtn").disabled = false;
-  document.getElementById("sendBatchBtn").innerText =
+  document.getElementById(
+    "quantityValue"
+  ).value = "";
+
+  document.getElementById(
+    "quantityItemName"
+  ).innerText = "";
+
+  document.getElementById(
+    "quantityItemInfo"
+  ).innerText = "";
+
+  document.getElementById(
+    "undoBtn"
+  ).style.display = "block";
+
+  const sendButton =
+    document.getElementById("sendBatchBtn");
+
+  sendButton.style.display = "block";
+  sendButton.disabled = false;
+  sendButton.innerText =
     "読取分をまとめて送信";
 
   updateScanDisplay(
     "数量追加 ✔ " +
-    record.displayText
+    record.displayText +
+    "\n管理区分：数量管理"
   );
 
-  log("数量を追加しました。次のQRを読み取ってください");
+  log(
+    "数量を追加しました\n" +
+    "続けて次のQRを読み取ってください"
+  );
+
+  /*
+   * 最初のQRが数量管理品だった場合は、
+   * 管理区分判定後にカメラを停止している。
+   *
+   * 数量入力完了後、ここで自動的に
+   * まとめ読取用のカメラを起動する。
+   */
+  if (
+    scanWorkflowPhase === SCAN_PHASE_BATCH &&
+    !scanning
+  ) {
+    setTimeout(function() {
+      startQr();
+    }, 300);
+  }
 }
 
 function cancelQuantityInput() {
