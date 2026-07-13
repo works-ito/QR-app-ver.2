@@ -505,22 +505,192 @@ let recItemMap = new Map();
 let quantityItemMap = new Map();
 const SCAN_INTERVAL = 120;
 const CROP_RATIO = 0.55;
+
+
 /*
- * まとめ送信する通常作業区分。
- *
- * 入庫・廃棄は数量管理専用だが、
- * 送信処理自体は通常のまとめ送信を使用する。
+ * =========================================================
+ * QR在庫管理 ver.2
+ * 管理区分別・作業区分定義
+ * =========================================================
  */
-const FAST_MODES = [
+
+
+/*
+ * すべての管理区分で使用できる共通作業区分。
+ *
+ * 共通作業区分では、個体・簡易個体・REC・数量管理を
+ * 同じ読取セッション内で混在して読み取ることができる。
+ */
+const COMMON_MODES = [
   "出庫",
   "出庫取消",
   "返却",
-  "修理中",
   "完成機",
-  "拠点移動",
+  "拠点移動"
+];
+
+
+/*
+ * 個体・簡易個体・RECで使用できる作業区分。
+ *
+ * 「修理中」は管理番号を持つ管理品だけで使用する。
+ * 数量管理品では使用しない。
+ */
+const MANAGED_ALLOWED_MODES = [
+  ...COMMON_MODES,
+  "修理中"
+];
+
+
+/*
+ * REC管理品だけで使用できる専用作業区分。
+ */
+const REC_MODES = [
+  "校正中",
+  "校正完了",
+  "交換完了"
+];
+
+
+/*
+ * 数量管理品だけで使用できる専用作業区分。
+ */
+const QUANTITY_ONLY_MODES = [
   "入庫",
   "廃棄"
 ];
+
+
+/*
+ * 数量管理品で使用できる作業区分。
+ *
+ * 修理中は使用しない。
+ * 返却後の軽微な修理・調整は未点検状態のまま行い、
+ * 作業完了後に「完成機」として登録する。
+ */
+const QUANTITY_ALLOWED_MODES = [
+  ...COMMON_MODES,
+  ...QUANTITY_ONLY_MODES
+];
+
+
+/*
+ * 通常のまとめ送信を使用する作業区分。
+ *
+ * REC専用作業区分は、REC専用の送信画面を使用するため
+ * FAST_MODESには含めない。
+ */
+const FAST_MODES = [
+  ...COMMON_MODES,
+  "修理中",
+  ...QUANTITY_ONLY_MODES
+];
+
+
+/*
+ * 管理区分ごとに画面へ表示する作業区分。
+ *
+ * individual：個体
+ * simple：簡易個体
+ * rec：REC
+ * quantity：数量管理
+ */
+const ALLOWED_MODES_BY_MANAGEMENT_TYPE = {
+  individual: [
+    ...COMMON_MODES,
+    "修理中"
+  ],
+
+  simple: [
+    ...COMMON_MODES,
+    "修理中"
+  ],
+
+  rec: [
+    ...COMMON_MODES,
+    "修理中",
+    ...REC_MODES
+  ],
+
+  quantity: [
+    ...COMMON_MODES,
+    ...QUANTITY_ONLY_MODES
+  ]
+};
+
+
+/*
+ * 管理区分の画面表示名。
+ */
+const MANAGEMENT_TYPE_LABELS = {
+  individual: "個体",
+  simple: "簡易個体",
+  rec: "REC",
+  quantity: "数量管理"
+};
+
+
+/*
+ * =========================================================
+ * ver.2 読取フロー状態
+ * =========================================================
+ *
+ * detect：
+ *   最初のQRを読み取り、管理区分を判定する段階。
+ *
+ * setup：
+ *   判定した管理区分に応じて、
+ *   作業区分・拠点・担当者を選択する段階。
+ *
+ * batch：
+ *   設定完了後、まとめ読取を行う段階。
+ */
+const SCAN_PHASE_DETECT = "detect";
+const SCAN_PHASE_SETUP = "setup";
+const SCAN_PHASE_BATCH = "batch";
+
+
+/*
+ * 現在の読取フロー状態。
+ *
+ * ページ起動時は、最初のQRによる管理区分判定から開始する。
+ */
+let scanWorkflowPhase = SCAN_PHASE_DETECT;
+
+
+/*
+ * 最初に読み取ったQRの判定結果。
+ *
+ * 初回QRは管理区分判定後も保持し、
+ * 設定完了後のまとめ読取開始時に1件目として使用する。
+ */
+let detectedManagementType = "";
+let detectedManagementTypeLabel = "";
+let firstDetectedQrText = "";
+let firstDetectedManagedResult = null;
+let firstDetectedQuantityItem = null;
+let firstDetectedCurrentState = "";
+
+
+/*
+ * 現在選択中の作業区分が、
+ * どの管理区分を対象としているかを保持する。
+ *
+ * 共通作業区分の場合は空文字とし、
+ * 管理区分を固定せず混在読取を許可する。
+ *
+ * 専用作業区分の場合だけ以下を設定する。
+ *
+ * managed：
+ *   個体・簡易個体・REC
+ *
+ * rec：
+ *   RECのみ
+ *
+ * quantity：
+ *   数量管理のみ
+ */
+let activeManagementRestriction = "";
 
 
 /*
