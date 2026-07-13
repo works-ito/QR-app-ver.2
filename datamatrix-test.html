@@ -1377,15 +1377,41 @@ function playBeep(type) {
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     const ctx = new AudioContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.value = type === "success" ? 1600 : 220;
-    gain.gain.value = 0.8;
-    osc.start();
-    osc.stop(ctx.currentTime + 0.3);
-  } catch(e) {
+
+    if (type === "success") {
+      // ===== 成功音（ピッ！）=====
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.frequency.value = 1600;
+      gain.gain.value = 0.8;
+
+      osc.start();
+      osc.stop(ctx.currentTime + 0.08);
+
+    } else {
+      // ===== エラー音（ブッ・ブッ・ブッ）=====
+      for (let i = 0; i < 3; i++) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.frequency.value = 120;
+        gain.gain.value = 0.8;
+
+        const start = ctx.currentTime + (i * 0.18);
+
+        osc.start(start);
+        osc.stop(start + 0.10);
+      }
+    }
+
+  } catch (e) {
     console.log(e);
   }
 }
