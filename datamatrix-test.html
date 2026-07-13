@@ -3125,6 +3125,7 @@ async function cancelLastSend() {
 
   const btn = document.getElementById("cancelLastSendBtn");
   btn.disabled = true;
+  startBatchLoading("直前取消中");
   log("直前送信を取消中...\n送信ID：" + sendId);
 
   try {
@@ -3150,7 +3151,12 @@ async function cancelLastSend() {
     if (!result.ok) {
       throw new Error(result.message || "取消に失敗しました");
     }
+    stopBatchLoading();
 
+    showSendStatus(
+    "✓ " + result.cancelCount + "件取消しました",
+    "success"
+   );
     alert("取消しました\n" + result.cancelCount + "件");
     lastSentLogIds = [];
     lastPendingSendId = "";
@@ -3158,11 +3164,17 @@ async function cancelLastSend() {
     btn.disabled = false;
     log("直前送信を取消しました");
 
-  } catch (err) {
-    btn.disabled = false;
-    alert("取消エラー\n" + err);
-    log("取消エラー");
-  }
+ } catch (err) {
+  stopBatchLoading();
+  showSendStatus(
+    "取消エラー",
+    "error"
+  );
+
+  btn.disabled = false;
+  alert("取消エラー\n" + err);
+  log("取消エラー");
+}
 }
 function sendUndoToSheet(qrText, record) {
   const data = {
