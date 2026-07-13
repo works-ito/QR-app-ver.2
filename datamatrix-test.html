@@ -700,7 +700,14 @@ if (showLoading) {
     return true;
 
   } catch (error) {
-    appInitialDataLoaded = false;
+    /*
+ * 初回取得に失敗した場合だけ未取得扱いにする。
+ * 定期更新・送信後更新に失敗した場合は、
+ * それまで保持していたローカルデータを使用し続ける。
+ */
+if (showLoading) {
+  appInitialDataLoaded = false;
+}
     appInitialDataError = String(
       error && error.message
         ? error.message
@@ -753,7 +760,29 @@ if (showLoading) {
 
   }, DATA_REFRESH_MINUTES * 60 * 1000);
 }
+/**
+ * 送信成功後に最新の在庫状態を再取得する。
+ *
+ * 取得失敗時も送信自体は成功済みなので、
+ * エラー表示で作業を止めず、現在保持しているデータを使い続ける。
+ */
+async function refreshInventoryAfterSend() {
+  const success = await loadAppInitialData(false);
 
+  if (success) {
+    console.log(
+      "送信後の在庫データ更新完了",
+      new Date().toLocaleString()
+    );
+  } else {
+    console.warn(
+      "送信後の在庫データ更新失敗：現在のキャッシュを継続使用",
+      new Date().toLocaleString()
+    );
+  }
+
+  return success;
+}
 /**
  * 取得した配列から検索用Mapを作成する
  */
@@ -2093,7 +2122,13 @@ async function sendBatchToSheet() {
       return;
     }
 rememberSentLogIds(result);
-    alert("まとめて送信完了\n" + result.successCount + "件");
+
+/*
+ * スプレッドシート反映後の最新状態を再取得する。
+ */
+await refreshInventoryAfterSend();
+
+alert("まとめて送信完了\n" + result.successCount + "件");
 
     const sentItems = scannedRecords.map(function(record) {
       return record.qrText;
@@ -2185,8 +2220,14 @@ async function sendRecBatchAfterMemo() {
       return;
     }
 rememberSentLogIds(result);
-    alert(
-      "REC送信完了\n" +
+
+/*
+ * REC送信後の最新状態を再取得する。
+ */
+await refreshInventoryAfterSend();
+
+alert(
+  "REC送信完了\n" +
       result.successCount + "件" +
       (memoForLog ? "\n追記も保存しました" : "")
     );
@@ -2274,8 +2315,12 @@ async function sendReturnBatchAfterMemo() {
       log("一部送信失敗あり");
       return;
     }
-rememberSentLogIds(result);
-
+      rememberSentLogIds(result);
+      /*
+       * 返却後の「未点検」など、最新状態を再取得する。
+       */
+    await refreshInventoryAfterSend();
+    
     const sentReturnPhotoInfo = {
       mode: "返却",
       sendId: result.sendId || lastPendingSendId || pendingReturnCaseId,
