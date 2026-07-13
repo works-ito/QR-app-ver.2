@@ -278,16 +278,18 @@ textarea {
 
       <label for="mode">作業区分</label>
       <select id="mode" onchange="toggleRecTarget()">
-        <option value="出庫">出庫</option>
-        <option value="出庫取消">出庫取消</option>
-        <option value="返却">返却</option>
-        <option value="修理中">修理</option>
-        <option value="完成機">完成機</option>
-        <option value="拠点移動">拠点移動</option>
-        <option value="校正中">校正中</option>
-        <option value="校正完了">校正完了</option>
-        <option value="交換完了">交換完了</option>
-      </select>
+  <option value="出庫">出庫</option>
+  <option value="出庫取消">出庫取消</option>
+  <option value="返却">返却</option>
+  <option value="修理中">修理</option>
+  <option value="完成機">完成機</option>
+  <option value="拠点移動">拠点移動</option>
+  <option value="校正中">校正中</option>
+  <option value="校正完了">校正完了</option>
+  <option value="交換完了">交換完了</option>
+  <option value="入庫">入庫</option>
+  <option value="廃棄">廃棄</option>
+</select>
 
       <label for="location">拠点</label>
       <select id="location">
@@ -503,7 +505,41 @@ let recItemMap = new Map();
 let quantityItemMap = new Map();
 const SCAN_INTERVAL = 120;
 const CROP_RATIO = 0.55;
+/*
+ * まとめ送信する通常作業区分。
+ *
+ * 入庫・廃棄は数量管理専用だが、
+ * 送信処理自体は通常のまとめ送信を使用する。
+ */
 const FAST_MODES = [
+  "出庫",
+  "出庫取消",
+  "返却",
+  "修理中",
+  "完成機",
+  "拠点移動",
+  "入庫",
+  "廃棄"
+];
+
+
+/*
+ * REC管理専用作業区分。
+ */
+const REC_MODES = [
+  "校正中",
+  "校正完了",
+  "交換完了"
+];
+
+
+/*
+ * 個体・簡易個体・RECで使用できる作業区分。
+ *
+ * RECは通常の個体管理も行うため、
+ * 共通作業区分をすべて受け付ける。
+ */
+const MANAGED_ALLOWED_MODES = [
   "出庫",
   "出庫取消",
   "返却",
@@ -511,7 +547,33 @@ const FAST_MODES = [
   "完成機",
   "拠点移動"
 ];
-const REC_MODES = ["校正中", "校正完了", "交換完了"];
+
+
+/*
+ * 数量管理品で使用できる作業区分。
+ *
+ * 修理中は使用しない。
+ * 返却後の軽微な修理・調整は未点検状態のまま行い、
+ * 作業完了後に完成機へ変更する。
+ */
+const QUANTITY_ALLOWED_MODES = [
+  "出庫",
+  "出庫取消",
+  "返却",
+  "完成機",
+  "拠点移動",
+  "入庫",
+  "廃棄"
+];
+
+
+/*
+ * 数量管理品だけで使用する作業区分。
+ */
+const QUANTITY_ONLY_MODES = [
+  "入庫",
+  "廃棄"
+];
 const AUTO_RELOAD_MINUTES = 30;
 const DATA_REFRESH_MINUTES = 15;
 
@@ -617,9 +679,16 @@ function validateStateTransition(currentState, mode) {
   }
 
   /*
-   * 修理中・完成機・拠点移動・REC処理は、
-   * まずは既存運用を優先して許可する。
-   */
+ * 修理中・完成機・拠点移動・REC処理は、
+ * 各管理区分の受付判定をhandleDecoded側で行ったうえで許可する。
+ *
+ * 数量管理品では「修理中」を使用しない。
+ * 返却後の軽微な修理・調整は未点検状態のまま実施し、
+ * 作業完了後に「完成機」として登録する。
+ *
+ * 「入庫」「廃棄」は数量管理品専用とし、
+ * 個体・簡易個体・REC管理品では受け付けない。
+ */
   return {
     ok: true,
     warning: false,
@@ -1812,16 +1881,56 @@ if (
 
   // 数量追加直後に同じQRを再読取するのを防止
   if (
-    decodedText.toLowerCase() === lastQuantityCode.toLowerCase() &&
+    decodedText.toLowerCase() ===
+      lastQuantityCode.toLowerCase() &&
     now - lastQuantityCompletedAt < 2000
   ) {
+    return;
+  }
+
+  const selectedMode =
+    document.getElementById("mode").value;
+
+  /*
+   * 数量管理品で使用できない作業区分を止める。
+   *
+   * 修理中：
+   * 数量管理品では原則使用しない。
+   *
+   * REC専用作業：
+   * 校正中・校正完了・交換完了はREC管理品のみ。
+   */
+  if (!QUANTITY_ALLOWED_MODES.includes(selectedMode)) {
+    stopQrForError();
+
+    notifyScanError(
+      "この作業区分では数量管理品を登録できません\n\n" +
+      "品目コード：" +
+      decodedText +
+      "\n作業区分：" +
+      selectedMode
+    );
+
+    log(
+      "数量管理品の対象外作業です\n" +
+      decodedText +
+      "\n作業区分：" +
+      selectedMode +
+      "\n\n再度読み取る場合は\n" +
+      "「QRを読み取る」を押してください"
+    );
+
+    setTimeout(function() {
+      scanBusy = false;
+    }, 300);
+
     return;
   }
 
   // 読み取れた瞬間に即反応
   acknowledgeQrRead(decodedText);
 
-  // その後にGASへ問い合わせ
+  // ローカルマスタから数量管理品を検索
   startQuantityInput(decodedText);
   return;
 }
@@ -1893,9 +2002,47 @@ currentState =
   );
 
 }
-    /*
-     * 校正中・校正完了・交換完了はREC管理品だけ受付。
-     */
+
+/*
+ * 入庫・廃棄は数量管理品専用。
+ *
+ * 個体・簡易個体・RECの管理IDでは受け付けない。
+ */
+const selectedManagedMode =
+  document.getElementById("mode").value;
+
+if (
+  QUANTITY_ONLY_MODES.includes(selectedManagedMode)
+) {
+  stopQrForError();
+
+  notifyScanError(
+    "「" +
+    selectedManagedMode +
+    "」は数量管理品専用です\n\n" +
+    "管理ID：" +
+    decodedText
+  );
+
+  log(
+    "数量管理品専用の作業区分です\n" +
+    decodedText +
+    "\n作業区分：" +
+    selectedManagedMode +
+    "\n\n再度読み取る場合は\n" +
+    "「QRを読み取る」を押してください"
+  );
+
+  setTimeout(function() {
+    scanBusy = false;
+  }, 300);
+
+  return;
+}
+
+/*
+ * 校正中・校正完了・交換完了はREC管理品だけ受付。
+ */
     if (
   isRecMode() &&
   managedResult.managementType !== "rec"
