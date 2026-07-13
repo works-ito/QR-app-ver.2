@@ -1783,14 +1783,14 @@ if (!stateCheck.ok) {
   );
 
   log(
-    "状態判定エラー\n" +
-    decodedText +
-    "\n現在状態：" +
-    (currentState || "状態なし") +
-    "\n作業区分：" +
-    selectedMode +
-    "\n\n再度読み取る場合は「QRを読み取る」を押してください"
-  );
+  "状態判定エラー\n" +
+  decodedText +
+  "\n現在状態：" +
+  (currentState || "状態なし") +
+  "\n作業区分：" +
+  selectedMode +
+  "\n\n再度読み取る場合は\n「QRを読み取る」を押してください"
+);
 
   setTimeout(function() {
     scanBusy = false;
