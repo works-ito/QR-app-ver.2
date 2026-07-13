@@ -1240,10 +1240,18 @@ function stopInitialDataLoading() {
 }
 function startBatchLoading(message) {
   stopBatchLoading();
+
   batchLoadingDots = 0;
+
+  showSendStatus(message, "sending");
+
   batchLoadingTimer = setInterval(function() {
     batchLoadingDots = (batchLoadingDots + 1) % 4;
-    log(message + ".".repeat(batchLoadingDots));
+
+    showSendStatus(
+      message + ".".repeat(batchLoadingDots),
+      "sending"
+    );
   }, 400);
 }
 
@@ -2148,7 +2156,7 @@ async function sendBatchToSheet() {
   stopQr();
   document.getElementById("sendBatchBtn").disabled = true;
   startBatchLoading("まとめて送信中");
-  showSendStatus("送信中...", "sending");
+  
   try {
     const records = scannedRecords.map(buildBatchRecordData);
     const result = await sendBatchRecords(records);
