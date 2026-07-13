@@ -1415,7 +1415,61 @@ function playBeep(type) {
     console.log(e);
   }
 }
+function notifyScanError(message) {
+  // 低音「ブッ・ブッ・ブッ」
+  playBeep("error");
 
+  // バイブ3回
+  if (navigator.vibrate) {
+    navigator.vibrate([120, 80, 120, 80, 120]);
+  }
+
+  // 読取エラーを赤色で通知
+  flashScanError();
+
+  /*
+   * 音・バイブを先に認識させてから、
+   * エラー内容のダイアログを表示する。
+   */
+  setTimeout(function() {
+    alert(message);
+  }, 650);
+}
+
+function flashScanError() {
+  const oldOverlay =
+    document.getElementById("scanErrorFlashOverlay");
+
+  if (oldOverlay) {
+    oldOverlay.remove();
+  }
+
+  const overlay = document.createElement("div");
+  overlay.id = "scanErrorFlashOverlay";
+
+  overlay.style.position = "fixed";
+  overlay.style.left = "4px";
+  overlay.style.top = "4px";
+  overlay.style.right = "4px";
+  overlay.style.bottom = "4px";
+  overlay.style.border = "8px solid #d00000";
+  overlay.style.borderRadius = "12px";
+  overlay.style.boxSizing = "border-box";
+  overlay.style.pointerEvents = "none";
+  overlay.style.zIndex = "999999";
+  overlay.style.opacity = "1";
+
+  document.body.appendChild(overlay);
+
+  setTimeout(function() {
+    overlay.style.opacity = "0";
+    overlay.style.transition = "opacity 0.15s";
+  }, 450);
+
+  setTimeout(function() {
+    overlay.remove();
+  }, 650);
+}
 async function startQr() {
   if (document.getElementById("mode").value === "返却" && returnQrMode === "") {
     alert("先に返却方法を選択してください");
@@ -1557,12 +1611,10 @@ function startQuantityInput(itemCode) {
   scanBusy = true;
 
   if (!appInitialDataLoaded) {
-    playBeep("error");
-
-    alert(
-      "在庫データの取得が完了していません。\n" +
-      "アプリを再読み込みしてください"
-    );
+    notifyScanError(
+    "在庫データの取得が完了していません。\n" +
+    "アプリを再読み込みしてください"
+  );
 
     log("在庫データ未取得");
     scanBusy = false;
@@ -1574,12 +1626,10 @@ function startQuantityInput(itemCode) {
   const item = findQuantityItemLocal(itemCode);
 
   if (!item) {
-    playBeep("error");
-
-    alert(
-      "数量管理品マスタに登録されていません\n\n" +
-      itemCode
-    );
+   notifyScanError(
+   "数量管理品マスタに登録されていません\n\n" +
+   itemCode
+  );
 
     log("未登録の数量管理品コード\n" + itemCode);
     scanBusy = false;
@@ -1769,16 +1819,14 @@ if (
     // ===== ここから個体・簡易個体・RECのローカル判定 =====
 
   if (!appInitialDataLoaded) {
-    playBeep("error");
+  notifyScanError(
+    "在庫データの取得が完了していません。\n" +
+    "アプリを再読み込みしてください"
+  );
 
-    alert(
-      "在庫データの取得が完了していません。\n" +
-      "アプリを再読み込みしてください"
-    );
-
-    log("在庫データ未取得");
-    return;
-  }
+  log("在庫データ未取得");
+  return;
+}
 
   /*
    * 旧Googleフォーム形式は、従来処理を維持する。
@@ -1793,13 +1841,7 @@ let currentState = "";
     if (!managedResult) {
   stopQrForError();
 
-  playBeep("error");
-
-  if (navigator.vibrate) {
-    navigator.vibrate([120, 80, 120]);
-  }
-
-  const normalizedReadKey = normalizeLookupKey(decodedText);
+   const normalizedReadKey = normalizeLookupKey(decodedText);
 
   console.log("未登録管理ID確認", {
     decodedText: decodedText,
@@ -1812,10 +1854,10 @@ let currentState = "";
     recMapSize: recItemMap.size
   });
 
-  alert(
-    "管理マスタに登録されていません\n\n" +
-    decodedText
-  );
+  notifyScanError(
+  "管理マスタに登録されていません\n\n" +
+  decodedText
+);
 
   log(
     "未登録の管理ID\n" +
@@ -1850,16 +1892,10 @@ currentState =
 ) {
   stopQrForError();
 
-  playBeep("error");
-
-  if (navigator.vibrate) {
-    navigator.vibrate([120, 80, 120]);
-  }
-
-  alert(
-    "この作業区分ではREC管理品だけ読み取れます\n\n" +
-    decodedText
-  );
+  notifyScanError(
+  "この作業区分ではREC管理品だけ読み取れます\n\n" +
+  decodedText
+);
 
   log(
     "REC管理品ではありません\n" +
@@ -1904,22 +1940,16 @@ const stateCheck =
 if (!stateCheck.ok) {
   stopQrForError();
 
-  playBeep("error");
-
-  if (navigator.vibrate) {
-    navigator.vibrate([120, 80, 120]);
-  }
-
-  alert(
-    stateCheck.message +
-    "\n\n管理ID：" +
-    decodedText +
-    "\n現在状態：" +
-    (currentState || "状態なし") +
-    "\n作業区分：" +
-    selectedMode
-  );
-
+  notifyScanError(
+  stateCheck.message +
+  "\n\n管理ID：" +
+  decodedText +
+  "\n現在状態：" +
+  (currentState || "状態なし") +
+  "\n作業区分：" +
+  selectedMode
+);
+ // この下にある既存のlog・scanBusy解除・returnはそのまま残す
   log(
   "状態判定エラー\n" +
   decodedText +
