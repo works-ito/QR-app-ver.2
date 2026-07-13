@@ -757,58 +757,6 @@ let firstDetectedCurrentState = "";
  */
 let activeManagementRestriction = "";
 
-
-/*
- * REC管理専用作業区分。
- */
-const REC_MODES = [
-  "校正中",
-  "校正完了",
-  "交換完了"
-];
-
-
-/*
- * 個体・簡易個体・RECで使用できる作業区分。
- *
- * RECは通常の個体管理も行うため、
- * 共通作業区分をすべて受け付ける。
- */
-const MANAGED_ALLOWED_MODES = [
-  "出庫",
-  "出庫取消",
-  "返却",
-  "修理中",
-  "完成機",
-  "拠点移動"
-];
-
-
-/*
- * 数量管理品で使用できる作業区分。
- *
- * 修理中は使用しない。
- * 返却後の軽微な修理・調整は未点検状態のまま行い、
- * 作業完了後に完成機へ変更する。
- */
-const QUANTITY_ALLOWED_MODES = [
-  "出庫",
-  "出庫取消",
-  "返却",
-  "完成機",
-  "拠点移動",
-  "入庫",
-  "廃棄"
-];
-
-
-/*
- * 数量管理品だけで使用する作業区分。
- */
-const QUANTITY_ONLY_MODES = [
-  "入庫",
-  "廃棄"
-];
 const AUTO_RELOAD_MINUTES = 30;
 const DATA_REFRESH_MINUTES = 15;
 
