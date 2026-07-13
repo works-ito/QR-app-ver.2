@@ -1401,7 +1401,8 @@ function playBeep(type) {
         osc.connect(gain);
         gain.connect(ctx.destination);
 
-        osc.frequency.value = 120;
+        osc.type = "square";
+        osc.frequency.value = 250;
         gain.gain.value = 0.8;
 
         const start = ctx.currentTime + (i * 0.18);
