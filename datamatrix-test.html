@@ -629,6 +629,22 @@ function validateStateTransition(currentState, mode) {
 function log(msg) {
   document.getElementById("status").innerText = msg;
 }
+function showSendStatus(message, type = "") {
+  const el = document.getElementById("sendStatus");
+
+  if (!el) return;
+
+  el.innerText = message;
+  el.className = "";
+
+  if (type) {
+    el.classList.add(type);
+  }
+}
+
+function clearSendStatus() {
+  showSendStatus("", "");
+}
 /**
  * ver.2
  * アプリ起動時に4シートの現在データを一括取得する
@@ -2132,7 +2148,7 @@ async function sendBatchToSheet() {
   stopQr();
   document.getElementById("sendBatchBtn").disabled = true;
   startBatchLoading("まとめて送信中");
-
+  showSendStatus("送信中...", "sending");
   try {
     const records = scannedRecords.map(buildBatchRecordData);
     const result = await sendBatchRecords(records);
@@ -2152,6 +2168,11 @@ rememberSentLogIds(result);
  */
 await refreshInventoryAfterSend();
 
+showSendStatus(
+  "✓ " + result.successCount + "件送信しました",
+  "success"
+);
+    
 alert("まとめて送信完了\n" + result.successCount + "件");
 
     const sentItems = scannedRecords.map(function(record) {
@@ -2168,6 +2189,8 @@ alert("まとめて送信完了\n" + result.successCount + "件");
     }
 
   } catch (err) {
+    showSendStatus("送信エラーが発生しました", "error");
+    
     handleBatchUnknownError(
       err,
       document.getElementById("sendBatchBtn"),
@@ -2239,6 +2262,7 @@ async function sendRecBatchAfterMemo() {
     btn.disabled = false;
 
     if (!result.ok) {
+      showSendStatus("送信に失敗しました", "error");
       showBatchFailure(result);
       log("一部送信失敗あり");
       return;
