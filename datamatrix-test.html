@@ -227,234 +227,27 @@ textarea {
   margin: 0;
   font-size: 20px;
 }
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
-<title>QR在庫管理</title>
+/* ===== 送信状態表示 ===== */
 
-<style>
-body { font-family:sans-serif; font-size:22px; padding:20px; }
-button, select, input {
-  font-size:24px; padding:14px; width:100%;
-  margin-bottom:12px; box-sizing:border-box;
-}
-select {
-  font-size:18px;
-}
-#status { color:blue; font-size:16px; font-weight:bold; white-space:pre-wrap; margin:10px 0; }
-#lastRead {
-  color:green; font-size:18px; font-weight:bold;
-  margin:5px 0; min-height:26px; white-space:pre-wrap;
-}
-#topSelectors {
-  display:flex;
-  gap:6px;
-}
-#topSelectors select {
-  flex:1;
-  min-width:0;
-}
-#cameraBox {
-  position: relative;
-  width: 100%;
-  max-width: 320px;
-}
-#video {
-  width:100%;
-  max-width:320px;
-  aspect-ratio: 3 / 4;
-  object-fit: contain;
-  background:#000;
-}
-#scanFrame {
-  position:absolute;
-  left:22.5%;
-  top:29%;
-  width:55%;
-  height:41%;
-  pointer-events:none;
-}
-.corner {
-  position:absolute;
-  width:34px;
-  height:34px;
-  border-color:white;
-  border-style:solid;
-  border-width:0;
-  filter: drop-shadow(0 0 3px #000);
-}
-.corner.tl { left:0; top:0; border-left-width:5px; border-top-width:5px; }
-.corner.tr { right:0; top:0; border-right-width:5px; border-top-width:5px; }
-.corner.bl { left:0; bottom:0; border-left-width:5px; border-bottom-width:5px; }
-.corner.br { right:0; bottom:0; border-right-width:5px; border-bottom-width:5px; }
-#scanFrame.flash .corner {
-  animation: scanFlash 0.35s ease;
-}
-@keyframes scanFlash {
-  0% { border-color:#ffffff; filter:none; }
-  25% { border-color:#00ff00; filter:drop-shadow(0 0 12px #00ff00); }
-  50% { border-color:#ffffff; filter:none; }
-  75% { border-color:#00ff00; filter:drop-shadow(0 0 12px #00ff00); }
-  100% { border-color:#ffffff; filter:none; }
-}
-#count { font-size:20px; font-weight:bold; margin:8px 0 4px; }
-#scanList { font-size:24px; line-height:1.5; margin-top:8px; white-space:pre-wrap; }
-.readItem { margin-bottom:4px; }
-canvas { display:none; }
-
-#memoArea, #returnMethodArea, #returnCaseArea, #shipmentPhotoArea, #returnPhotoArea, #recDateBox, #recSendArea {
-  display:none;
-  margin-top:20px;
-  padding:12px;
-  border:2px solid #333;
-}
-#memoArea { background:#fffbe6; }
-#recDateBox { background:#fffbe6; border:2px solid #333; padding:12px; margin-top:8px; overflow:hidden; }
-#recDateBox label { font-weight:bold; display:block; margin-bottom:8px; }
-#recDateBox input {
-  width:100%;
-  max-width:100%;
-  min-width:0;
-  box-sizing:border-box;
-}
-#recDate {
-  display:block;
-  width:100%;
-  max-width:100%;
-  min-width:0;
-  box-sizing:border-box;
-  padding:8px;
-  color:#000;
-  font-size:24px;
-  font-weight:bold;
-  text-align:center;
-  -webkit-appearance:none;
-  appearance:none;
-}
-#returnCaseArea { background:#eef; }
-#recSendArea { background:#fffbe6; }
-#shipmentPhotoArea { background:#eefaf0; }
-#returnPhotoArea { background:#eefaf0; }
-#shipmentPhotoArea p, #returnPhotoArea p {
-  font-size:18px;
-  margin:6px 0 12px;
-}
-#shipmentPhotoPreview, #returnPhotoPreview {
-  font-size:18px;
-  white-space:pre-wrap;
-  margin:8px 0;
-}
-textarea {
-  font-size:22px;
-  padding:12px;
-  width:100%;
-  height:100px;
-  box-sizing:border-box;
-  margin-bottom:12px;
-}
-#quantityInputArea {
-  display:none;
-  margin-top:20px;
-  padding:14px;
-  border:2px solid #333;
-  background:#eefaf0;
-}
-
-#quantityItemName {
-  font-size:28px;
-  font-weight:bold;
-  margin-bottom:6px;
-}
-
-#quantityItemInfo {
-  font-size:18px;
-  margin-bottom:14px;
-}
-
-#quantityValue {
-  font-size:30px;
-  text-align:center;
-  font-weight:bold;
-}
-
-/* ===== ver.2 ホーム画面 ===== */
-
-#mainScanButtonArea {
-  margin: 20px 0 16px;
-}
-
-#startBtn {
-  background: #1677ff;
-  color: #fff;
-  border: none;
-  border-radius: 10px;
-  font-size: 28px;
+#sendStatus {
+  min-height: 34px;
+  margin: 2px 0 14px;
+  text-align: center;
+  font-size: 19px;
   font-weight: bold;
-  min-height: 72px;
-  box-shadow: 0 3px 8px rgba(0,0,0,0.18);
+  white-space: pre-wrap;
 }
 
-#startBtn:active {
-  transform: translateY(1px);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+#sendStatus.sending {
+  color: #0066cc;
 }
 
-#settingsPanel {
-  margin-bottom: 16px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  background: #f7f7f7;
-  overflow: hidden;
+#sendStatus.success {
+  color: #008000;
 }
 
-#settingsPanel summary {
-  padding: 13px 14px;
-  font-size: 17px;
-  font-weight: bold;
-  cursor: pointer;
-  list-style-position: inside;
-}
-
-#settingsContent {
-  padding: 0 12px 12px;
-}
-
-#settingsContent label {
-  display: block;
-  font-size: 15px;
-  font-weight: bold;
-  margin: 8px 0 5px;
-  color: #444;
-}
-
-#settingsContent select {
-  margin-bottom: 8px;
-}
-
-#topSelectors {
-  display: block;
-}
-
-#currentBatchArea {
-  margin: 14px 0;
-  padding: 14px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  background: #fff;
-}
-
-#currentBatchTitle {
-  font-size: 17px;
-  font-weight: bold;
-  margin-bottom: 6px;
-}
-
-#count {
-  margin: 0;
-  font-size: 20px;
+#sendStatus.error {
+  color: #d00000;
 }
   
 </style>
@@ -566,7 +359,7 @@ textarea {
 </button>
 
 <div id="sendStatus" class="sendStatus"></div>
-
+<button id="sendBatchBtn">
 <canvas id="canvas"></canvas>
 
 <div id="scanList"></div>
