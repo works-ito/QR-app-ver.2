@@ -1708,7 +1708,7 @@ function determineManagementRestriction(mode) {
  * 設定内容を確定し、最初のQRを1件目として処理した後、
  * まとめ読取を開始する。
  */
-function beginBatchScan() {
+async function beginBatchScan() {
   if (scanWorkflowPhase !== SCAN_PHASE_SETUP) {
     alert("最初にQRを読み取ってください");
     return;
@@ -1777,7 +1777,7 @@ function beginBatchScan() {
    * 最初の管理区分判定に使用したQRを、
    * まとめ読取の1件目として再処理する。
    */
-  handleDecoded(firstQr);
+  await handleDecoded(firstQr);
 
   /*
    * 数量管理品の場合は、数量入力完了後に
