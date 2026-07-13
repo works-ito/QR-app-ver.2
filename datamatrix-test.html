@@ -2176,11 +2176,17 @@ rememberSentLogIds(result);
  */
 await refreshInventoryAfterSend();
 
+/*
+ * スプレッドシート反映と最新状態の再取得が完了したため、
+ * 送信中の点滅表示を停止する。
+ */
+stopBatchLoading();
+
 showSendStatus(
   "✓ " + result.successCount + "件送信しました",
   "success"
 );
-    
+
 alert("まとめて送信完了\n" + result.successCount + "件");
 
     const sentItems = scannedRecords.map(function(record) {
