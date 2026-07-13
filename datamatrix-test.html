@@ -489,7 +489,10 @@ const FAST_MODES = [
 ];
 const REC_MODES = ["校正中", "校正完了", "交換完了"];
 const AUTO_RELOAD_MINUTES = 30;
+const DATA_REFRESH_MINUTES = 15;
+
 let lastHiddenTime = null;
+let inventoryRefreshTimer = null;
 
 function isFastMode() {
   return FAST_MODES.includes(document.getElementById("mode").value);
@@ -608,14 +611,16 @@ function log(msg) {
  *
  * 現段階では、取得失敗しても既存アプリの動作を止めない。
  */
-async function loadAppInitialData() {
+async function loadAppInitialData(showLoading = true) {
   if (appInitialDataLoading) return false;
 
   appInitialDataLoading = true;
-  appInitialDataLoaded = false;
   appInitialDataError = "";
 
-  startInitialDataLoading("最新在庫データ取得中");
+  if (showLoading) {
+    appInitialDataLoaded = false;
+    startInitialDataLoading("最新在庫データ取得中");
+  }
 
   try {
     const response = await fetch(GAS_URL, {
@@ -683,11 +688,14 @@ async function loadAppInitialData() {
       rec: recItems.length,
       quantity: quantityItems.length
     });
-stopInitialDataLoading();
-    log(
+if (showLoading) {
+  stopInitialDataLoading();
+
+  log(
     "在庫データ確認完了\n" +
     "QRを読み取ってください"
-　　);
+  );
+}
 
     return true;
 
@@ -705,11 +713,14 @@ stopInitialDataLoading();
      * 月曜日にGAS側を実装するまで、ここへ入る。
      * 既存アプリはそのまま使用可能。
      */
-　　　stopInitialDataLoading();
-    log(
-      "現在状態の一括取得は未接続です\n" +
-      "既存機能で起動します"
-    );
+　　if (showLoading) {
+  stopInitialDataLoading();
+
+  log(
+    "現在状態の一括取得に失敗しました\n" +
+    "既存データで起動します"
+  );
+}
 
     return false;
 
@@ -718,6 +729,30 @@ stopInitialDataLoading();
   }
 }
 
+  function startInventoryRefreshTimer() {
+  if (inventoryRefreshTimer) {
+    clearInterval(inventoryRefreshTimer);
+  }
+
+  inventoryRefreshTimer = setInterval(async function() {
+    console.log("在庫データ定期更新開始");
+
+    const success = await loadAppInitialData(false);
+
+    if (success) {
+      console.log(
+        "在庫データ定期更新完了",
+        new Date().toLocaleString()
+      );
+    } else {
+      console.log(
+        "在庫データ定期更新失敗",
+        new Date().toLocaleString()
+      );
+    }
+
+  }, DATA_REFRESH_MINUTES * 60 * 1000);
+}
 
 /**
  * 取得した配列から検索用Mapを作成する
@@ -3079,7 +3114,9 @@ checkAppVersion();
  *
  * GAS側がまだ未実装でも、既存機能は止まらない。
  */
-loadAppInitialData();
+loadAppInitialData(true).then(function() {
+  startInventoryRefreshTimer();
+});
 
 setInterval(checkAppVersion, 10000);
 
