@@ -2403,56 +2403,467 @@ function cancelQuantityInput() {
 }
   
 function handleDecoded(decodedText) {
-  decodedText = String(decodedText).trim();
+  decodedText = String(decodedText || "").trim();
 
-  if (scanBusy) return;
-
-  if (!isValidQrText(decodedText)) {
-    log("対応形式ではないため無視しました\n" + decodedText);
+  /*
+   * 別のQRを処理中、または数量入力中の場合は受け付けない。
+   */
+  if (scanBusy) {
     return;
   }
 
- // 管理番号形式ではない英数字コードは数量管理品候補
-if (
-  isQuantityItemCode(decodedText) &&
-  !isManagedId(decodedText)
-) {
-  const now = Date.now();
+  /*
+   * 対応していない形式は読み飛ばす。
+   */
+  if (!isValidQrText(decodedText)) {
+    log(
+      "対応形式ではないため無視しました\n" +
+      decodedText
+    );
 
-  // 数量追加直後に同じQRを再読取するのを防止
+    return;
+  }
+
+  /*
+   * 旧GoogleフォームURLはver.2では使用しない。
+   */
   if (
-    decodedText.toLowerCase() ===
-      lastQuantityCode.toLowerCase() &&
-    now - lastQuantityCompletedAt < 2000
+    decodedText.includes("entry.") &&
+    decodedText.includes("=")
   ) {
+    stopQrForError();
+
+    notifyScanError(
+      "旧Googleフォーム形式のQRは使用できません\n\n" +
+      "新しい管理QRを読み取ってください"
+    );
+
+    log(
+      "旧Googleフォーム形式のQRです\n" +
+      "新しい管理QRを使用してください"
+    );
+
+    setTimeout(function() {
+      scanBusy = false;
+    }, 300);
+
+    return;
+  }
+
+  /*
+   * 起動時一括取得が完了していない場合は、
+   * 管理区分を判定できないため停止する。
+   */
+  if (!appInitialDataLoaded) {
+    stopQrForError();
+
+    notifyScanError(
+      "在庫データの取得が完了していません\n\n" +
+      "アプリを再読み込みしてください"
+    );
+
+    log("在庫データ未取得");
+
+    setTimeout(function() {
+      scanBusy = false;
+    }, 300);
+
+    return;
+  }
+
+
+  /*
+   * =====================================================
+   * 第1段階
+   * 最初のQRを読み取り、管理区分を判定する
+   * =====================================================
+   */
+  if (scanWorkflowPhase === SCAN_PHASE_DETECT) {
+    scanBusy = true;
+
+    let detectedType = "";
+    let detectedManagedResult = null;
+    let detectedQuantityItem = null;
+    let detectedCurrentState = "";
+
+
+    /*
+     * 管理ID形式：
+     * 個体・簡易個体・RECのいずれかを検索する。
+     */
+    if (isManagedId(decodedText)) {
+      detectedManagedResult =
+        findManagedItemLocal(decodedText);
+
+      if (!detectedManagedResult) {
+        stopQrForError();
+
+        notifyScanError(
+          "管理マスタに登録されていません\n\n" +
+          decodedText
+        );
+
+        log(
+          "未登録の管理ID\n" +
+          decodedText +
+          "\n\n再度読み取る場合は\n" +
+          "「QRを読み取る」を押してください"
+        );
+
+        setTimeout(function() {
+          scanBusy = false;
+        }, 300);
+
+        return;
+      }
+
+      detectedType =
+        detectedManagedResult.managementType;
+
+      detectedCurrentState =
+        getFirstItemValue(
+          detectedManagedResult.item,
+          [
+            "現在状態",
+            "状態",
+            "作業区分",
+            "status"
+          ]
+        );
+    }
+
+
+    /*
+     * ハイフンなしの英数字コード：
+     * 数量管理品マスタを検索する。
+     */
+    else if (isQuantityItemCode(decodedText)) {
+      detectedQuantityItem =
+        findQuantityItemLocal(decodedText);
+
+      if (!detectedQuantityItem) {
+        stopQrForError();
+
+        notifyScanError(
+          "数量管理品マスタに登録されていません\n\n" +
+          decodedText
+        );
+
+        log(
+          "未登録の数量管理品コード\n" +
+          decodedText +
+          "\n\n再度読み取る場合は\n" +
+          "「QRを読み取る」を押してください"
+        );
+
+        setTimeout(function() {
+          scanBusy = false;
+        }, 300);
+
+        return;
+      }
+
+      detectedType = "quantity";
+    }
+
+
+    /*
+     * 上記のどちらにも該当しない場合。
+     */
+    else {
+      stopQrForError();
+
+      notifyScanError(
+        "管理区分を判定できないQRです\n\n" +
+        decodedText
+      );
+
+      log(
+        "管理区分判定エラー\n" +
+        decodedText
+      );
+
+      setTimeout(function() {
+        scanBusy = false;
+      }, 300);
+
+      return;
+    }
+
+
+    /*
+     * 最初のQRを正常に判定できた時点で、
+     * 音・振動・緑枠を即時に出す。
+     */
+    acknowledgeQrRead(decodedText);
+
+    enterSetupPhase({
+      managementType: detectedType,
+      qrText: decodedText,
+      managedResult: detectedManagedResult,
+      quantityItem: detectedQuantityItem,
+      currentState: detectedCurrentState
+    });
+
+    return;
+  }
+
+
+  /*
+   * =====================================================
+   * 第2段階
+   * 設定画面表示中はQRを受け付けない
+   * =====================================================
+   */
+  if (scanWorkflowPhase === SCAN_PHASE_SETUP) {
+    return;
+  }
+
+
+  /*
+   * =====================================================
+   * 第3段階
+   * 設定確定後のまとめ読取
+   * =====================================================
+   */
+  if (scanWorkflowPhase !== SCAN_PHASE_BATCH) {
     return;
   }
 
   const selectedMode =
     document.getElementById("mode").value;
 
+
   /*
-   * 数量管理品で使用できない作業区分を止める。
-   *
-   * 修理中：
-   * 数量管理品では原則使用しない。
-   *
-   * REC専用作業：
-   * 校正中・校正完了・交換完了はREC管理品のみ。
+   * 設定が完了していない状態では登録しない。
    */
-  if (!QUANTITY_ALLOWED_MODES.includes(selectedMode)) {
+  if (!selectedMode) {
     stopQrForError();
 
     notifyScanError(
-      "この作業区分では数量管理品を登録できません\n\n" +
-      "品目コード：" +
-      decodedText +
-      "\n作業区分：" +
-      selectedMode
+      "作業区分が選択されていません\n\n" +
+      "最初から設定をやり直してください"
+    );
+
+    log("作業区分未選択");
+
+    setTimeout(function() {
+      scanBusy = false;
+    }, 300);
+
+    return;
+  }
+
+
+  /*
+   * =====================================================
+   * 数量管理品の処理
+   * =====================================================
+   */
+  if (
+    isQuantityItemCode(decodedText) &&
+    !isManagedId(decodedText)
+  ) {
+    const now = Date.now();
+
+    /*
+     * 数量追加直後に、カメラが同じQRを再認識するのを防止する。
+     */
+    if (
+      decodedText.toLowerCase() ===
+        String(lastQuantityCode || "").toLowerCase() &&
+      now - lastQuantityCompletedAt < 2000
+    ) {
+      return;
+    }
+
+
+    /*
+     * 修理中は、個体・簡易個体・REC専用。
+     */
+    if (activeManagementRestriction === "managed") {
+      stopQrForError();
+
+      notifyScanError(
+        "「修理中」では数量管理品を登録できません\n\n" +
+        "品目コード：" +
+        decodedText
+      );
+
+      log(
+        "数量管理品は修理中の対象外です\n" +
+        decodedText +
+        "\n\n再度読み取る場合は\n" +
+        "「QRを読み取る」を押してください"
+      );
+
+      setTimeout(function() {
+        scanBusy = false;
+      }, 300);
+
+      return;
+    }
+
+
+    /*
+     * REC専用作業では数量管理品を受け付けない。
+     */
+    if (activeManagementRestriction === "rec") {
+      stopQrForError();
+
+      notifyScanError(
+        "この作業区分ではREC管理品だけ読み取れます\n\n" +
+        "品目コード：" +
+        decodedText +
+        "\n作業区分：" +
+        selectedMode
+      );
+
+      log(
+        "REC専用作業のため数量管理品は登録できません\n" +
+        decodedText +
+        "\n\n再度読み取る場合は\n" +
+        "「QRを読み取る」を押してください"
+      );
+
+      setTimeout(function() {
+        scanBusy = false;
+      }, 300);
+
+      return;
+    }
+
+
+    /*
+     * 数量管理品で使用できない作業区分を停止する。
+     */
+    if (!QUANTITY_ALLOWED_MODES.includes(selectedMode)) {
+      stopQrForError();
+
+      notifyScanError(
+        "この作業区分では数量管理品を登録できません\n\n" +
+        "品目コード：" +
+        decodedText +
+        "\n作業区分：" +
+        selectedMode
+      );
+
+      log(
+        "数量管理品の対象外作業です\n" +
+        decodedText +
+        "\n作業区分：" +
+        selectedMode +
+        "\n\n再度読み取る場合は\n" +
+        "「QRを読み取る」を押してください"
+      );
+
+      setTimeout(function() {
+        scanBusy = false;
+      }, 300);
+
+      return;
+    }
+
+
+    /*
+     * 数量管理専用作業または共通作業として受付可能。
+     * 数量管理品マスタの存在確認はstartQuantityInput()で行う。
+     */
+    acknowledgeQrRead(decodedText);
+    startQuantityInput(decodedText);
+
+    return;
+  }
+
+
+  /*
+   * =====================================================
+   * 個体・簡易個体・RECの処理
+   * =====================================================
+   */
+  if (!isManagedId(decodedText)) {
+    stopQrForError();
+
+    notifyScanError(
+      "管理区分を判定できないQRです\n\n" +
+      decodedText
     );
 
     log(
-      "数量管理品の対象外作業です\n" +
+      "管理区分判定エラー\n" +
+      decodedText
+    );
+
+    setTimeout(function() {
+      scanBusy = false;
+    }, 300);
+
+    return;
+  }
+
+
+  const managedResult =
+    findManagedItemLocal(decodedText);
+
+  if (!managedResult) {
+    stopQrForError();
+
+    const normalizedReadKey =
+      normalizeLookupKey(decodedText);
+
+    console.log("未登録管理ID確認", {
+      decodedText: decodedText,
+      normalizedReadKey: normalizedReadKey,
+      individualHas:
+        individualItemMap.has(normalizedReadKey),
+      simpleHas:
+        simpleItemMap.has(normalizedReadKey),
+      recHas:
+        recItemMap.has(normalizedReadKey),
+      individualMapSize:
+        individualItemMap.size,
+      simpleMapSize:
+        simpleItemMap.size,
+      recMapSize:
+        recItemMap.size
+    });
+
+    notifyScanError(
+      "管理マスタに登録されていません\n\n" +
+      decodedText
+    );
+
+    log(
+      "未登録の管理ID\n" +
+      decodedText +
+      "\n\n再度読み取る場合は\n" +
+      "「QRを読み取る」を押してください"
+    );
+
+    setTimeout(function() {
+      scanBusy = false;
+    }, 300);
+
+    return;
+  }
+
+
+  /*
+   * 入庫・廃棄は数量管理品専用。
+   */
+  if (activeManagementRestriction === "quantity") {
+    stopQrForError();
+
+    notifyScanError(
+      "「" +
+      selectedMode +
+      "」は数量管理品専用です\n\n" +
+      "管理ID：" +
+      decodedText
+    );
+
+    log(
+      "数量管理品専用の作業区分です\n" +
       decodedText +
       "\n作業区分：" +
       selectedMode +
@@ -2467,205 +2878,155 @@ if (
     return;
   }
 
-  // 読み取れた瞬間に即反応
-  acknowledgeQrRead(decodedText);
-
-  // ローカルマスタから数量管理品を検索
-  startQuantityInput(decodedText);
-  return;
-}
-
-    // ===== ここから個体・簡易個体・RECのローカル判定 =====
-
-  if (!appInitialDataLoaded) {
-  notifyScanError(
-    "在庫データの取得が完了していません。\n" +
-    "アプリを再読み込みしてください"
-  );
-
-  log("在庫データ未取得");
-  return;
-}
 
   /*
-   * 旧Googleフォーム形式は、従来処理を維持する。
-   * 管理ID形式のQRだけローカルMapで検索する。
+   * 校正中・校正完了・交換完了はREC管理品専用。
    */
-  let managedResult = null;
-let currentState = "";
+  if (
+    activeManagementRestriction === "rec" &&
+    managedResult.managementType !== "rec"
+  ) {
+    stopQrForError();
 
-  if (isManagedId(decodedText)) {
-    managedResult = findManagedItemLocal(decodedText);
+    notifyScanError(
+      "この作業区分ではREC管理品だけ読み取れます\n\n" +
+      "管理ID：" +
+      decodedText +
+      "\n作業区分：" +
+      selectedMode
+    );
 
-    if (!managedResult) {
-  stopQrForError();
+    log(
+      "REC管理品ではありません\n" +
+      decodedText +
+      "\n作業区分：" +
+      selectedMode +
+      "\n\n再度読み取る場合は\n" +
+      "「QRを読み取る」を押してください"
+    );
 
-   const normalizedReadKey = normalizeLookupKey(decodedText);
+    setTimeout(function() {
+      scanBusy = false;
+    }, 300);
 
-  console.log("未登録管理ID確認", {
-    decodedText: decodedText,
-    normalizedReadKey: normalizedReadKey,
-    individualHas: individualItemMap.has(normalizedReadKey),
-    simpleHas: simpleItemMap.has(normalizedReadKey),
-    recHas: recItemMap.has(normalizedReadKey),
-    individualMapSize: individualItemMap.size,
-    simpleMapSize: simpleItemMap.size,
-    recMapSize: recItemMap.size
-  });
-
-  notifyScanError(
-  "管理マスタに登録されていません\n\n" +
-  decodedText
-);
-
-  log(
-    "未登録の管理ID\n" +
-    decodedText +
-    "\n\n再度読み取る場合は「QRを読み取る」を押してください"
-  );
-
-  setTimeout(function() {
-    scanBusy = false;
-  }, 300);
-
-  return;
-}
-currentState =
-  getFirstItemValue(
-    managedResult.item,
-    [
-      "現在状態",
-      "状態",
-      "作業区分",
-      "status"
-    ]
-  );
-
-}
-
-/*
- * 入庫・廃棄は数量管理品専用。
- *
- * 個体・簡易個体・RECの管理IDでは受け付けない。
- */
-const selectedManagedMode =
-  document.getElementById("mode").value;
-
-if (
-  QUANTITY_ONLY_MODES.includes(selectedManagedMode)
-) {
-  stopQrForError();
-
-  notifyScanError(
-    "「" +
-    selectedManagedMode +
-    "」は数量管理品専用です\n\n" +
-    "管理ID：" +
-    decodedText
-  );
-
-  log(
-    "数量管理品専用の作業区分です\n" +
-    decodedText +
-    "\n作業区分：" +
-    selectedManagedMode +
-    "\n\n再度読み取る場合は\n" +
-    "「QRを読み取る」を押してください"
-  );
-
-  setTimeout(function() {
-    scanBusy = false;
-  }, 300);
-
-  return;
-}
-
-/*
- * 校正中・校正完了・交換完了はREC管理品だけ受付。
- */
-    if (
-  isRecMode() &&
-  managedResult.managementType !== "rec"
-) {
-  stopQrForError();
-
-  notifyScanError(
-  "この作業区分ではREC管理品だけ読み取れます\n\n" +
-  decodedText
-);
-
-  log(
-    "REC管理品ではありません\n" +
-    decodedText +
-    "\n\n再度読み取る場合は「QRを読み取る」を押してください"
-  );
-
-  setTimeout(function() {
-    scanBusy = false;
-  }, 300);
-
-  return;
+    return;
   }
 
-  const record = makeScanRecord(
-    decodedText,
-    managedResult
-  );
 
+  /*
+   * 修理中は個体・簡易個体・RECのみ。
+   *
+   * この位置へ来る時点で管理ID形式なので、
+   * individual・simple・recのいずれかである。
+   */
+  if (
+    activeManagementRestriction === "managed" &&
+    !["individual", "simple", "rec"].includes(
+      managedResult.managementType
+    )
+  ) {
+    stopQrForError();
+
+    notifyScanError(
+      "「修理中」の対象ではありません\n\n" +
+      "管理ID：" +
+      decodedText
+    );
+
+    log(
+      "修理中の対象外管理区分です\n" +
+      decodedText
+    );
+
+    setTimeout(function() {
+      scanBusy = false;
+    }, 300);
+
+    return;
+  }
+
+
+  /*
+   * 校正完了・交換完了の日付を確認する。
+   */
+  if (!validateRecDateBeforeSend()) {
+    log("日付未入力のため読取を止めました");
+    return;
+  }
+
+
+  const currentState =
+    getFirstItemValue(
+      managedResult.item,
+      [
+        "現在状態",
+        "状態",
+        "作業区分",
+        "status"
+      ]
+    );
+
+
+  /*
+   * 現在状態と作業区分の整合性をローカル判定する。
+   */
+  const stateCheck =
+    validateStateTransition(
+      currentState,
+      selectedMode
+    );
+
+  if (!stateCheck.ok) {
+    stopQrForError();
+
+    notifyScanError(
+      stateCheck.message +
+      "\n\n管理ID：" +
+      decodedText +
+      "\n現在状態：" +
+      (currentState || "状態なし") +
+      "\n作業区分：" +
+      selectedMode
+    );
+
+    log(
+      "状態判定エラー\n" +
+      decodedText +
+      "\n現在状態：" +
+      (currentState || "状態なし") +
+      "\n作業区分：" +
+      selectedMode +
+      "\n\n再度読み取る場合は\n" +
+      "「QRを読み取る」を押してください"
+    );
+
+    setTimeout(function() {
+      scanBusy = false;
+    }, 300);
+
+    return;
+  }
+
+
+  const record =
+    makeScanRecord(
+      decodedText,
+      managedResult
+    );
+
+
+  /*
+   * 同じセッション内の二重読取を防止する。
+   */
   if (scannedSet.has(record.key)) {
     return;
   }
 
-  if (!validateRecDateBeforeSend()) {
-  log("日付未入力のため読取を止めました");
-  return;
-}
 
-/*
- * 個体・簡易個体・REC管理品の現在状態を、
- * 端末内データだけで即時判定する。
- */
-const selectedMode =
-  document.getElementById("mode").value;
-
-const stateCheck =
-  validateStateTransition(
-    currentState,
-    selectedMode
-  );
-
-if (!stateCheck.ok) {
-  stopQrForError();
-
-  notifyScanError(
-  stateCheck.message +
-  "\n\n管理ID：" +
-  decodedText +
-  "\n現在状態：" +
-  (currentState || "状態なし") +
-  "\n作業区分：" +
-  selectedMode
-);
- // この下にある既存のlog・scanBusy解除・returnはそのまま残す
-  log(
-  "状態判定エラー\n" +
-  decodedText +
-  "\n現在状態：" +
-  (currentState || "状態なし") +
-  "\n作業区分：" +
-  selectedMode +
-  "\n\n再度読み取る場合は\n「QRを読み取る」を押してください"
-);
-
-  setTimeout(function() {
-    scanBusy = false;
-  }, 300);
-
-  return;
-}
-
-// ローカル状態判定に通った後で成功反応
-acknowledgeQrRead(decodedText);
+  /*
+   * すべての受付判定を通過した後で成功反応を出す。
+   */
+  acknowledgeQrRead(decodedText);
 
   scannedSet.add(record.key);
   scannedRecords.push(record);
@@ -2673,27 +3034,54 @@ acknowledgeQrRead(decodedText);
   lastScanned = record.key;
   lastScannedRecord = record;
 
-  document.getElementById("undoBtn").style.display = "block";
+  document.getElementById(
+    "undoBtn"
+  ).style.display = "block";
 
   updateScanDisplay(
-  "読取成功 ✔ " +
-  record.displayText +
-  "\n現在状態：" +
-  (currentState || "状態なし")
-);
+    "読取成功 ✔ " +
+    record.displayText +
+    "\n管理区分：" +
+    (
+      MANAGEMENT_TYPE_LABELS[
+        managedResult.managementType
+      ] ||
+      managedResult.managementType
+    ) +
+    "\n現在状態：" +
+    (currentState || "状態なし")
+  );
 
-  if (isFastMode() || isRecMode()) {
-    document.getElementById("sendBatchBtn").style.display = "block";
-    document.getElementById("sendBatchBtn").disabled = false;
 
-    document.getElementById("sendBatchBtn").innerText =
+  /*
+   * まとめ送信ボタンを表示する。
+   */
+  if (
+    isFastMode() ||
+    isRecMode()
+  ) {
+    const sendButton =
+      document.getElementById("sendBatchBtn");
+
+    sendButton.style.display = "block";
+    sendButton.disabled = false;
+
+    sendButton.innerText =
       isRecMode()
         ? "REC読取分を送信"
         : "読取分をまとめて送信";
 
-    document.getElementById("memoArea").style.display = "none";
-    document.getElementById("recSendArea").style.display = "none";
-    document.getElementById("returnCaseArea").style.display = "none";
+    document.getElementById(
+      "memoArea"
+    ).style.display = "none";
+
+    document.getElementById(
+      "recSendArea"
+    ).style.display = "none";
+
+    document.getElementById(
+      "returnCaseArea"
+    ).style.display = "none";
 
     log(
       isRecMode()
@@ -2704,15 +3092,15 @@ acknowledgeQrRead(decodedText);
     return;
   }
 
+
   /*
-   * 現在の作業区分はすべてFAST_MODESまたはREC_MODESなので、
-   * 基本的にはここへ来ない。
+   * 現在定義されている作業区分は、
+   * FAST_MODESまたはREC_MODESのいずれかに入る。
    * 旧処理との互換性維持用。
    */
   sendToSheet(decodedText);
   stopQr();
 }
-
 function stopQr() {
   if (!scanning) {
     log("まだ起動していません");
