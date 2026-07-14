@@ -1784,15 +1784,35 @@ async function beginBatchScan() {
   "phase：" + scanWorkflowPhase
 );
 
-await handleDecoded(firstQr);
+try {
+  await handleDecoded(firstQr);
 
-log(
-  "確認B：最初のQR再処理後\n" +
-  "読取件数：" + scannedRecords.length + "\n" +
-  "scanBusy：" + scanBusy + "\n" +
-  "pendingQuantityItem：" + Boolean(pendingQuantityItem) + "\n" +
-  "phase：" + scanWorkflowPhase
-);
+  log(
+    "確認B：最初のQR再処理後\n" +
+    "読取件数：" + scannedRecords.length + "\n" +
+    "scanBusy：" + scanBusy + "\n" +
+    "pendingQuantityItem：" + Boolean(pendingQuantityItem) + "\n" +
+    "phase：" + scanWorkflowPhase
+  );
+
+} catch (err) {
+  scanBusy = false;
+
+  log(
+    "最初のQR処理でJavaScriptエラー\n\n" +
+    "エラー：" +
+    (err && err.message ? err.message : String(err)) +
+    "\n\nQR：" +
+    String(firstQr || "空")
+  );
+
+  alert(
+    "最初のQR処理エラー\n\n" +
+    (err && err.message ? err.message : String(err))
+  );
+
+  return;
+}
 
 if (pendingQuantityItem) {
   return;
