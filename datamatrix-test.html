@@ -1788,8 +1788,6 @@ const recordCountBefore =
   scannedRecords.length;
 
 try {
-
-try {
   await handleDecoded(firstQr);
 
   log(
@@ -1817,8 +1815,6 @@ try {
   );
 
   return;
-}
-
 }
 
 /*
@@ -3270,7 +3266,10 @@ function resetScan() {
   firstDetectedCurrentState = "";
 
   activeManagementRestriction = "";
+　 document.getElementById("mode").innerHTML =
+  '<option value="">作業区分を選択</option>';
 
+  document.getElementById("mode").value = "";
   scannedSet.clear();
   scannedRecords = [];
   lastScanned = "";
@@ -3313,16 +3312,16 @@ function resetScan() {
 
   document.querySelectorAll('input[name="returnMemoType"]').forEach(function(radio) { radio.checked = false; });
   document.querySelectorAll('input[name="recMemoType"]').forEach(function(radio) { radio.checked = false; });
-    document.getElementById("startBtn").style.display = "block";
+  document.getElementById("startBtn").style.display = "block";
   document.getElementById("stopBtn").style.display = "none";
   document.getElementById("resetBtn").style.display = "none";
 
   toggleRecTarget();
   log("読取履歴をリセットしました");
-if (pendingAutoReload) {
+　if (pendingAutoReload) {
   pendingAutoReload = false;
   location.href = location.pathname + "?v=" + Date.now();
-}
+　}
 }
 
 function undoLastScan() {
