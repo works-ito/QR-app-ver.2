@@ -1795,9 +1795,7 @@ async function beginBatchScan() {
     return;
   }
 
-  setTimeout(function() {
-    startQr();
-  }, 300);
+  restartQrCamera();
 }
 
 
