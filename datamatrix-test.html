@@ -3242,6 +3242,17 @@ function stopQrForError() {
   document.getElementById("resetBtn").style.display = "none";
 }
 function resetScan() {
+  scanWorkflowPhase = SCAN_PHASE_DETECT;
+
+  detectedManagementType = "";
+  detectedManagementTypeLabel = "";
+  firstDetectedQrText = "";
+  firstDetectedManagedResult = null;
+  firstDetectedQuantityItem = null;
+  firstDetectedCurrentState = "";
+
+  activeManagementRestriction = "";
+
   scannedSet.clear();
   scannedRecords = [];
   lastScanned = "";
@@ -3284,6 +3295,11 @@ function resetScan() {
 
   document.querySelectorAll('input[name="returnMemoType"]').forEach(function(radio) { radio.checked = false; });
   document.querySelectorAll('input[name="recMemoType"]').forEach(function(radio) { radio.checked = false; });
+    document.getElementById("startBtn").style.display = "block";
+  document.getElementById("stopBtn").style.display = "none";
+  document.getElementById("resetBtn").style.display = "none";
+
+  toggleRecTarget();
   log("読取履歴をリセットしました");
 if (pendingAutoReload) {
   pendingAutoReload = false;
