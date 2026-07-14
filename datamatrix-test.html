@@ -1777,25 +1777,32 @@ async function beginBatchScan() {
    * 最初の管理区分判定に使用したQRを、
    * まとめ読取の1件目として再処理する。
    */
-  await handleDecoded(firstQr);
+  log(
+  "確認A：最初のQR再処理前\n" +
+  "QR：" + String(firstQr || "空") + "\n" +
+  "scanBusy：" + scanBusy + "\n" +
+  "phase：" + scanWorkflowPhase
+);
 
-  /*
-   * 数量管理品の場合は、数量入力完了後に
-   * カメラを再開するため、ここでは起動しない。
-   */
-  if (pendingQuantityItem) {
-    return;
-  }
+await handleDecoded(firstQr);
 
-  /*
-   * 状態判定エラー等でdetectへ戻された場合は、
-   * カメラを起動しない。
-   */
-  if (scanWorkflowPhase !== SCAN_PHASE_BATCH) {
-    return;
-  }
+log(
+  "確認B：最初のQR再処理後\n" +
+  "読取件数：" + scannedRecords.length + "\n" +
+  "scanBusy：" + scanBusy + "\n" +
+  "pendingQuantityItem：" + Boolean(pendingQuantityItem) + "\n" +
+  "phase：" + scanWorkflowPhase
+);
 
-  restartQrCamera();
+if (pendingQuantityItem) {
+  return;
+}
+
+if (scanWorkflowPhase !== SCAN_PHASE_BATCH) {
+  return;
+}
+
+restartQrCamera();
 }
 
 
