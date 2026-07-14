@@ -266,9 +266,26 @@ textarea {
 </div>
 
 <div id="mainScanButtonArea">
-  <button id="startBtn" onclick="startQr()">QRを読み取る</button>
+  <button id="startBtn" onclick="startQr()">QR読取</button>
 </div>
 
+  <button
+  id="noQrReturnBtn"
+  type="button"
+  onclick="startNoQrReturn()"
+  style="
+    background:#eeeeee;
+    color:#333333;
+    border:1px solid #aaaaaa;
+    border-radius:10px;
+    font-size:24px;
+    font-weight:bold;
+    min-height:64px;
+  "
+>
+  QRなし返却
+</button>
+  
 <details id="settingsPanel" style="display:none;">
   <summary>読取設定</summary>
 
@@ -538,7 +555,8 @@ let pendingReturnCaseId = "";
 let pendingReturnMemoType = "";
 let pendingReturnMemo = "";
 let returnQrMode = "";
-
+let noQrReturnSetup = false;
+  
 let pendingRecRecords = [];
 let pendingRecMemoType = "";
 let pendingRecMemo = "";
@@ -1659,6 +1677,13 @@ function enterSetupPhase(options) {
 
   populateModeOptions(detectedManagementType);
 
+    noQrReturnSetup = false;
+
+  document.getElementById(
+    "beginBatchScanBtn"
+  ).innerText =
+    "この設定でまとめ読取開始";
+  
   const settingsPanel =
     document.getElementById("settingsPanel");
 
@@ -1741,7 +1766,32 @@ async function beginBatchScan() {
     return;
   }
 
-  if (!validateRecDateBeforeSend()) {
+   if (!validateRecDateBeforeSend()) {
+    return;
+  }
+
+  /*
+   * QRなし返却専用ルート。
+   * 最初のQR再処理やカメラ起動は行わない。
+   */
+  if (noQrReturnSetup) {
+    saveSelections();
+
+    noQrReturnSetup = false;
+    scanWorkflowPhase = SCAN_PHASE_BATCH;
+
+    const settingsPanel =
+      document.getElementById("settingsPanel");
+
+    settingsPanel.open = false;
+    settingsPanel.style.display = "none";
+
+    document.getElementById(
+      "beginBatchScanBtn"
+    ).innerText =
+      "この設定でまとめ読取開始";
+
+    selectReturnNoQr();
     return;
   }
 
@@ -1969,6 +2019,91 @@ function selectReturnNoQr() {
   scrollToElement("returnCaseArea");
 }
 
+  function startNoQrReturn() {
+  /*
+   * QRなし返却専用の設定画面を開く。
+   */
+  if (scanning) {
+    stopQr();
+  }
+
+  noQrReturnSetup = true;
+  scanWorkflowPhase = SCAN_PHASE_SETUP;
+
+  returnQrMode = "";
+  pendingReturnItems = [];
+  pendingReturnCaseId = "";
+  pendingReturnMemoType = "";
+  pendingReturnMemo = "";
+
+  /*
+   * 作業区分は「返却」に固定する。
+   */
+  const modeSelect =
+    document.getElementById("mode");
+
+  modeSelect.innerHTML =
+    '<option value="返却">返却</option>';
+
+  modeSelect.value = "返却";
+
+  /*
+   * QRなし返却では、最初のQR情報の代わりに
+   * 専用ルートであることを表示する。
+   */
+  document.getElementById(
+    "detectedManagementType"
+  ).innerText = "QRなし返却";
+
+  document.getElementById(
+    "detectedFirstQr"
+  ).innerText =
+    "管理QRの読取は行いません";
+
+  document.getElementById(
+    "recTargetBox"
+  ).style.display = "none";
+
+  document.getElementById(
+    "recDateBox"
+  ).style.display = "none";
+
+  document.getElementById(
+    "returnMethodArea"
+  ).style.display = "none";
+
+  /*
+   * 設定確定ボタンの表示を変更する。
+   */
+  document.getElementById(
+    "beginBatchScanBtn"
+  ).innerText = "QRなし返却へ進む";
+
+  const settingsPanel =
+    document.getElementById("settingsPanel");
+
+  settingsPanel.style.display = "block";
+  settingsPanel.open = true;
+
+  document.getElementById(
+    "startBtn"
+  ).style.display = "none";
+
+  document.getElementById(
+    "stopBtn"
+  ).style.display = "none";
+
+  document.getElementById(
+    "resetBtn"
+  ).style.display = "none";
+
+  log(
+    "QRなし返却\n" +
+    "拠点・担当者を確認してください"
+  );
+
+  scrollToElement("settingsPanel");
+}
 function playBeep(type) {
   try {
     const AudioContext =
@@ -3233,6 +3368,12 @@ function resetScan() {
   firstDetectedCurrentState = "";
 
   activeManagementRestriction = "";
+    noQrReturnSetup = false;
+
+  document.getElementById(
+    "beginBatchScanBtn"
+  ).innerText =
+    "この設定でまとめ読取開始";
 　 document.getElementById("mode").innerHTML =
   '<option value="">作業区分を選択</option>';
 
