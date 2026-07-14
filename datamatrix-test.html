@@ -1777,12 +1777,17 @@ async function beginBatchScan() {
    * 最初の管理区分判定に使用したQRを、
    * まとめ読取の1件目として再処理する。
    */
-  log(
+ log(
   "確認A：最初のQR再処理前\n" +
   "QR：" + String(firstQr || "空") + "\n" +
   "scanBusy：" + scanBusy + "\n" +
   "phase：" + scanWorkflowPhase
 );
+
+const recordCountBefore =
+  scannedRecords.length;
+
+try {
 
 try {
   await handleDecoded(firstQr);
@@ -1811,6 +1816,19 @@ try {
     (err && err.message ? err.message : String(err))
   );
 
+  return;
+}
+
+}
+
+/*
+ * 最初のQRが状態判定エラー等で登録されなかった場合は、
+ * カメラを自動再起動しない。
+ */
+if (
+  !pendingQuantityItem &&
+  scannedRecords.length === recordCountBefore
+) {
   return;
 }
 
