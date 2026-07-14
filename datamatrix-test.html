@@ -2076,40 +2076,7 @@ function flashScanError() {
     overlay.remove();
   }, 650);
 }
-function flashScanError() {
-  const oldOverlay =
-    document.getElementById("scanErrorFlashOverlay");
 
-  if (oldOverlay) {
-    oldOverlay.remove();
-  }
-
-  const overlay = document.createElement("div");
-  overlay.id = "scanErrorFlashOverlay";
-
-  overlay.style.position = "fixed";
-  overlay.style.left = "4px";
-  overlay.style.top = "4px";
-  overlay.style.right = "4px";
-  overlay.style.bottom = "4px";
-  overlay.style.border = "8px solid #d00000";
-  overlay.style.borderRadius = "12px";
-  overlay.style.boxSizing = "border-box";
-  overlay.style.pointerEvents = "none";
-  overlay.style.zIndex = "999999";
-  overlay.style.opacity = "1";
-
-  document.body.appendChild(overlay);
-
-  setTimeout(function() {
-    overlay.style.opacity = "0";
-    overlay.style.transition = "opacity 0.15s";
-  }, 450);
-
-  setTimeout(function() {
-    overlay.remove();
-  }, 650);
-}
 function notifyScanError(message) {
   // エラー音「ブッ・ブッ・ブッ」
   playBeep("error");
