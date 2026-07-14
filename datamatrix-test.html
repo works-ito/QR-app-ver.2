@@ -2062,6 +2062,60 @@ function flashScanError() {
     overlay.remove();
   }, 650);
 }
+function flashScanError() {
+  const oldOverlay =
+    document.getElementById("scanErrorFlashOverlay");
+
+  if (oldOverlay) {
+    oldOverlay.remove();
+  }
+
+  const overlay = document.createElement("div");
+  overlay.id = "scanErrorFlashOverlay";
+
+  overlay.style.position = "fixed";
+  overlay.style.left = "4px";
+  overlay.style.top = "4px";
+  overlay.style.right = "4px";
+  overlay.style.bottom = "4px";
+  overlay.style.border = "8px solid #d00000";
+  overlay.style.borderRadius = "12px";
+  overlay.style.boxSizing = "border-box";
+  overlay.style.pointerEvents = "none";
+  overlay.style.zIndex = "999999";
+  overlay.style.opacity = "1";
+
+  document.body.appendChild(overlay);
+
+  setTimeout(function() {
+    overlay.style.opacity = "0";
+    overlay.style.transition = "opacity 0.15s";
+  }, 450);
+
+  setTimeout(function() {
+    overlay.remove();
+  }, 650);
+}
+function notifyScanError(message) {
+  // エラー音「ブッ・ブッ・ブッ」
+  playBeep("error");
+
+  // バイブ3回
+  if (navigator.vibrate) {
+    navigator.vibrate([120, 80, 120, 80, 120]);
+  }
+
+  // 画面周囲を赤く点滅
+  flashScanError();
+
+  /*
+   * 音・バイブ・赤表示を先に認識させてから、
+   * エラー内容を表示する。
+   */
+  setTimeout(function() {
+    alert(message);
+  }, 250);
+}  
 async function startQr() {
   if (document.getElementById("mode").value === "返却" && returnQrMode === "") {
     alert("先に返却方法を選択してください");
