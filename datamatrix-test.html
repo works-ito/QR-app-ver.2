@@ -1809,7 +1809,26 @@ function enterSetupPhase(options) {
     "読取QR：" + firstDetectedQrText;
 
   populateModeOptions(detectedManagementType);
+  /*
+ * 通常のQR読取ルートでは、
+ * QRなし返却で書き換えた設定ボタンを元に戻す。
+ */
+const beginButton =
+  document.getElementById("beginBatchScanBtn");
 
+beginButton.innerText =
+  "この設定でまとめ読取開始";
+
+beginButton.onclick =
+  beginBatchScan;
+
+/*
+ * QRなし返却では非表示にした管理区分表示も戻す。
+ */
+document.getElementById(
+  "detectedManagementArea"
+).style.display = "block";
+  
   const settingsPanel =
     document.getElementById("settingsPanel");
 
