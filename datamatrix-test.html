@@ -4215,22 +4215,22 @@ function clearReturnPhotos() {
 
 function skipReturnPhotos() {
   if (
-    lastReturnPhotoInfo &&
-    lastReturnPhotoInfo.photoRequired === true
-  ) {
-    alert(
-      "QRなし返却では写真保存が必須です。\n\n" +
-      "返却伝票と、QR未取付機の管理番号が分かる写真を追加してください。"
-    );
+  lastReturnPhotoInfo &&
+  lastReturnPhotoInfo.photoRequired === true
+) {
+  notifyScanError(
+    "QRなし返却では写真保存が必須です。\n\n" +
+    "返却伝票と、QR未取付機の管理番号が分かる写真を追加してください。"
+  );
 
-    log(
-      "QRなし返却は写真必須です。\n" +
-      "返却伝票と管理番号の写真を追加してください"
-    );
+  log(
+    "QRなし返却は写真必須です。\n" +
+    "返却伝票と管理番号の写真を追加してください"
+  );
 
-    scrollToElement("returnPhotoArea");
-    return;
-  }
+  scrollToElement("returnPhotoArea");
+  return;
+}
 
   document.getElementById("returnPhotoArea").style.display = "none";
   document.getElementById("returnCameraInput").value = "";
@@ -4297,8 +4297,47 @@ async function uploadReturnPhotos() {
     btn.style.display = "none";
     btn.disabled = false;
     selectedReturnPhotos = [];
-    lastReturnPhotoInfo = null;
-    log("返却写真保存完了。続けて読み取る場合は「カメラ起動」を押してください");
+lastReturnPhotoInfo = null;
+
+/*
+ * QRなし返却完了後は、
+ * 通常の最初のQR読取画面へ戻す。
+ */
+scanWorkflowPhase = SCAN_PHASE_DETECT;
+returnQrMode = "";
+
+detectedManagementType = "";
+detectedManagementTypeLabel = "";
+firstDetectedQrText = "";
+firstDetectedManagedResult = null;
+firstDetectedQuantityItem = null;
+firstDetectedCurrentState = "";
+
+activeManagementRestriction = "";
+
+document.getElementById("mode").innerHTML =
+  '<option value="">作業区分を選択</option>';
+
+document.getElementById("mode").value = "";
+
+document.getElementById("settingsPanel").open = false;
+document.getElementById("settingsPanel").style.display = "none";
+
+document.getElementById("startBtn").style.display = "block";
+document.getElementById("stopBtn").style.display = "none";
+document.getElementById("resetBtn").style.display = "none";
+
+const noQrReturnBtn =
+  document.getElementById("startNoQrReturnBtn");
+
+if (noQrReturnBtn) {
+  noQrReturnBtn.style.display = "block";
+}
+
+log(
+  "返却写真保存完了。\n" +
+  "続けて作業する場合は、上のボタンを押してください"
+);
 
   } catch (err) {
     alert("返却写真保存エラー\n" + err);
