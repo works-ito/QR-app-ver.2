@@ -249,23 +249,7 @@ textarea {
 #sendStatus.error {
   color: #d00000;
 }
-.radioRow {
-  display: flex;
-  align-items: center;
-}
-
-.radioRow label {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.radioRow input[type="radio"] {
-  width: auto;
-  padding: 0;
-  margin: 0;
-  box-sizing: content-box;
-} 
+  
 </style>
 </head>
 
@@ -282,26 +266,9 @@ textarea {
 </div>
 
 <div id="mainScanButtonArea">
-  <button id="startBtn" onclick="startQr()">QR読取</button>
+  <button id="startBtn" onclick="startQr()">QRを読み取る</button>
 </div>
 
-  <button
-  id="noQrReturnBtn"
-  type="button"
-  onclick="startNoQrReturn()"
-  style="
-    background:#eeeeee;
-    color:#333333;
-    border:1px solid #aaaaaa;
-    border-radius:10px;
-    font-size:24px;
-    font-weight:bold;
-    min-height:64px;
-  "
->
-  QRなし返却
-</button>
-  
 <details id="settingsPanel" style="display:none;">
   <summary>読取設定</summary>
 
@@ -497,13 +464,8 @@ textarea {
   <div style="font-weight:bold; margin-bottom:10px;">REC読取分の送信</div>
   <div id="recSendTarget" style="font-weight:bold; margin-bottom:10px;"></div>
 
-  <div class="radioRow">
-  <label><input type="radio" name="recMemoType" value="なし" checked>追記なし</label>
-</div>
-
-<div class="radioRow">
+  <label><input type="radio" name="recMemoType" value="なし">追記なし</label><br>
   <label><input type="radio" name="recMemoType" value="あり">追記あり</label>
-</div>
 
   <textarea id="recMemoText" placeholder="発送日・発送先・証明書待ち等" style="display:none;"></textarea>
   <button onclick="sendRecBatchAfterMemo()">REC読取分を送信</button>
@@ -517,13 +479,8 @@ textarea {
 
 <div id="returnCaseArea">
   <div style="font-weight:bold; margin-bottom:10px;">返却案件の追記</div>
-  <div class="radioRow">
-  <label><input type="radio" name="returnMemoType" value="なし" checked>追記なし</label>
-</div>
-
-<div class="radioRow">
+  <label><input type="radio" name="returnMemoType" value="なし">追記なし</label><br>
   <label><input type="radio" name="returnMemoType" value="あり">追記あり</label>
-</div>
   <textarea id="returnCaseMemo" placeholder="燃料不足・付属品不足・伝票写真あり等" style="display:none;"></textarea>
   <button onclick="sendReturnBatchAfterMemo()">返却をまとめて送信</button>
 </div>
@@ -581,8 +538,7 @@ let pendingReturnCaseId = "";
 let pendingReturnMemoType = "";
 let pendingReturnMemo = "";
 let returnQrMode = "";
-let noQrReturnSetup = false;
-  
+
 let pendingRecRecords = [];
 let pendingRecMemoType = "";
 let pendingRecMemo = "";
@@ -1703,13 +1659,6 @@ function enterSetupPhase(options) {
 
   populateModeOptions(detectedManagementType);
 
-    noQrReturnSetup = false;
-
-  document.getElementById(
-    "beginBatchScanBtn"
-  ).innerText =
-    "この設定でまとめ読取開始";
-  
   const settingsPanel =
     document.getElementById("settingsPanel");
 
@@ -1792,32 +1741,7 @@ async function beginBatchScan() {
     return;
   }
 
-   if (!validateRecDateBeforeSend()) {
-    return;
-  }
-
-  /*
-   * QRなし返却専用ルート。
-   * 最初のQR再処理やカメラ起動は行わない。
-   */
-  if (noQrReturnSetup) {
-    saveSelections();
-
-    noQrReturnSetup = false;
-    scanWorkflowPhase = SCAN_PHASE_BATCH;
-
-    const settingsPanel =
-      document.getElementById("settingsPanel");
-
-    settingsPanel.open = false;
-    settingsPanel.style.display = "none";
-
-    document.getElementById(
-      "beginBatchScanBtn"
-    ).innerText =
-      "この設定でまとめ読取開始";
-
-    selectReturnNoQr();
+  if (!validateRecDateBeforeSend()) {
     return;
   }
 
@@ -2045,91 +1969,6 @@ function selectReturnNoQr() {
   scrollToElement("returnCaseArea");
 }
 
-  function startNoQrReturn() {
-  /*
-   * QRなし返却専用の設定画面を開く。
-   */
-  if (scanning) {
-    stopQr();
-  }
-
-  noQrReturnSetup = true;
-  scanWorkflowPhase = SCAN_PHASE_SETUP;
-
-  returnQrMode = "";
-  pendingReturnItems = [];
-  pendingReturnCaseId = "";
-  pendingReturnMemoType = "";
-  pendingReturnMemo = "";
-
-  /*
-   * 作業区分は「返却」に固定する。
-   */
-  const modeSelect =
-    document.getElementById("mode");
-
-  modeSelect.innerHTML =
-    '<option value="返却">返却</option>';
-
-  modeSelect.value = "返却";
-
-  /*
-   * QRなし返却では、最初のQR情報の代わりに
-   * 専用ルートであることを表示する。
-   */
-  document.getElementById(
-    "detectedManagementType"
-  ).innerText = "QRなし返却";
-
-  document.getElementById(
-    "detectedFirstQr"
-  ).innerText =
-    "管理QRの読取は行いません";
-
-  document.getElementById(
-    "recTargetBox"
-  ).style.display = "none";
-
-  document.getElementById(
-    "recDateBox"
-  ).style.display = "none";
-
-  document.getElementById(
-    "returnMethodArea"
-  ).style.display = "none";
-
-  /*
-   * 設定確定ボタンの表示を変更する。
-   */
-  document.getElementById(
-    "beginBatchScanBtn"
-  ).innerText = "QRなし返却へ進む";
-
-  const settingsPanel =
-    document.getElementById("settingsPanel");
-
-  settingsPanel.style.display = "block";
-  settingsPanel.open = true;
-
-  document.getElementById(
-    "startBtn"
-  ).style.display = "none";
-
-  document.getElementById(
-    "stopBtn"
-  ).style.display = "none";
-
-  document.getElementById(
-    "resetBtn"
-  ).style.display = "none";
-
-  log(
-    "QRなし返却\n" +
-    "拠点・担当者を確認してください"
-  );
-
-  scrollToElement("settingsPanel");
-}
 function playBeep(type) {
   try {
     const AudioContext =
@@ -2214,6 +2053,40 @@ function flashScanError() {
   const overlay = document.createElement("div");
   overlay.id = "scanErrorFlashOverlay";
 
+  overlay.style.position = "fixed"; 
+  overlay.style.left = "4px";
+  overlay.style.top = "4px";
+  overlay.style.right = "4px";
+  overlay.style.bottom = "4px";
+  overlay.style.border = "8px solid #d00000";
+  overlay.style.borderRadius = "12px";
+  overlay.style.boxSizing = "border-box";
+  overlay.style.pointerEvents = "none";
+  overlay.style.zIndex = "999999";
+  overlay.style.opacity = "1";
+
+  document.body.appendChild(overlay);
+
+  setTimeout(function() {
+    overlay.style.opacity = "0";
+    overlay.style.transition = "opacity 0.15s";
+  }, 450);
+
+  setTimeout(function() {
+    overlay.remove();
+  }, 650);
+}
+function flashScanError() {
+  const oldOverlay =
+    document.getElementById("scanErrorFlashOverlay");
+
+  if (oldOverlay) {
+    oldOverlay.remove();
+  }
+
+  const overlay = document.createElement("div");
+  overlay.id = "scanErrorFlashOverlay";
+
   overlay.style.position = "fixed";
   overlay.style.left = "4px";
   overlay.style.top = "4px";
@@ -2237,7 +2110,6 @@ function flashScanError() {
     overlay.remove();
   }, 650);
 }
-
 function notifyScanError(message) {
   // エラー音「ブッ・ブッ・ブッ」
   playBeep("error");
@@ -3394,12 +3266,6 @@ function resetScan() {
   firstDetectedCurrentState = "";
 
   activeManagementRestriction = "";
-    noQrReturnSetup = false;
-
-  document.getElementById(
-    "beginBatchScanBtn"
-  ).innerText =
-    "この設定でまとめ読取開始";
 　 document.getElementById("mode").innerHTML =
   '<option value="">作業区分を選択</option>';
 
@@ -3722,15 +3588,22 @@ async function sendReturnBatchAfterMemo() {
     };
 
     alert(
-      "QRなし返却を受付しました\n\n案件追記：" +
-      (memoForLog || "追記なし") +
-      "\n\n必要に応じて返却写真を保存してください"
-    );
+  "QRなし返却を受付しました\n\n案件追記：" +
+  (memoForLog || "追記なし") +
+  "\n\n返却伝票と管理番号の写真を追加してください"
+);
 
-    document.getElementById("returnCaseArea").style.display = "none";
-    showReturnPhotoArea(sentReturnPhotoInfo);
-    log("QRなし返却。写真保存の有無を選択してください");
-    return;
+document.getElementById("returnCaseArea").style.display = "none";
+
+// QRなし返却は写真必須
+showReturnPhotoArea(sentReturnPhotoInfo, true);
+
+log(
+  "QRなし返却は写真必須です。\n" +
+  "返却伝票と管理番号の写真を追加してください"
+);
+
+return;
   }
 
   if (!confirm("返却を " + pendingReturnItems.length + "件まとめて送信します。よろしいですか？")) {
@@ -4120,20 +3993,36 @@ function drawImageCover(ctx, img, x, y, w, h) {
 }
 
 
-function showReturnPhotoArea(info) {
+function showReturnPhotoArea(info, photoRequired = false) {
   lastReturnPhotoInfo = Object.assign({}, info || {}, {
     mode: "返却",
-    createdAt: (info && info.createdAt) ? info.createdAt : new Date().toISOString()
+    photoRequired: photoRequired,
+    createdAt: (info && info.createdAt)
+      ? info.createdAt
+      : new Date().toISOString()
   });
 
   selectedReturnPhotos = [];
+
   document.getElementById("returnPhotoArea").style.display = "block";
-  document.getElementById("returnPhotoPreview").innerText =
-    "返却送信完了。\nQR未取付機・返却伝票・破損・付属品不足などがある場合は写真を保存してください。\nカメラで1枚ずつ追加、またはライブラリから最大6枚選択できます。";
+
+  if (photoRequired) {
+    document.getElementById("returnPhotoPreview").innerText =
+      "QRなし返却は写真保存が必須です。\n" +
+      "返却伝票と、QR未取付機の管理番号が確認できる写真を追加してください。\n" +
+      "カメラで1枚ずつ追加、またはライブラリから最大6枚選択できます。";
+  } else {
+    document.getElementById("returnPhotoPreview").innerText =
+      "返却送信完了。\n" +
+      "QR未取付機・返却伝票・破損・付属品不足などがある場合は写真を保存してください。\n" +
+      "カメラで1枚ずつ追加、またはライブラリから最大6枚選択できます。";
+  }
+
   document.getElementById("uploadReturnPhotoBtn").style.display = "none";
   document.getElementById("uploadReturnPhotoBtn").disabled = false;
   document.getElementById("returnCameraInput").value = "";
   document.getElementById("returnLibraryInput").value = "";
+
   scrollToElement("returnPhotoArea");
 }
 
@@ -4190,15 +4079,38 @@ function clearReturnPhotos() {
 }
 
 function skipReturnPhotos() {
+  if (
+    lastReturnPhotoInfo &&
+    lastReturnPhotoInfo.photoRequired === true
+  ) {
+    alert(
+      "QRなし返却では写真保存が必須です。\n\n" +
+      "返却伝票と、QR未取付機の管理番号が分かる写真を追加してください。"
+    );
+
+    log(
+      "QRなし返却は写真必須です。\n" +
+      "返却伝票と管理番号の写真を追加してください"
+    );
+
+    scrollToElement("returnPhotoArea");
+    return;
+  }
+
   document.getElementById("returnPhotoArea").style.display = "none";
   document.getElementById("returnCameraInput").value = "";
   document.getElementById("returnLibraryInput").value = "";
   document.getElementById("returnPhotoPreview").innerText = "";
   document.getElementById("uploadReturnPhotoBtn").style.display = "none";
   document.getElementById("uploadReturnPhotoBtn").disabled = false;
+
   selectedReturnPhotos = [];
   lastReturnPhotoInfo = null;
-  log("返却写真なしで完了しました。続けて読み取る場合は「QRを読み取る」を押してください");
+
+  log(
+    "返却写真なしで完了しました。" +
+    "続けて読み取る場合は「QRを読み取る」を押してください"
+  );
 }
 
 async function uploadReturnPhotos() {
