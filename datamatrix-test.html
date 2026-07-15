@@ -531,27 +531,135 @@ textarea {
 <div id="shipmentPhotoArea">
   <div style="font-weight:bold; margin-bottom:10px;">出庫写真の添付</div>
   <p>1枚目は出庫伝票の撮影推奨。最大6枚まで。</p>
+
   <button onclick="skipShipmentPhotos()">写真なしで完了</button>
-  <input type="file" id="shipmentCameraInput" accept="image/*" capture="environment" style="display:none;" onchange="addShipmentCameraPhoto()">
-  <input type="file" id="shipmentLibraryInput" accept="image/*" multiple style="display:none;" onchange="addShipmentLibraryPhotos()">
-  <button onclick="chooseShipmentCamera()">カメラで1枚ずつ追加</button>
-  <button onclick="chooseShipmentLibrary()">ライブラリから選ぶ</button>
-  <button onclick="clearShipmentPhotos()">選択写真をクリア</button>
+
+  <input
+    type="file"
+    id="shipmentCameraInput"
+    accept="image/*"
+    capture="environment"
+    style="display:none;"
+    onchange="addShipmentCameraPhoto()"
+  >
+
+  <input
+    type="file"
+    id="shipmentLibraryInput"
+    accept="image/*"
+    multiple
+    style="display:none;"
+    onchange="addShipmentLibraryPhotos()"
+  >
+
+  <button
+    id="shipmentCameraBtn"
+    onclick="chooseShipmentCamera()"
+  >
+    カメラで撮影
+  </button>
+
+  <button onclick="chooseShipmentLibrary()">
+    ライブラリから選ぶ
+  </button>
+
+  <button onclick="clearShipmentPhotos()">
+    選択写真をクリア
+  </button>
+
   <div id="shipmentPhotoPreview"></div>
-  <button id="uploadShipmentPhotoBtn" onclick="uploadShipmentPhotos()" style="display:none;">写真を保存</button>
+
+  <div id="shipmentContinueArea" style="display:none;">
+    <div style="font-weight:bold; margin-bottom:10px;">
+      続けて撮影しますか？
+    </div>
+
+    <button onclick="continueShipmentCamera()">
+      続ける
+    </button>
+
+    <button onclick="finishShipmentCamera()">
+      終了
+    </button>
+  </div>
+
+  <button
+    id="uploadShipmentPhotoBtn"
+    onclick="uploadShipmentPhotos()"
+    style="display:none;"
+  >
+    写真を保存
+  </button>
 </div>
 
 <div id="returnPhotoArea">
   <div style="font-weight:bold; margin-bottom:10px;">返却写真の添付</div>
-  <p>QR未取付機・返却伝票・破損・付属品不足などがある場合に保存。最大6枚まで。</p>
-  <button onclick="skipReturnPhotos()">写真なしで完了</button>
-  <input type="file" id="returnCameraInput" accept="image/*" capture="environment" style="display:none;" onchange="addReturnCameraPhoto()">
-  <input type="file" id="returnLibraryInput" accept="image/*" multiple style="display:none;" onchange="addReturnLibraryPhotos()">
-  <button onclick="chooseReturnCamera()">カメラで1枚ずつ追加</button>
-  <button onclick="chooseReturnLibrary()">ライブラリから選ぶ</button>
-  <button onclick="clearReturnPhotos()">選択写真をクリア</button>
+
+  <p>
+    QR未取付機・返却伝票・破損・付属品不足などがある場合に保存。
+    最大6枚まで。
+  </p>
+
+  <button onclick="skipReturnPhotos()">
+    写真なしで完了
+  </button>
+
+  <input
+    type="file"
+    id="returnCameraInput"
+    accept="image/*"
+    capture="environment"
+    style="display:none;"
+    onchange="addReturnCameraPhoto()"
+  >
+
+  <input
+    type="file"
+    id="returnLibraryInput"
+    accept="image/*"
+    multiple
+    style="display:none;"
+    onchange="addReturnLibraryPhotos()"
+  >
+
+  <button
+    id="returnCameraBtn"
+    onclick="chooseReturnCamera()"
+  >
+    カメラで撮影
+  </button>
+
+  <button onclick="chooseReturnLibrary()">
+    ライブラリから選ぶ
+  </button>
+
+  <button onclick="clearReturnPhotos()">
+    選択写真をクリア
+  </button>
+
   <div id="returnPhotoPreview"></div>
-  <button id="uploadReturnPhotoBtn" onclick="uploadReturnPhotos()" style="display:none;">返却写真を保存</button>
+
+  <div id="returnContinueArea" style="display:none;">
+    <div style="font-weight:bold; margin-bottom:10px;">
+      続けて撮影しますか？
+    </div>
+
+    <button onclick="continueReturnCamera()">
+      続ける
+    </button>
+
+    <button onclick="finishReturnCamera()">
+      終了
+    </button>
+  </div>
+
+  <button
+    id="uploadReturnPhotoBtn"
+    onclick="uploadReturnPhotos()"
+    style="display:none;"
+  >
+    返却写真を保存
+  </button>
 </div>
 
 <script>
@@ -3962,11 +4070,125 @@ function chooseShipmentCamera() { document.getElementById("shipmentCameraInput")
 function chooseShipmentLibrary() { document.getElementById("shipmentLibraryInput").click(); }
 
 function addShipmentCameraPhoto() {
-  const input = document.getElementById("shipmentCameraInput");
-  const files = Array.from(input.files || []);
-  if (files.length === 0) return;
-  addShipmentPhotosToList(files);
+  const input =
+    document.getElementById("shipmentCameraInput");
+
+  const files =
+    Array.from(input.files || []);
+
+  if (files.length === 0) {
+    return;
+  }
+
+  if (
+    selectedShipmentPhotos.length +
+    files.length >
+    6
+  ) {
+    alert(
+      "写真は最大6枚までです。\n" +
+      "現在：" +
+      selectedShipmentPhotos.length +
+      "枚"
+    );
+
+    input.value = "";
+    return;
+  }
+
+  files.forEach(function(file) {
+    selectedShipmentPhotos.push(file);
+  });
+
   input.value = "";
+
+  const count =
+    selectedShipmentPhotos.length;
+
+  const cameraButton =
+    document.getElementById(
+      "shipmentCameraBtn"
+    );
+
+  const continueArea =
+    document.getElementById(
+      "shipmentContinueArea"
+    );
+
+  const uploadButton =
+    document.getElementById(
+      "uploadShipmentPhotoBtn"
+    );
+
+  if (count >= 6) {
+    document.getElementById(
+      "shipmentPhotoPreview"
+    ).innerText =
+      "6枚追加しました（6/6）\n" +
+      "写真を保存してください。";
+
+    continueArea.style.display = "none";
+    cameraButton.style.display = "none";
+    uploadButton.style.display = "block";
+
+    return;
+  }
+
+  document.getElementById(
+    "shipmentPhotoPreview"
+  ).innerText =
+    "写真を追加しました（" +
+    count +
+    "/6）";
+
+  cameraButton.style.display = "none";
+  uploadButton.style.display = "none";
+  continueArea.style.display = "block";
+
+  scrollToElement("shipmentContinueArea");
+}
+
+function continueShipmentCamera() {
+  document.getElementById(
+    "shipmentContinueArea"
+  ).style.display = "none";
+
+  document.getElementById(
+    "shipmentCameraInput"
+  ).click();
+}
+
+function finishShipmentCamera() {
+  const count =
+    selectedShipmentPhotos.length;
+
+  document.getElementById(
+    "shipmentContinueArea"
+  ).style.display = "none";
+
+  const cameraButton =
+    document.getElementById(
+      "shipmentCameraBtn"
+    );
+
+  cameraButton.innerText =
+    "撮影を再開";
+
+  cameraButton.style.display =
+    count < 6 ? "block" : "none";
+
+  document.getElementById(
+    "shipmentPhotoPreview"
+  ).innerText =
+    "写真は" +
+    count +
+    "枚追加されています。\n" +
+    "この内容で保存するか、撮影を再開してください。";
+
+  document.getElementById(
+    "uploadShipmentPhotoBtn"
+  ).style.display =
+    count > 0 ? "block" : "none";
 }
 
 function addShipmentLibraryPhotos() {
@@ -4000,9 +4222,38 @@ function updateShipmentPhotoPreview() {
 
 function clearShipmentPhotos() {
   selectedShipmentPhotos = [];
-  document.getElementById("shipmentCameraInput").value = "";
-  document.getElementById("shipmentLibraryInput").value = "";
-  updateShipmentPhotoPreview();
+
+  document.getElementById(
+    "shipmentCameraInput"
+  ).value = "";
+
+  document.getElementById(
+    "shipmentLibraryInput"
+  ).value = "";
+
+  document.getElementById(
+    "shipmentPhotoPreview"
+  ).innerText =
+    "写真はまだ選択されていません。";
+
+  document.getElementById(
+    "uploadShipmentPhotoBtn"
+  ).style.display = "none";
+
+  document.getElementById(
+    "shipmentContinueArea"
+  ).style.display = "none";
+
+  const cameraButton =
+    document.getElementById(
+      "shipmentCameraBtn"
+    );
+
+  cameraButton.innerText =
+    "カメラで撮影";
+
+  cameraButton.style.display =
+    "block";
 }
 
 function skipShipmentPhotos() {
@@ -4190,11 +4441,125 @@ function chooseReturnCamera() { document.getElementById("returnCameraInput").cli
 function chooseReturnLibrary() { document.getElementById("returnLibraryInput").click(); }
 
 function addReturnCameraPhoto() {
-  const input = document.getElementById("returnCameraInput");
-  const files = Array.from(input.files || []);
-  if (files.length === 0) return;
-  addReturnPhotosToList(files);
+  const input =
+    document.getElementById("returnCameraInput");
+
+  const files =
+    Array.from(input.files || []);
+
+  if (files.length === 0) {
+    return;
+  }
+
+  if (
+    selectedReturnPhotos.length +
+    files.length >
+    6
+  ) {
+    alert(
+      "写真は最大6枚までです。\n" +
+      "現在：" +
+      selectedReturnPhotos.length +
+      "枚"
+    );
+
+    input.value = "";
+    return;
+  }
+
+  files.forEach(function(file) {
+    selectedReturnPhotos.push(file);
+  });
+
   input.value = "";
+
+  const count =
+    selectedReturnPhotos.length;
+
+  const cameraButton =
+    document.getElementById(
+      "returnCameraBtn"
+    );
+
+  const continueArea =
+    document.getElementById(
+      "returnContinueArea"
+    );
+
+  const uploadButton =
+    document.getElementById(
+      "uploadReturnPhotoBtn"
+    );
+
+  if (count >= 6) {
+    document.getElementById(
+      "returnPhotoPreview"
+    ).innerText =
+      "6枚追加しました（6/6）\n" +
+      "返却写真を保存してください。";
+
+    continueArea.style.display = "none";
+    cameraButton.style.display = "none";
+    uploadButton.style.display = "block";
+
+    return;
+  }
+
+  document.getElementById(
+    "returnPhotoPreview"
+  ).innerText =
+    "写真を追加しました（" +
+    count +
+    "/6）";
+
+  cameraButton.style.display = "none";
+  uploadButton.style.display = "none";
+  continueArea.style.display = "block";
+
+  scrollToElement("returnContinueArea");
+}
+
+function continueReturnCamera() {
+  document.getElementById(
+    "returnContinueArea"
+  ).style.display = "none";
+
+  document.getElementById(
+    "returnCameraInput"
+  ).click();
+}
+
+function finishReturnCamera() {
+  const count =
+    selectedReturnPhotos.length;
+
+  document.getElementById(
+    "returnContinueArea"
+  ).style.display = "none";
+
+  const cameraButton =
+    document.getElementById(
+      "returnCameraBtn"
+    );
+
+  cameraButton.innerText =
+    "撮影を再開";
+
+  cameraButton.style.display =
+    count < 6 ? "block" : "none";
+
+  document.getElementById(
+    "returnPhotoPreview"
+  ).innerText =
+    "写真は" +
+    count +
+    "枚追加されています。\n" +
+    "この内容で保存するか、撮影を再開してください。";
+
+  document.getElementById(
+    "uploadReturnPhotoBtn"
+  ).style.display =
+    count > 0 ? "block" : "none";
 }
 
 function addReturnLibraryPhotos() {
@@ -4228,14 +4593,67 @@ function updateReturnPhotoPreview() {
 
 function clearReturnPhotos() {
   selectedReturnPhotos = [];
-  const cameraInput = document.getElementById("returnCameraInput");
-  const libraryInput = document.getElementById("returnLibraryInput");
-  if (cameraInput) cameraInput.value = "";
-  if (libraryInput) libraryInput.value = "";
-  const preview = document.getElementById("returnPhotoPreview");
-  const uploadBtn = document.getElementById("uploadReturnPhotoBtn");
-  if (preview) preview.innerText = "写真はまだ選択されていません。";
-  if (uploadBtn) uploadBtn.style.display = "none";
+
+  const cameraInput =
+    document.getElementById(
+      "returnCameraInput"
+    );
+
+  const libraryInput =
+    document.getElementById(
+      "returnLibraryInput"
+    );
+
+  if (cameraInput) {
+    cameraInput.value = "";
+  }
+
+  if (libraryInput) {
+    libraryInput.value = "";
+  }
+
+  const preview =
+    document.getElementById(
+      "returnPhotoPreview"
+    );
+
+  const uploadButton =
+    document.getElementById(
+      "uploadReturnPhotoBtn"
+    );
+
+  const continueArea =
+    document.getElementById(
+      "returnContinueArea"
+    );
+
+  const cameraButton =
+    document.getElementById(
+      "returnCameraBtn"
+    );
+
+  if (preview) {
+    preview.innerText =
+      "写真はまだ選択されていません。";
+  }
+
+  if (uploadButton) {
+    uploadButton.style.display =
+      "none";
+  }
+
+  if (continueArea) {
+    continueArea.style.display =
+      "none";
+  }
+
+  if (cameraButton) {
+    cameraButton.innerText =
+      "カメラで撮影";
+
+    cameraButton.style.display =
+      "block";
+  }
 }
 
 function skipReturnPhotos() {
