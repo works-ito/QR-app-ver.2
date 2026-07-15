@@ -249,7 +249,11 @@ textarea {
 #sendStatus.error {
   color: #d00000;
 }
-  
+.radioRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+} 
 </style>
 </head>
 
@@ -481,8 +485,15 @@ textarea {
   <div style="font-weight:bold; margin-bottom:10px;">REC読取分の送信</div>
   <div id="recSendTarget" style="font-weight:bold; margin-bottom:10px;"></div>
 
-  <label><input type="radio" name="recMemoType" value="なし">追記なし</label><br>
-  <label><input type="radio" name="recMemoType" value="あり">追記あり</label>
+  <div class="radioRow">
+  <input type="radio" id="noNote" name="returnNote" value="none" checked>
+  <label for="noNote">追記なし</label>
+</div>
+
+<div class="radioRow">
+  <input type="radio" id="withNote" name="returnNote" value="with">
+  <label for="withNote">追記あり</label>
+</div>
 
   <textarea id="recMemoText" placeholder="発送日・発送先・証明書待ち等" style="display:none;"></textarea>
   <button onclick="sendRecBatchAfterMemo()">REC読取分を送信</button>
