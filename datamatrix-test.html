@@ -486,13 +486,11 @@ textarea {
   <div id="recSendTarget" style="font-weight:bold; margin-bottom:10px;"></div>
 
   <div class="radioRow">
-  <input type="radio" id="noNote" name="returnNote" value="none" checked>
-  <label for="noNote">追記なし</label>
+  <label><input type="radio" name="recMemoType" value="なし" checked>追記なし</label>
 </div>
 
 <div class="radioRow">
-  <input type="radio" id="withNote" name="returnNote" value="with">
-  <label for="withNote">追記あり</label>
+  <label><input type="radio" name="recMemoType" value="あり">追記あり</label>
 </div>
 
   <textarea id="recMemoText" placeholder="発送日・発送先・証明書待ち等" style="display:none;"></textarea>
@@ -507,8 +505,13 @@ textarea {
 
 <div id="returnCaseArea">
   <div style="font-weight:bold; margin-bottom:10px;">返却案件の追記</div>
-  <label><input type="radio" name="returnMemoType" value="なし">追記なし</label><br>
+  <div class="radioRow">
+  <label><input type="radio" name="returnMemoType" value="なし" checked>追記なし</label>
+</div>
+
+<div class="radioRow">
   <label><input type="radio" name="returnMemoType" value="あり">追記あり</label>
+</div>
   <textarea id="returnCaseMemo" placeholder="燃料不足・付属品不足・伝票写真あり等" style="display:none;"></textarea>
   <button onclick="sendReturnBatchAfterMemo()">返却をまとめて送信</button>
 </div>
