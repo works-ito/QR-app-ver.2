@@ -3907,19 +3907,21 @@ return;
       returnCaseId: pendingReturnCaseId
     });
 
-    stopBatchLoading();
-    returnButton.disabled = false;
-
     if (!result.ok) {
-      showBatchFailure(result);
-      log("一部送信失敗あり");
-      return;
-    }
-      rememberSentLogIds(result);
-      /*
-       * 返却後の「未点検」など、最新状態を再取得する。
-       */
-    await refreshInventoryAfterSend();
+  stopBatchLoading();
+  returnButton.disabled = false;
+
+  showBatchFailure(result);
+  log("一部送信失敗あり");
+  return;
+}
+
+rememberSentLogIds(result);
+
+await refreshInventoryAfterSend();
+
+stopBatchLoading();
+returnButton.disabled = false;
     
     const sentReturnPhotoInfo = {
       mode: "返却",
