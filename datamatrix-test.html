@@ -75,8 +75,39 @@ select {
 #scanList { font-size:20px; line-height:1.5; margin-top:8px; white-space:pre-wrap; }
 .readItem { margin-bottom:4px; }
 canvas { display:none; }
+#memoArea,
+#returnMethodArea,
+#returnCaseArea,
+#shipmentPhotoArea,
+#returnPhotoArea,
+#recDateBox,
+#recSendArea,
+#irregularArea {
+  display:none;
+  margin-top:20px;
+  padding:12px;
+  border:2px solid #333;
+}
+#irregularArea {
+  background:#fff3cd;
+  border-color:#d39e00;
+}
 
-#memoArea, #returnMethodArea, #returnCaseArea, #shipmentPhotoArea, #returnPhotoArea, #recDateBox, #recSendArea {
+#irregularTitle {
+  font-size:26px;
+  font-weight:bold;
+  margin-bottom:10px;
+}
+
+#irregularNumberInput {
+  font-size:26px;
+  font-weight:bold;
+  text-align:center;
+}
+
+#irregularNote {
+  height:120px;
+}
   display:none;
   margin-top:20px;
   padding:12px;
@@ -482,6 +513,101 @@ textarea {
   <button onclick="cancelQuantityInput()">この読取を取消</button>
 </div>
   
+<div id="irregularArea">
+
+  <div id="irregularTitle">
+    イレギュラーQR受付
+  </div>
+
+  <div style="
+    font-size:18px;
+    line-height:1.5;
+    margin-bottom:14px;
+  ">
+    通常のQRが読み取れない場合の1件専用登録です。
+  </div>
+
+  <div style="
+    font-size:18px;
+    font-weight:bold;
+    margin-bottom:8px;
+  ">
+    管理番号・品目コード
+  </div>
+
+  <input
+    type="text"
+    id="irregularNumberInput"
+    autocomplete="off"
+    autocapitalize="characters"
+    placeholder="管理番号または品目コードを入力"
+  >
+
+  <div class="radioRow">
+    <label>
+      <input
+        type="radio"
+        name="irregularNumberType"
+        value="入力"
+        checked
+      >
+      番号を入力する
+    </label>
+
+    <label>
+      <input
+        type="radio"
+        name="irregularNumberType"
+        value="番号不明"
+      >
+      番号が読めない
+    </label>
+  </div>
+
+  <div style="
+    font-size:18px;
+    font-weight:bold;
+    margin:18px 0 8px;
+  ">
+    状況・理由・機械の特徴
+  </div>
+
+  <textarea
+    id="irregularNote"
+    placeholder="QRが破損している、汚れている、管理番号が読めない、機械の特徴などを必ず入力"
+  ></textarea>
+
+  <button
+    id="irregularNextBtn"
+    type="button"
+    onclick="confirmIrregularInput()"
+    style="
+      background:#d39e00;
+      color:#fff;
+      border:none;
+      border-radius:10px;
+      font-size:25px;
+      font-weight:bold;
+      min-height:64px;
+    "
+  >
+    入力内容を確認
+  </button>
+
+  <button
+    type="button"
+    onclick="cancelIrregularFlow()"
+    style="
+      background:#eee;
+      color:#333;
+      border:1px solid #aaa;
+      border-radius:8px;
+    "
+  >
+    イレギュラー受付を取消
+  </button>
+
+</div>
 <div id="memoArea">
   <div>追記対象：</div>
   <div id="memoTarget" style="font-weight:bold; margin-bottom:10px;"></div>
