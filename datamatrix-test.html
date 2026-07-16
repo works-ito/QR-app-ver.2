@@ -3692,14 +3692,15 @@ async function sendBatchToSheet() {
     const records = scannedRecords.map(buildBatchRecordData);
     const result = await sendBatchRecords(records);
 
-    stopBatchLoading();
-    document.getElementById("sendBatchBtn").disabled = false;
-
     if (!result.ok) {
-      showBatchFailure(result);
-      log("一部送信失敗あり");
-      return;
-    }
+  stopBatchLoading();
+  document.getElementById("sendBatchBtn").disabled = false;
+
+  showBatchFailure(result);
+  log("一部送信失敗あり");
+  return;
+}
+
 rememberSentLogIds(result);
 
 /*
@@ -3712,6 +3713,7 @@ await refreshInventoryAfterSend();
  * 送信中の点滅表示を停止する。
  */
 stopBatchLoading();
+document.getElementById("sendBatchBtn").disabled = false;
 
 showSendStatus(
   "✓ " + result.successCount + "件送信しました",
@@ -3803,21 +3805,25 @@ async function sendRecBatchAfterMemo() {
       memoUser: pendingRecRecords[0] ? pendingRecRecords[0].user : ""
     });
 
-    stopBatchLoading();
-    btn.disabled = false;
-
     if (!result.ok) {
-      showSendStatus("送信に失敗しました", "error");
-      showBatchFailure(result);
-      log("一部送信失敗あり");
-      return;
-    }
+  stopBatchLoading();
+  btn.disabled = false;
+
+  showSendStatus("送信に失敗しました", "error");
+  showBatchFailure(result);
+  log("一部送信失敗あり");
+  return;
+}
+
 rememberSentLogIds(result);
 
 /*
  * REC送信後の最新状態を再取得する。
  */
 await refreshInventoryAfterSend();
+
+stopBatchLoading();
+btn.disabled = false;
 
 alert(
   "REC送信完了\n" +
