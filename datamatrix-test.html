@@ -3173,9 +3173,9 @@ function handleDecoded(decodedText) {
    * イレギュラーQRは通常のQR判定より先に処理する。
    */
   if (isIrregularQr(decodedText)) {
-    alert("イレギュラーQRを読み取りました");
-    return;
-  }
+  startIrregularFlow();
+  return;
+}
 
   /*
    * 別のQRを処理中、または数量入力中の場合は受け付けない。
