@@ -2712,7 +2712,237 @@ function isIrregularQr(text) {
   return normalizeLookupKey(text) ===
     normalizeLookupKey(IRREGULAR_QR_TEXT);
 }
- 
+/*
+ * イレギュラーQR専用画面を開始する。
+ */
+function startIrregularFlow() {
+  /*
+   * 同じ固定QRを連続認識しないよう、
+   * 最初にカメラを完全停止する。
+   */
+  stopQrForError();
+
+  scanWorkflowPhase = SCAN_PHASE_SETUP;
+  scanBusy = true;
+
+  document.getElementById(
+    "startBtn"
+  ).style.display = "none";
+
+  document.getElementById(
+    "startNoQrReturnBtn"
+  ).style.display = "none";
+
+  document.getElementById(
+    "stopBtn"
+  ).style.display = "none";
+
+  document.getElementById(
+    "resetBtn"
+  ).style.display = "none";
+
+  document.getElementById(
+    "settingsPanel"
+  ).style.display = "none";
+
+  document.getElementById(
+    "irregularNumberInput"
+  ).value = "";
+
+  document.getElementById(
+    "irregularNumberInput"
+  ).disabled = false;
+
+  document.getElementById(
+    "irregularNote"
+  ).value = "";
+
+  document
+    .querySelectorAll(
+      'input[name="irregularNumberType"]'
+    )
+    .forEach(function(radio) {
+      radio.checked =
+        radio.value === "入力";
+    });
+
+  document.getElementById(
+    "irregularArea"
+  ).style.display = "block";
+
+  log(
+    "イレギュラーQRを読み取りました\n" +
+    "管理番号または品目コードを入力してください"
+  );
+
+  scrollToElement("irregularArea");
+
+  setTimeout(function() {
+    document.getElementById(
+      "irregularNumberInput"
+    ).focus();
+  }, 500);
+}
+
+
+/*
+ * 番号入力／番号不明の切替。
+ */
+function toggleIrregularNumberInput() {
+  const selected =
+    document.querySelector(
+      'input[name="irregularNumberType"]:checked'
+    );
+
+  const input =
+    document.getElementById(
+      "irregularNumberInput"
+    );
+
+  if (
+    selected &&
+    selected.value === "番号不明"
+  ) {
+    input.value = "";
+    input.disabled = true;
+    input.placeholder =
+      "番号不明として登録します";
+  } else {
+    input.disabled = false;
+    input.placeholder =
+      "管理番号または品目コードを入力";
+
+    setTimeout(function() {
+      input.focus();
+    }, 100);
+  }
+}
+
+
+/*
+ * 入力内容の一次確認。
+ *
+ * 次の工程で、
+ * ローカル検索・管理区分判定・作業区分選択へ接続する。
+ */
+function confirmIrregularInput() {
+  const selected =
+    document.querySelector(
+      'input[name="irregularNumberType"]:checked'
+    );
+
+  const numberType =
+    selected
+      ? selected.value
+      : "";
+
+  const enteredNumber =
+    document.getElementById(
+      "irregularNumberInput"
+    ).value.trim();
+
+  const note =
+    document.getElementById(
+      "irregularNote"
+    ).value.trim();
+
+  if (!numberType) {
+    alert(
+      "番号を入力する／番号が読めないを選択してください"
+    );
+    return;
+  }
+
+  if (
+    numberType === "入力" &&
+    !enteredNumber
+  ) {
+    alert(
+      "管理番号または品目コードを入力してください"
+    );
+
+    document.getElementById(
+      "irregularNumberInput"
+    ).focus();
+
+    return;
+  }
+
+  if (!note) {
+    alert(
+      "状況・理由・機械の特徴を入力してください"
+    );
+
+    document.getElementById(
+      "irregularNote"
+    ).focus();
+
+    return;
+  }
+
+  /*
+   * 現段階では入力確認まで。
+   * 次にローカル検索と作業区分選択を接続する。
+   */
+  if (numberType === "番号不明") {
+    alert(
+      "入力確認完了\n\n" +
+      "番号：番号不明\n" +
+      "追記：" +
+      note
+    );
+  } else {
+    alert(
+      "入力確認完了\n\n" +
+      "番号：" +
+      enteredNumber +
+      "\n追記：" +
+      note
+    );
+  }
+}
+
+
+/*
+ * イレギュラーQR受付を取り消し、
+ * 通常のホーム画面へ戻す。
+ */
+function cancelIrregularFlow() {
+  document.getElementById(
+    "irregularArea"
+  ).style.display = "none";
+
+  document.getElementById(
+    "irregularNumberInput"
+  ).value = "";
+
+  document.getElementById(
+    "irregularNumberInput"
+  ).disabled = false;
+
+  document.getElementById(
+    "irregularNote"
+  ).value = "";
+
+  scanWorkflowPhase =
+    SCAN_PHASE_DETECT;
+
+  scanBusy = false;
+
+  document.getElementById(
+    "startBtn"
+  ).style.display = "block";
+
+  document.getElementById(
+    "startNoQrReturnBtn"
+  ).style.display = "block";
+
+  log(
+    "イレギュラー受付を取り消しました\n" +
+    "QRを読み取ってください"
+  );
+}
+
 function startQuantityInput(itemCode) {
   if (scanBusy) return;
 
@@ -3776,7 +4006,16 @@ function resetScan() {
   document.getElementById("startNoQrReturnBtn").style.display = "block";
   document.getElementById("stopBtn").style.display = "none";
   document.getElementById("resetBtn").style.display = "none";
-
+　document
+  .querySelectorAll(
+    'input[name="irregularNumberType"]'
+  )
+  .forEach(function(radio) {
+    radio.addEventListener(
+      "change",
+      toggleIrregularNumberInput
+    );
+  });
   toggleRecTarget();
   log("読取履歴をリセットしました");
 　if (pendingAutoReload) {
