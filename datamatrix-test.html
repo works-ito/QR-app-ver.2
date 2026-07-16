@@ -680,6 +680,9 @@ let batchLoadingDots = 0;
 let initialLoadingTimer = null;
 let initialLoadingDots = 0;
 
+let photoLoadingTimer = null;
+let photoLoadingDots = 0;
+
 let pendingReturnItems = [];
 let pendingReturnCaseId = "";
 let pendingReturnMemoType = "";
@@ -1661,6 +1664,28 @@ function stopBatchLoading() {
   }
 
   showSendStatus("", "");
+}
+
+  function startPhotoLoading(message) {
+  stopPhotoLoading();
+
+  photoLoadingDots = 0;
+  log(message);
+
+  photoLoadingTimer = setInterval(function() {
+    photoLoadingDots = (photoLoadingDots + 1) % 4;
+
+    log(
+      message + ".".repeat(photoLoadingDots)
+    );
+  }, 400);
+}
+
+function stopPhotoLoading() {
+  if (photoLoadingTimer) {
+    clearInterval(photoLoadingTimer);
+    photoLoadingTimer = null;
+  }
 }
   
 function startMemoLoading(qrText) {
@@ -4300,53 +4325,103 @@ async function uploadShipmentPhotos() {
     alert("出庫情報がありません");
     return;
   }
+
   if (files.length === 0) {
     alert("写真を選択してください");
     return;
   }
+
   if (files.length > 6) {
     alert("写真は最大6枚までです");
     return;
   }
 
-  const btn = document.getElementById("uploadShipmentPhotoBtn");
+  const btn =
+    document.getElementById("uploadShipmentPhotoBtn");
+
   btn.disabled = true;
-  log("写真をコラージュ化しています...");
+
+  startPhotoLoading(
+    "写真を合成しています"
+  );
 
   try {
-    const collageBase64 = await makeShipmentCollage(files, lastShipmentPhotoInfo);
-    log("出庫写真を保存中...");
+    const collageBase64 =
+      await makeShipmentCollage(
+        files,
+        lastShipmentPhotoInfo
+      );
+
+    startPhotoLoading(
+      "出庫写真を保存中"
+    );
 
     const result = await fetch(GAS_URL, {
       method: "POST",
-      headers: { "Content-Type": "text/plain" },
+      headers: {
+        "Content-Type": "text/plain"
+      },
       body: JSON.stringify({
         action: "saveShipmentPhoto",
         photoBase64: collageBase64,
         photoInfo: lastShipmentPhotoInfo
       })
-    }).then(function(response) { return response.json(); });
+    }).then(function(response) {
+      return response.json();
+    });
 
     if (!result.ok) {
-      alert("写真保存失敗\n" + result.message);
+      stopPhotoLoading();
+
+      alert(
+        "写真保存失敗\n" +
+        result.message
+      );
+
       log("写真保存失敗");
       btn.disabled = false;
       return;
     }
 
+    stopPhotoLoading();
+
     alert("出庫写真を保存しました");
-    document.getElementById("shipmentPhotoArea").style.display = "none";
-    document.getElementById("shipmentCameraInput").value = "";
-    document.getElementById("shipmentLibraryInput").value = "";
-    document.getElementById("shipmentPhotoPreview").innerText = "";
+
+    document.getElementById(
+      "shipmentPhotoArea"
+    ).style.display = "none";
+
+    document.getElementById(
+      "shipmentCameraInput"
+    ).value = "";
+
+    document.getElementById(
+      "shipmentLibraryInput"
+    ).value = "";
+
+    document.getElementById(
+      "shipmentPhotoPreview"
+    ).innerText = "";
+
     btn.style.display = "none";
     btn.disabled = false;
+
     selectedShipmentPhotos = [];
     lastShipmentPhotoInfo = null;
-    log("写真保存完了。続けて読み取る場合は「カメラ起動」を押してください");
+
+    log(
+      "写真保存完了。\n" +
+      "続けて読み取る場合は「QRを読み取る」を押してください"
+    );
 
   } catch (err) {
-    alert("写真保存エラー\n" + err);
+    stopPhotoLoading();
+
+    alert(
+      "写真保存エラー\n" +
+      err
+    );
+
     log("写真保存エラー");
     btn.disabled = false;
   }
