@@ -721,6 +721,13 @@ let quantityItemMap = new Map();
 const SCAN_INTERVAL = 120;
 const CROP_RATIO = 0.55;
 
+/*
+ * イレギュラーQR
+ *
+ * 通常の機械QRが読み取れない場合に使用する
+ * 共通の例外受付専用QR。
+ */
+const IRREGULAR_QR_TEXT = "WORKS-IRREGULAR-QR";
 
 /*
  * =========================================================
@@ -2570,6 +2577,30 @@ function isValidQrText(text) {
   return false;
 }
 
+/*
+ * イレギュラーQRかどうかを判定する。
+ *
+ * 通常の機械QR・数量管理QRより先に判定する。
+ */
+function isIrregularQr(text) {
+  return String(text || "").trim() === IRREGULAR_QR_TEXT;
+}
+function isIrregularQr(text) {
+  text = String(text || "").trim();
+
+  /*
+   * 現段階では
+   * 「IR-」から始まるQRを
+   * イレギュラーQRとして扱う。
+   *
+   * 例
+   * IR-001
+   * IR-RETURN
+   * IR-LOST
+   */
+  return /^IR-/i.test(text);
+}
+  
 function startQuantityInput(itemCode) {
   if (scanBusy) return;
 
@@ -2795,6 +2826,14 @@ function cancelQuantityInput() {
   
 function handleDecoded(decodedText) {
   decodedText = String(decodedText || "").trim();
+
+  /*
+   * イレギュラーQRは通常のQR判定より先に処理する。
+   */
+  if (isIrregularQr(decodedText)) {
+    alert("イレギュラーQRを読み取りました");
+    return;
+  }
 
   /*
    * 別のQRを処理中、または数量入力中の場合は受け付けない。
