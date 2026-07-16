@@ -1659,8 +1659,10 @@ function stopBatchLoading() {
     clearInterval(batchLoadingTimer);
     batchLoadingTimer = null;
   }
-}
 
+  showSendStatus("", "");
+}
+  
 function startMemoLoading(qrText) {
   stopMemoLoading();
   loadingDots = 0;
