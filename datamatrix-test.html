@@ -2583,7 +2583,8 @@ function isValidQrText(text) {
  * 通常の機械QR・数量管理QRより先に判定する。
  */
 function isIrregularQr(text) {
-  return String(text || "").trim() === IRREGULAR_QR_TEXT;
+  return normalizeLookupKey(text) ===
+    normalizeLookupKey(IRREGULAR_QR_TEXT);
 }
 function isIrregularQr(text) {
   text = String(text || "").trim();
