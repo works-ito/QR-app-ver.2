@@ -854,7 +854,18 @@ const CROP_RATIO = 0.55;
  * 共通の例外受付専用QR。
  */
 const IRREGULAR_QR_TEXT = "WORKS-IRREGULAR-QR";
-
+/*
+ * イレギュラーQR受付中の入力内容。
+ *
+ * 次の工程で通常フローや写真保存へ引き継ぐため、
+ * 画面入力とは別に保持する。
+ */
+let pendingIrregularNumberType = "";
+let pendingIrregularEnteredNumber = "";
+let pendingIrregularNote = "";
+let pendingIrregularManagementType = "";
+let pendingIrregularManagedResult = null;
+let pendingIrregularQuantityItem = null;
 /*
  * =========================================================
  * QR在庫管理 ver.2
@@ -2825,6 +2836,13 @@ function toggleIrregularNumberInput() {
  * 次の工程で、
  * ローカル検索・管理区分判定・作業区分選択へ接続する。
  */
+/*
+ * イレギュラーQRで入力された番号を確認し、
+ * ローカルデータから管理区分を判定する。
+ *
+ * この段階では通常の作業設定画面へは移動せず、
+ * 判定結果の確認だけを行う。
+ */
 function confirmIrregularInput() {
   const selected =
     document.querySelector(
@@ -2881,27 +2899,168 @@ function confirmIrregularInput() {
   }
 
   /*
-   * 現段階では入力確認まで。
-   * 次にローカル検索と作業区分選択を接続する。
+   * 入力内容を次工程へ引き継ぐため保持する。
+   */
+  pendingIrregularNumberType =
+    numberType;
+
+  pendingIrregularEnteredNumber =
+    enteredNumber;
+
+  pendingIrregularNote =
+    note;
+
+  pendingIrregularManagementType = "";
+  pendingIrregularManagedResult = null;
+  pendingIrregularQuantityItem = null;
+
+  /*
+   * 番号不明の場合は在庫・状態を更新しない。
+   *
+   * 今回は番号不明として認識できたことだけ確認する。
    */
   if (numberType === "番号不明") {
     alert(
       "入力確認完了\n\n" +
       "番号：番号不明\n" +
+      "管理区分：判定なし\n" +
       "追記：" +
       note
     );
-  } else {
+
+    log(
+      "イレギュラー受付\n" +
+      "番号不明として確認しました"
+    );
+
+    return;
+  }
+
+  /*
+   * 個体・簡易個体・RECをローカル検索する。
+   */
+  const managedResult =
+    findManagedItemLocal(
+      enteredNumber
+    );
+
+  if (managedResult) {
+    pendingIrregularManagementType =
+      managedResult.managementType;
+
+    pendingIrregularManagedResult =
+      managedResult;
+
+    const managementLabel =
+      MANAGEMENT_TYPE_LABELS[
+        managedResult.managementType
+      ] ||
+      managedResult.managementType;
+
+    const currentState =
+      getFirstItemValue(
+        managedResult.item,
+        [
+          "現在状態",
+          "状態",
+          "作業区分",
+          "status"
+        ]
+      );
+
     alert(
-      "入力確認完了\n\n" +
+      "管理区分を判定しました\n\n" +
       "番号：" +
       enteredNumber +
+      "\n管理区分：" +
+      managementLabel +
+      "\n現在状態：" +
+      (currentState || "状態なし") +
       "\n追記：" +
       note
     );
-  }
-}
 
+    log(
+      "イレギュラー番号確認完了\n" +
+      "管理区分：" +
+      managementLabel +
+      "\n番号：" +
+      enteredNumber
+    );
+
+    return;
+  }
+
+  /*
+   * 数量管理品をローカル検索する。
+   */
+  const quantityItem =
+    findQuantityItemLocal(
+      enteredNumber
+    );
+
+  if (quantityItem) {
+    pendingIrregularManagementType =
+      "quantity";
+
+    pendingIrregularQuantityItem =
+      quantityItem;
+
+    const displayName =
+      getFirstItemValue(
+        quantityItem,
+        [
+          "表示名",
+          "品名",
+          "商品名",
+          "displayName"
+        ]
+      );
+
+    alert(
+      "管理区分を判定しました\n\n" +
+      "番号：" +
+      enteredNumber +
+      "\n管理区分：数量管理" +
+      "\n品名：" +
+      (displayName || "表示名なし") +
+      "\n追記：" +
+      note
+    );
+
+    log(
+      "イレギュラー番号確認完了\n" +
+      "管理区分：数量管理\n" +
+      "品目コード：" +
+      enteredNumber
+    );
+
+    return;
+  }
+
+  /*
+   * どのマスタにも存在しない番号。
+   *
+   * 誤入力の可能性があるため、
+   * この段階では登録を進めない。
+   */
+  notifyScanError(
+    "入力した番号がマスタに登録されていません\n\n" +
+    "入力番号：" +
+    enteredNumber +
+    "\n\n番号を確認して再入力してください"
+  );
+
+  log(
+    "イレギュラー番号確認エラー\n" +
+    "マスタ未登録：" +
+    enteredNumber
+  );
+
+  document.getElementById(
+    "irregularNumberInput"
+  ).focus();
+}
 
 /*
  * イレギュラーQR受付を取り消し、
