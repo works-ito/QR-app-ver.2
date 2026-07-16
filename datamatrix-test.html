@@ -2586,22 +2586,7 @@ function isIrregularQr(text) {
   return normalizeLookupKey(text) ===
     normalizeLookupKey(IRREGULAR_QR_TEXT);
 }
-function isIrregularQr(text) {
-  text = String(text || "").trim();
-
-  /*
-   * 現段階では
-   * 「IR-」から始まるQRを
-   * イレギュラーQRとして扱う。
-   *
-   * 例
-   * IR-001
-   * IR-RETURN
-   * IR-LOST
-   */
-  return /^IR-/i.test(text);
-}
-  
+ 
 function startQuantityInput(itemCode) {
   if (scanBusy) return;
 
