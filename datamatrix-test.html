@@ -867,6 +867,10 @@ let pendingIrregularManagementType = "";
 let pendingIrregularManagedResult = null;
 let pendingIrregularQuantityItem = null;
 /*
+ * 現在イレギュラーQR受付中かどうか。
+ */
+let irregularFlowActive = false;
+  /*
  * =========================================================
  * QR在庫管理 ver.2
  * 管理区分別・作業区分定義
@@ -1971,9 +1975,11 @@ function enterSetupPhase(options) {
   ).innerText = detectedManagementTypeLabel;
 
   document.getElementById(
-    "detectedFirstQr"
-  ).innerText =
-    "読取QR：" + firstDetectedQrText;
+  "detectedFirstQr"
+).innerText =
+  irregularFlowActive
+    ? "手入力番号：" + firstDetectedQrText
+    : "読取QR：" + firstDetectedQrText;
 
   populateModeOptions(detectedManagementType);
   /*
@@ -1983,11 +1989,31 @@ function enterSetupPhase(options) {
 const beginButton =
   document.getElementById("beginBatchScanBtn");
 
-beginButton.innerText =
-  "この設定でまとめ読取開始";
+if (irregularFlowActive) {
+  /*
+   * 次工程でイレギュラー送信情報と写真必須処理を接続するまで、
+   * 通常送信へ進ませない。
+   */
+  beginButton.innerText =
+    "イレギュラー受付設定確認済み";
 
-beginButton.onclick =
-  beginBatchScan;
+  beginButton.onclick = null;
+  beginButton.disabled = true;
+
+  beginButton.style.background =
+    "#999";
+} else {
+  beginButton.innerText =
+    "この設定でまとめ読取開始";
+
+  beginButton.onclick =
+    beginBatchScan;
+
+  beginButton.disabled = false;
+
+  beginButton.style.background =
+    "#1677ff";
+}
 
 /*
  * QRなし返却では非表示にした管理区分表示も戻す。
@@ -2732,7 +2758,9 @@ function startIrregularFlow() {
    * 最初にカメラを完全停止する。
    */
   stopQrForError();
-
+  
+  irregularFlowActive = true;
+  
   scanWorkflowPhase = SCAN_PHASE_SETUP;
   scanBusy = true;
 
@@ -2968,27 +2996,48 @@ function confirmIrregularInput() {
         ]
       );
 
-    alert(
-      "管理区分を判定しました\n\n" +
-      "番号：" +
-      enteredNumber +
-      "\n管理区分：" +
-      managementLabel +
-      "\n現在状態：" +
-      (currentState || "状態なし") +
-      "\n追記：" +
-      note
-    );
+alert(
+  "管理区分を判定しました\n\n" +
+  "番号：" +
+  enteredNumber +
+  "\n管理区分：" +
+  managementLabel +
+  "\n現在状態：" +
+  (currentState || "状態なし") +
+  "\n追記：" +
+  note +
+  "\n\n作業設定へ進みます"
+);
 
-    log(
-      "イレギュラー番号確認完了\n" +
-      "管理区分：" +
-      managementLabel +
-      "\n番号：" +
-      enteredNumber
-    );
+document.getElementById(
+  "irregularArea"
+).style.display = "none";
 
-    return;
+enterSetupPhase({
+  managementType:
+    managedResult.managementType,
+
+  qrText:
+    enteredNumber,
+
+  managedResult:
+    managedResult,
+
+  quantityItem:
+    null,
+
+  currentState:
+    currentState
+  });
+
+log(
+  "イレギュラー番号確認完了\n" +
+  "管理区分：" +
+  managementLabel +
+  "\n作業区分・拠点・担当者を確認してください"
+  );
+
+return;
   }
 
   /*
@@ -3018,24 +3067,45 @@ function confirmIrregularInput() {
       );
 
     alert(
-      "管理区分を判定しました\n\n" +
-      "番号：" +
-      enteredNumber +
-      "\n管理区分：数量管理" +
-      "\n品名：" +
-      (displayName || "表示名なし") +
-      "\n追記：" +
-      note
-    );
+  "管理区分を判定しました\n\n" +
+  "番号：" +
+  enteredNumber +
+  "\n管理区分：数量管理" +
+  "\n品名：" +
+  (displayName || "表示名なし") +
+  "\n追記：" +
+  note +
+  "\n\n作業設定へ進みます"
+);
 
-    log(
-      "イレギュラー番号確認完了\n" +
-      "管理区分：数量管理\n" +
-      "品目コード：" +
-      enteredNumber
-    );
+document.getElementById(
+  "irregularArea"
+).style.display = "none";
 
-    return;
+enterSetupPhase({
+  managementType:
+    "quantity",
+
+  qrText:
+    enteredNumber,
+
+  managedResult:
+    null,
+
+  quantityItem:
+    quantityItem,
+
+  currentState:
+    ""
+});
+
+log(
+  "イレギュラー番号確認完了\n" +
+  "管理区分：数量管理\n" +
+  "作業区分・拠点・担当者を確認してください"
+);
+
+return;
   }
 
   /*
@@ -3084,7 +3154,9 @@ function cancelIrregularFlow() {
   ).value = "";
 
   scanWorkflowPhase =
-    SCAN_PHASE_DETECT;
+  SCAN_PHASE_DETECT;
+
+  irregularFlowActive = false;
 
   scanBusy = false;
 
@@ -4114,7 +4186,17 @@ function resetScan() {
   firstDetectedCurrentState = "";
 
   activeManagementRestriction = "";
-　 document.getElementById("mode").innerHTML =
+
+  irregularFlowActive = false;
+
+  pendingIrregularNumberType = "";
+  pendingIrregularEnteredNumber = "";
+  pendingIrregularNote = "";
+  pendingIrregularManagementType = "";
+  pendingIrregularManagedResult = null;
+  pendingIrregularQuantityItem = null;
+  
+　document.getElementById("mode").innerHTML =
   '<option value="">作業区分を選択</option>';
 
   document.getElementById("mode").value = "";
