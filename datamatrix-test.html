@@ -1905,7 +1905,34 @@ function loadSelections() {
   ensureRecDateDefault();
 }
 
+/**
+ * イレギュラーQRの番号不明ルートで、
+ * 選択可能な共通作業区分を表示する。
+ *
+ * 管理区分を判定できないため、
+ * REC専用・数量管理専用・修理中は表示しない。
+ */
+function populateUnknownIrregularModeOptions() {
+  const modeSelect =
+    document.getElementById("mode");
 
+  modeSelect.innerHTML =
+    '<option value="">作業区分を選択</option>';
+
+  COMMON_MODES.forEach(function(mode) {
+    const option =
+      document.createElement("option");
+
+    option.value = mode;
+    option.textContent = mode;
+
+    modeSelect.appendChild(option);
+  });
+
+  modeSelect.value = "";
+
+  toggleRecTarget();
+}
 /**
  * 管理区分に応じて、選択できる作業区分を作成する。
  */
