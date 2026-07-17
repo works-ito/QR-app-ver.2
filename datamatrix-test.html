@@ -1962,7 +1962,87 @@ function populateModeOptions(managementType) {
   toggleRecTarget();
 }
 
+/**
+ * イレギュラーQRの番号不明ルートで、
+ * 作業区分・拠点・担当者の設定画面を表示する。
+ */
+function enterUnknownIrregularSetupPhase() {
+  scanWorkflowPhase =
+    SCAN_PHASE_SETUP;
 
+  detectedManagementType =
+    "unknown";
+
+  detectedManagementTypeLabel =
+    "番号不明";
+
+  firstDetectedQrText =
+    "番号不明";
+
+  firstDetectedManagedResult =
+    null;
+
+  firstDetectedQuantityItem =
+    null;
+
+  firstDetectedCurrentState =
+    "";
+
+  document.getElementById(
+    "irregularArea"
+  ).style.display = "none";
+
+  document.getElementById(
+    "detectedManagementArea"
+  ).style.display = "none";
+
+  populateUnknownIrregularModeOptions();
+
+  const beginButton =
+    document.getElementById(
+      "beginBatchScanBtn"
+    );
+
+  beginButton.innerText =
+    "この設定で番号不明受付を開始";
+
+  beginButton.onclick =
+    beginUnknownIrregularRegistration;
+
+  beginButton.disabled =
+    false;
+
+  beginButton.style.background =
+    "#d39e00";
+
+  const settingsPanel =
+    document.getElementById(
+      "settingsPanel"
+    );
+
+  settingsPanel.style.display =
+    "block";
+
+  settingsPanel.open =
+    true;
+
+  document.getElementById(
+    "startBtn"
+  ).style.display = "none";
+
+  document.getElementById(
+    "startNoQrReturnBtn"
+  ).style.display = "none";
+
+  log(
+    "イレギュラー受付：番号不明\n" +
+    "作業区分・拠点・担当者を選択してください"
+  );
+
+  scrollToElement(
+    "settingsPanel"
+  );
+}
 /**
  * 最初のQRから管理区分を判定した後、
  * 作業区分・拠点・担当者の設定画面へ移動する。
