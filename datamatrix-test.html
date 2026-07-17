@@ -4879,6 +4879,25 @@ returnButton.disabled = false;
     handleBatchUnknownError(err, returnButton, "返却まとめて送信");
   }
 }
+/*
+ * イレギュラー受付専用IDを作成する。
+ */
+function createIrregularCaseId() {
+  return (
+    "IRR-" +
+    new Date()
+      .toISOString()
+      .replace(/[-:.TZ]/g, "")
+      .slice(0, 14) +
+    "-" +
+    String(
+      Math.floor(
+        Math.random() * 1000
+      )
+    ).padStart(3, "0")
+  );
+}
+
 function createBatchId() {
   return "BATCH-" + new Date()
     .toISOString()
@@ -5848,13 +5867,17 @@ function skipReturnPhotos() {
     "続けて読み取る場合は「QRを読み取る」を押してください"
   );
 }
+
 /*
- * イレギュラー受付写真の入力確認。
+ * イレギュラーQR受付の写真合成と送信。
  *
- * GASへの本送信処理は次工程で接続する。
- * 現段階では、写真が1枚以上追加されていることを確認する。
+ * 現段階では、
+ * 個体・簡易個体・RECの番号入力ありルートを送信する。
+ *
+ * 数量管理品と番号不明ルートは、
+ * 別処理として次工程で接続する。
  */
-function uploadIrregularPhotos() {
+async function uploadIrregularPhotos() {
   if (!pendingIrregularRecord) {
     alert(
       "イレギュラー受付情報がありません"
@@ -5882,25 +5905,278 @@ function uploadIrregularPhotos() {
     return;
   }
 
-  alert(
-    "イレギュラー受付写真を確認しました\n\n" +
-    "写真：" +
-    files.length +
-    "枚\n" +
-    "番号：" +
-    pendingIrregularRecord.qrText +
-    "\n作業区分：" +
-    pendingIrregularRecord.mode +
-    "\n\n次にGASへの保存処理を接続します"
+  /*
+   * 数量管理品は数量入力が必要なため、
+   * この段階では誤送信を防止する。
+   */
+  if (
+    pendingIrregularRecord.managementType ===
+    "quantity"
+  ) {
+    alert(
+      "数量管理品のイレギュラー受付は、数量入力機能を接続してから使用できます"
+    );
+
+    return;
+  }
+
+  const btn =
+    document.getElementById(
+      "uploadReturnPhotoBtn"
+    );
+
+  btn.disabled = true;
+
+  startPhotoLoading(
+    "イレギュラー受付写真を合成しています"
   );
 
-  log(
-    "イレギュラー受付写真確認完了\n" +
-    "写真：" +
-    files.length +
-    "枚\n" +
-    "次に送信処理を接続します"
-  );
+  try {
+    /*
+     * 写真を1枚の受付画像へ合成する。
+     */
+    const collageBase64 =
+      await makeIrregularCollage(
+        files,
+        pendingIrregularRecord
+      );
+
+    startPhotoLoading(
+      "イレギュラー受付を保存中"
+    );
+
+    const irregularCaseId =
+      createIrregularCaseId();
+
+    const payload = {
+      action:
+        "saveIrregularRegistration",
+
+      irregularCaseId:
+        irregularCaseId,
+
+      photoBase64:
+        collageBase64,
+
+      record: {
+        qr:
+          pendingIrregularRecord.qrText,
+
+        mode:
+          pendingIrregularRecord.mode,
+
+        user:
+          pendingIrregularRecord.user,
+
+        location:
+          pendingIrregularRecord.location,
+
+        recTarget:
+          pendingIrregularRecord.recTarget || "",
+
+        recDate:
+          pendingIrregularRecord.recDate || "",
+
+        managementType:
+          pendingIrregularRecord.managementType,
+
+        displayName:
+          pendingIrregularRecord.displayName || "",
+
+        currentState:
+          pendingIrregularRecord.currentState || "",
+
+        irregularNote:
+          pendingIrregularRecord.irregularNote,
+
+        readMethod:
+          pendingIrregularRecord.readMethod,
+
+        photoCount:
+          files.length
+      }
+    };
+
+    const response =
+      await fetch(
+        GAS_URL,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "text/plain"
+          },
+          body:
+            JSON.stringify(payload)
+        }
+      );
+
+    const text =
+      await response.text();
+
+    let result;
+
+    try {
+      result =
+        JSON.parse(text);
+    } catch (parseError) {
+      throw new Error(
+        "保存結果の解析に失敗しました\n" +
+        text.slice(0, 200)
+      );
+    }
+
+    if (!result.ok) {
+      stopPhotoLoading();
+
+      alert(
+        "イレギュラー受付保存失敗\n" +
+        (
+          result.message ||
+          "保存できませんでした"
+        )
+      );
+
+      log(
+        "イレギュラー受付保存失敗"
+      );
+
+      btn.disabled = false;
+
+      return;
+    }
+
+    stopPhotoLoading();
+
+    alert(
+      "イレギュラー受付を保存しました\n\n" +
+      "受付ID：" +
+      (
+        result.irregularCaseId ||
+        irregularCaseId
+      ) +
+      "\n番号：" +
+      pendingIrregularRecord.qrText +
+      "\n作業区分：" +
+      pendingIrregularRecord.mode +
+      "\n写真：" +
+      files.length +
+      "枚"
+    );
+
+    /*
+     * 写真画面を閉じる。
+     */
+    document.getElementById(
+      "returnPhotoArea"
+    ).style.display = "none";
+
+    document.getElementById(
+      "returnCameraInput"
+    ).value = "";
+
+    document.getElementById(
+      "returnLibraryInput"
+    ).value = "";
+
+    document.getElementById(
+      "returnPhotoPreview"
+    ).innerText = "";
+
+    btn.style.display = "none";
+    btn.disabled = false;
+
+    /*
+     * 在庫状態を最新化する。
+     */
+    await refreshInventoryAfterSend();
+
+    /*
+     * イレギュラー受付情報をクリアする。
+     */
+    selectedReturnPhotos = [];
+
+    pendingIrregularNumberType = "";
+    pendingIrregularEnteredNumber = "";
+    pendingIrregularNote = "";
+    pendingIrregularManagementType = "";
+    pendingIrregularManagedResult = null;
+    pendingIrregularQuantityItem = null;
+    pendingIrregularRecord = null;
+
+    irregularFlowActive = false;
+
+    /*
+     * 通常ホーム画面へ戻す。
+     */
+    scanWorkflowPhase =
+      SCAN_PHASE_DETECT;
+
+    detectedManagementType = "";
+    detectedManagementTypeLabel = "";
+    firstDetectedQrText = "";
+    firstDetectedManagedResult = null;
+    firstDetectedQuantityItem = null;
+    firstDetectedCurrentState = "";
+
+    activeManagementRestriction = "";
+
+    document.getElementById(
+      "mode"
+    ).innerHTML =
+      '<option value="">作業区分を選択</option>';
+
+    document.getElementById(
+      "mode"
+    ).value = "";
+
+    document.getElementById(
+      "settingsPanel"
+    ).open = false;
+
+    document.getElementById(
+      "settingsPanel"
+    ).style.display = "none";
+
+    document.getElementById(
+      "startBtn"
+    ).style.display = "block";
+
+    document.getElementById(
+      "startNoQrReturnBtn"
+    ).style.display = "block";
+
+    document.getElementById(
+      "stopBtn"
+    ).style.display = "none";
+
+    document.getElementById(
+      "resetBtn"
+    ).style.display = "none";
+
+    log(
+      "イレギュラー受付保存完了\n" +
+      "続けて作業する場合は、上のボタンを押してください"
+    );
+
+  } catch (error) {
+    stopPhotoLoading();
+
+    alert(
+      "イレギュラー受付保存エラー\n" +
+      (
+        error &&
+        error.message
+          ? error.message
+          : String(error)
+      )
+    );
+
+    log(
+      "イレギュラー受付保存エラー"
+    );
+
+    btn.disabled = false;
+  }
 }
 async function uploadReturnPhotos() {
   const files = selectedReturnPhotos.slice();
@@ -5998,6 +6274,239 @@ log(
     log("返却写真保存エラー");
     btn.disabled = false;
   }
+}
+
+/*
+ * イレギュラー受付写真を
+ * 1枚の受付画像へ合成する。
+ */
+function makeIrregularCollage(
+  files,
+  record
+) {
+  return new Promise(
+    async function(resolve) {
+      const images = [];
+
+      for (const file of files) {
+        const img =
+          await loadPhotoImage(file);
+
+        images.push(img);
+      }
+
+      const cols = 3;
+      const rows = 2;
+      const cellW = 1100;
+      const cellH = 825;
+      const headerH = 300;
+
+      const canvas =
+        document.createElement(
+          "canvas"
+        );
+
+      canvas.width =
+        cols * cellW;
+
+      canvas.height =
+        rows * cellH +
+        headerH;
+
+      const ctx =
+        canvas.getContext("2d");
+
+      ctx.fillStyle =
+        "#ffffff";
+
+      ctx.fillRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
+
+      ctx.fillStyle =
+        "#000000";
+
+      ctx.font =
+        "42px sans-serif";
+
+      ctx.fillText(
+        "イレギュラーQR受付写真",
+        20,
+        52
+      );
+
+      ctx.font =
+        "28px sans-serif";
+
+      ctx.fillText(
+        "日時：" +
+        new Date().toLocaleString(
+          "ja-JP"
+        ),
+        20,
+        100
+      );
+
+      ctx.fillText(
+        "担当：" +
+        (
+          record.user ||
+          ""
+        ),
+        20,
+        142
+      );
+
+      ctx.fillText(
+        "拠点：" +
+        (
+          record.location ||
+          ""
+        ),
+        20,
+        184
+      );
+
+      ctx.fillText(
+        "管理番号：" +
+        (
+          record.qrText ||
+          ""
+        ),
+        620,
+        100
+      );
+
+      ctx.fillText(
+        "品名：" +
+        String(
+          record.displayName ||
+          ""
+        ).slice(0, 50),
+        620,
+        142
+      );
+
+      ctx.fillText(
+        "作業区分：" +
+        (
+          record.mode ||
+          ""
+        ),
+        620,
+        184
+      );
+
+      ctx.fillText(
+        "読取方法：" +
+        (
+          record.readMethod ||
+          ""
+        ),
+        1700,
+        100
+      );
+
+      ctx.fillText(
+        "現在状態：" +
+        (
+          record.currentState ||
+          "状態なし"
+        ),
+        1700,
+        142
+      );
+
+      ctx.fillText(
+        "追記：" +
+        String(
+          record.irregularNote ||
+          ""
+        ).slice(0, 90),
+        20,
+        240
+      );
+
+      for (
+        let i = 0;
+        i < 6;
+        i++
+      ) {
+        const x =
+          (i % cols) *
+          cellW;
+
+        const y =
+          Math.floor(i / cols) *
+          cellH +
+          headerH;
+
+        ctx.strokeStyle =
+          "#cccccc";
+
+        ctx.strokeRect(
+          x,
+          y,
+          cellW,
+          cellH
+        );
+
+        ctx.fillStyle =
+          "#f5f5f5";
+
+        ctx.fillRect(
+          x + 1,
+          y + 1,
+          cellW - 2,
+          cellH - 2
+        );
+
+        if (images[i]) {
+          drawImageCover(
+            ctx,
+            images[i],
+            x,
+            y,
+            cellW,
+            cellH
+          );
+        }
+
+        ctx.fillStyle =
+          "rgba(0,0,0,0.65)";
+
+        ctx.fillRect(
+          x + 10,
+          y + 10,
+          92,
+          44
+        );
+
+        ctx.fillStyle =
+          "#ffffff";
+
+        ctx.font =
+          "30px sans-serif";
+
+        ctx.fillText(
+          (i + 1) +
+          "枚目",
+          x + 18,
+          y + 42
+        );
+      }
+
+      resolve(
+        canvas.toDataURL(
+          "image/jpeg",
+          0.92
+        )
+      );
+    }
+  );
 }
 
 function makeReturnCollage(files, info) {
