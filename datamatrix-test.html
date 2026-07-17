@@ -870,6 +870,10 @@ let pendingIrregularQuantityItem = null;
  * 現在イレギュラーQR受付中かどうか。
  */
 let irregularFlowActive = false;
+/*
+ * イレギュラー受付で送信前確認中の1件。
+ */
+let pendingIrregularRecord = null;
   /*
  * =========================================================
  * QR在庫管理 ver.2
@@ -1990,18 +1994,16 @@ const beginButton =
   document.getElementById("beginBatchScanBtn");
 
 if (irregularFlowActive) {
-  /*
-   * 次工程でイレギュラー送信情報と写真必須処理を接続するまで、
-   * 通常送信へ進ませない。
-   */
   beginButton.innerText =
-    "イレギュラー受付設定確認済み";
+    "この設定でイレギュラー受付を開始";
 
-  beginButton.onclick = null;
-  beginButton.disabled = true;
+  beginButton.onclick =
+    beginIrregularRegistration;
+
+  beginButton.disabled = false;
 
   beginButton.style.background =
-    "#999";
+    "#d39e00";
 } else {
   beginButton.innerText =
     "この設定でまとめ読取開始";
@@ -2360,6 +2362,247 @@ function startNoQrReturn() {
   );
 
   scrollToElement("settingsPanel");
+}
+
+/*
+ * イレギュラーQRで手入力した1件について、
+ * 作業設定と状態遷移を確認する。
+ *
+ * この段階ではまだGASへ送信しない。
+ */
+function beginIrregularRegistration() {
+  if (!irregularFlowActive) {
+    alert("イレギュラー受付情報がありません");
+    return;
+  }
+
+  const mode =
+    document.getElementById("mode").value;
+
+  const location =
+    document.getElementById("location").value;
+
+  const user =
+    document.getElementById("user").value;
+
+  if (!mode) {
+    alert("作業区分を選択してください");
+    document.getElementById("mode").focus();
+    return;
+  }
+
+  if (!location) {
+    alert("拠点を選択してください");
+    document.getElementById("location").focus();
+    return;
+  }
+
+  if (!user) {
+    alert("担当者を選択してください");
+    document.getElementById("user").focus();
+    return;
+  }
+
+  if (!validateRecDateBeforeSend()) {
+    return;
+  }
+
+  if (
+    !pendingIrregularEnteredNumber ||
+    pendingIrregularNumberType !== "入力"
+  ) {
+    alert(
+      "入力した管理番号または品目コードがありません"
+    );
+    return;
+  }
+
+  const managementType =
+    pendingIrregularManagementType;
+
+  /*
+   * 選択した作業区分が、
+   * 判定済みの管理区分で使用可能か確認する。
+   */
+  const allowedModes =
+    ALLOWED_MODES_BY_MANAGEMENT_TYPE[
+      managementType
+    ] || [];
+
+  if (!allowedModes.includes(mode)) {
+    alert(
+      "この管理区分では選択した作業区分を使用できません\n\n" +
+      "管理区分：" +
+      (
+        MANAGEMENT_TYPE_LABELS[
+          managementType
+        ] ||
+        managementType
+      ) +
+      "\n作業区分：" +
+      mode
+    );
+
+    return;
+  }
+
+  let currentState = "";
+  let displayName =
+    pendingIrregularEnteredNumber;
+
+  /*
+   * 個体・簡易個体・REC。
+   */
+  if (pendingIrregularManagedResult) {
+    const item =
+      pendingIrregularManagedResult.item;
+
+    currentState =
+      getFirstItemValue(
+        item,
+        [
+          "現在状態",
+          "状態",
+          "作業区分",
+          "status"
+        ]
+      );
+
+    displayName =
+      getFirstItemValue(
+        item,
+        [
+          "機種表示",
+          "表示名",
+          "機種名",
+          "品名",
+          "商品名",
+          "displayName"
+        ]
+      ) ||
+      pendingIrregularEnteredNumber;
+
+    const stateCheck =
+      validateStateTransition(
+        currentState,
+        mode
+      );
+
+    if (!stateCheck.ok) {
+      notifyScanError(
+        stateCheck.message +
+        "\n\n管理ID：" +
+        pendingIrregularEnteredNumber +
+        "\n現在状態：" +
+        (currentState || "状態なし") +
+        "\n作業区分：" +
+        mode
+      );
+
+      log(
+        "イレギュラー受付・状態判定エラー\n" +
+        pendingIrregularEnteredNumber
+      );
+
+      return;
+    }
+  }
+
+  /*
+   * 数量管理品。
+   */
+  if (pendingIrregularQuantityItem) {
+    displayName =
+      getFirstItemValue(
+        pendingIrregularQuantityItem,
+        [
+          "表示名",
+          "品名",
+          "商品名",
+          "displayName"
+        ]
+      ) ||
+      pendingIrregularEnteredNumber;
+  }
+
+  pendingIrregularRecord = {
+    qrText:
+      pendingIrregularEnteredNumber,
+
+    mode:
+      mode,
+
+    user:
+      user,
+
+    location:
+      location,
+
+    recTarget:
+      document.getElementById(
+        "recTarget"
+      ).value,
+
+    recDate:
+      shouldRequireRecDate()
+        ? document.getElementById(
+            "recDate"
+          ).value
+        : "",
+
+    managementType:
+      managementType,
+
+    displayName:
+      displayName,
+
+    currentState:
+      currentState,
+
+    irregularNote:
+      pendingIrregularNote,
+
+    readMethod:
+      "イレギュラーQR（手入力）"
+  };
+
+  saveSelections();
+
+  const managementLabel =
+    MANAGEMENT_TYPE_LABELS[
+      managementType
+    ] ||
+    managementType;
+
+  alert(
+    "イレギュラー受付設定確認完了\n\n" +
+    "番号：" +
+    pendingIrregularRecord.qrText +
+    "\n品名：" +
+    pendingIrregularRecord.displayName +
+    "\n管理区分：" +
+    managementLabel +
+    "\n現在状態：" +
+    (
+      pendingIrregularRecord.currentState ||
+      "状態なし"
+    ) +
+    "\n作業区分：" +
+    pendingIrregularRecord.mode +
+    "\n拠点：" +
+    pendingIrregularRecord.location +
+    "\n担当者：" +
+    pendingIrregularRecord.user +
+    "\n追記：" +
+    pendingIrregularRecord.irregularNote +
+    "\n読取方法：" +
+    pendingIrregularRecord.readMethod
+  );
+
+  log(
+    "イレギュラー受付設定確認完了\n" +
+    "次に必須写真と送信処理を接続します"
+  );
 }
 
 function beginNoQrReturn() {
@@ -3157,6 +3400,7 @@ function cancelIrregularFlow() {
   SCAN_PHASE_DETECT;
 
   irregularFlowActive = false;
+　pendingIrregularRecord = null;
 
   scanBusy = false;
 
@@ -4195,6 +4439,7 @@ function resetScan() {
   pendingIrregularManagementType = "";
   pendingIrregularManagedResult = null;
   pendingIrregularQuantityItem = null;
+  pendingIrregularRecord = null;
   
 　document.getElementById("mode").innerHTML =
   '<option value="">作業区分を選択</option>';
