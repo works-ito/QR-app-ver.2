@@ -715,12 +715,17 @@ textarea {
 </div>
 
 <div id="returnPhotoArea">
-  <div style="font-weight:bold; margin-bottom:10px;">返却写真の添付</div>
+  <div
+  id="returnPhotoTitle"
+  style="font-weight:bold; margin-bottom:10px;"
+>
+  返却写真の添付
+</div>
 
-  <p>
-    QR未取付機・返却伝票・破損・付属品不足などがある場合に保存。
-    最大6枚まで。
-  </p>
+<p id="returnPhotoDescription">
+  QR未取付機・返却伝票・破損・付属品不足などがある場合に保存。
+  最大6枚まで。
+</p>
 
   <button onclick="skipReturnPhotos()">
     写真なしで完了
@@ -2599,10 +2604,27 @@ function beginIrregularRegistration() {
     pendingIrregularRecord.readMethod
   );
 
-  log(
-    "イレギュラー受付内容確認\n" +
-    "次に必須写真と送信処理を接続します"
-  );
+    /*
+   * 作業設定画面を閉じ、
+   * イレギュラー受付用の必須写真画面へ進む。
+   */
+  document.getElementById(
+    "settingsPanel"
+  ).open = false;
+
+  document.getElementById(
+    "settingsPanel"
+  ).style.display = "none";
+
+  document.getElementById(
+    "returnCaseArea"
+  ).style.display = "none";
+
+  document.getElementById(
+    "irregularArea"
+  ).style.display = "none";
+
+  showIrregularPhotoArea();
 }
 
 function beginNoQrReturn() {
@@ -5378,9 +5400,169 @@ function drawImageCover(ctx, img, x, y, w, h) {
   ctx.drawImage(img, nx, ny, nw, nh);
   ctx.restore();
 }
+/*
+ * イレギュラーQR受付用の写真画面を表示する。
+ *
+ * 写真UIは返却写真画面を流用するが、
+ * タイトル・説明・保存処理はイレギュラー専用へ切り替える。
+ */
+function showIrregularPhotoArea() {
+  if (!pendingIrregularRecord) {
+    alert(
+      "イレギュラー受付情報がありません"
+    );
 
+    return;
+  }
+
+  selectedReturnPhotos = [];
+
+  /*
+   * 返却写真情報は使用しない。
+   * イレギュラー受付情報は
+   * pendingIrregularRecord に保持している。
+   */
+  lastReturnPhotoInfo = null;
+
+  const title =
+    document.getElementById(
+      "returnPhotoTitle"
+    );
+
+  const description =
+    document.getElementById(
+      "returnPhotoDescription"
+    );
+
+  const preview =
+    document.getElementById(
+      "returnPhotoPreview"
+    );
+
+  const uploadButton =
+    document.getElementById(
+      "uploadReturnPhotoBtn"
+    );
+
+  const cameraButton =
+    document.getElementById(
+      "returnCameraBtn"
+    );
+
+  const continueArea =
+    document.getElementById(
+      "returnContinueArea"
+    );
+
+  if (title) {
+    title.innerText =
+      "イレギュラー受付写真";
+  }
+
+  if (description) {
+    description.innerText =
+      "管理番号・伝票・QRラベルの状態が分かる写真を撮影してください。" +
+      "（1枚以上必須・最大6枚）";
+  }
+
+  if (preview) {
+    preview.innerText =
+      "管理番号・伝票・QRラベルの状態が分かる写真を撮影してください。\n" +
+      "写真は1枚以上必須です。\n" +
+      "カメラで1枚ずつ追加、またはライブラリから最大6枚選択できます。";
+  }
+
+  document.getElementById(
+    "returnPhotoArea"
+  ).style.display = "block";
+
+  document.getElementById(
+    "returnCameraInput"
+  ).value = "";
+
+  document.getElementById(
+    "returnLibraryInput"
+  ).value = "";
+
+  if (uploadButton) {
+    uploadButton.style.display =
+      "none";
+
+    uploadButton.disabled =
+      false;
+
+    /*
+     * 返却写真保存ではなく、
+     * イレギュラー専用保存処理へ切り替える。
+     */
+    uploadButton.onclick =
+      uploadIrregularPhotos;
+
+    uploadButton.innerText =
+      "イレギュラー受付写真を保存";
+  }
+
+  if (cameraButton) {
+    cameraButton.innerText =
+      "カメラで撮影";
+
+    cameraButton.style.display =
+      "block";
+  }
+
+  if (continueArea) {
+    continueArea.style.display =
+      "none";
+  }
+
+  log(
+    "イレギュラー受付は写真必須です。\n" +
+    "管理番号・伝票・QRラベルの状態が分かる写真を追加してください"
+  );
+
+  scrollToElement(
+    "returnPhotoArea"
+  );
+}
 
 function showReturnPhotoArea(info, photoRequired = false) {
+    /*
+   * 通常の返却写真画面として表示するため、
+   * イレギュラー用に変更した表示と保存処理を元へ戻す。
+   */
+  const title =
+    document.getElementById(
+      "returnPhotoTitle"
+    );
+
+  const description =
+    document.getElementById(
+      "returnPhotoDescription"
+    );
+
+  const uploadButton =
+    document.getElementById(
+      "uploadReturnPhotoBtn"
+    );
+
+  if (title) {
+    title.innerText =
+      "返却写真の添付";
+  }
+
+  if (description) {
+    description.innerText =
+      "QR未取付機・返却伝票・破損・付属品不足などがある場合に保存。" +
+      "最大6枚まで。";
+  }
+
+  if (uploadButton) {
+    uploadButton.onclick =
+      uploadReturnPhotos;
+
+    uploadButton.innerText =
+      "返却写真を保存";
+  }
   lastReturnPhotoInfo = Object.assign({}, info || {}, {
     mode: "返却",
     photoRequired: photoRequired,
@@ -5666,7 +5848,60 @@ function skipReturnPhotos() {
     "続けて読み取る場合は「QRを読み取る」を押してください"
   );
 }
+/*
+ * イレギュラー受付写真の入力確認。
+ *
+ * GASへの本送信処理は次工程で接続する。
+ * 現段階では、写真が1枚以上追加されていることを確認する。
+ */
+function uploadIrregularPhotos() {
+  if (!pendingIrregularRecord) {
+    alert(
+      "イレギュラー受付情報がありません"
+    );
 
+    return;
+  }
+
+  const files =
+    selectedReturnPhotos.slice();
+
+  if (files.length === 0) {
+    alert(
+      "写真を1枚以上追加してください"
+    );
+
+    return;
+  }
+
+  if (files.length > 6) {
+    alert(
+      "写真は最大6枚までです"
+    );
+
+    return;
+  }
+
+  alert(
+    "イレギュラー受付写真を確認しました\n\n" +
+    "写真：" +
+    files.length +
+    "枚\n" +
+    "番号：" +
+    pendingIrregularRecord.qrText +
+    "\n作業区分：" +
+    pendingIrregularRecord.mode +
+    "\n\n次にGASへの保存処理を接続します"
+  );
+
+  log(
+    "イレギュラー受付写真確認完了\n" +
+    "写真：" +
+    files.length +
+    "枚\n" +
+    "次に送信処理を接続します"
+  );
+}
 async function uploadReturnPhotos() {
   const files = selectedReturnPhotos.slice();
 
