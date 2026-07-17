@@ -6253,10 +6253,15 @@ async function uploadIrregularPhotos() {
           pendingIrregularRecord.irregularNote,
 
         readMethod:
-          pendingIrregularRecord.readMethod,
+        pendingIrregularRecord.readMethod,
 
-        photoCount:
-          files.length
+  numberType:
+        pendingIrregularRecord.numberType ||
+        pendingIrregularNumberType ||
+  "入力",
+
+photoCount:
+  files.length
       }
     };
 
