@@ -2316,6 +2316,163 @@ if (scanWorkflowPhase !== SCAN_PHASE_BATCH) {
 restartQrCamera();
 }
 
+  /**
+ * 番号不明のイレギュラー受付について、
+ * 作業区分・拠点・担当者を確定し、
+ * 必須写真画面へ進む。
+ *
+ * 番号不明のため、
+ * 通常管理ログと在庫状態は更新しない。
+ */
+function beginUnknownIrregularRegistration() {
+  if (!irregularFlowActive) {
+    alert(
+      "イレギュラー受付情報がありません"
+    );
+    return;
+  }
+
+  if (
+    pendingIrregularNumberType !==
+    "番号不明"
+  ) {
+    alert(
+      "番号不明の受付情報ではありません"
+    );
+    return;
+  }
+
+  const mode =
+    document.getElementById(
+      "mode"
+    ).value;
+
+  const location =
+    document.getElementById(
+      "location"
+    ).value;
+
+  const user =
+    document.getElementById(
+      "user"
+    ).value;
+
+  if (!mode) {
+    alert(
+      "作業区分を選択してください"
+    );
+
+    document.getElementById(
+      "mode"
+    ).focus();
+
+    return;
+  }
+
+  if (!location) {
+    alert(
+      "拠点を選択してください"
+    );
+
+    document.getElementById(
+      "location"
+    ).focus();
+
+    return;
+  }
+
+  if (!user) {
+    alert(
+      "担当者を選択してください"
+    );
+
+    document.getElementById(
+      "user"
+    ).focus();
+
+    return;
+  }
+
+  if (!pendingIrregularNote) {
+    alert(
+      "状況・理由・機械の特徴がありません"
+    );
+    return;
+  }
+
+  pendingIrregularRecord = {
+    qrText:
+      "番号不明",
+
+    numberType:
+      "番号不明",
+
+    mode:
+      mode,
+
+    user:
+      user,
+
+    location:
+      location,
+
+    recTarget:
+      "",
+
+    recDate:
+      "",
+
+    managementType:
+      "unknown",
+
+    displayName:
+      "番号不明",
+
+    currentState:
+      "",
+
+    irregularNote:
+      pendingIrregularNote,
+
+    readMethod:
+      "イレギュラーQR（番号不明）"
+  };
+
+  saveSelections();
+
+  alert(
+    "番号不明受付内容確認\n\n" +
+    "番号：番号不明\n" +
+    "作業区分：" +
+    mode +
+    "\n拠点：" +
+    location +
+    "\n担当者：" +
+    user +
+    "\n追記：" +
+    pendingIrregularNote +
+    "\n\n通常管理ログと在庫状態は更新しません。\n" +
+    "イレギュラー受付ログと写真だけを保存します。"
+  );
+
+  document.getElementById(
+    "settingsPanel"
+  ).open = false;
+
+  document.getElementById(
+    "settingsPanel"
+  ).style.display = "none";
+
+  document.getElementById(
+    "returnCaseArea"
+  ).style.display = "none";
+
+  document.getElementById(
+    "irregularArea"
+  ).style.display = "none";
+
+  showIrregularPhotoArea();
+}
 
 /**
  * 設定画面を取消し、
@@ -3320,21 +3477,20 @@ function confirmIrregularInput() {
    * 今回は番号不明として認識できたことだけ確認する。
    */
   if (numberType === "番号不明") {
-    alert(
-      "入力確認完了\n\n" +
-      "番号：番号不明\n" +
-      "管理区分：判定なし\n" +
-      "追記：" +
-      note
-    );
+  alert(
+    "番号不明として受付します\n\n" +
+    "管理番号・品目コード：番号不明\n" +
+    "在庫状態：更新しません\n" +
+    "通常管理ログ：保存しません\n" +
+    "追記：" +
+    note +
+    "\n\n作業設定へ進みます"
+  );
 
-    log(
-      "イレギュラー受付\n" +
-      "番号不明として確認しました"
-    );
+  enterUnknownIrregularSetupPhase();
 
-    return;
-  }
+  return;
+}
 
   /*
    * 個体・簡易個体・RECをローカル検索する。
