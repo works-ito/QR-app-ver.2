@@ -6560,18 +6560,27 @@ const confirmationOpened =
       btn
   });
 
-  if (confirmationOpened) {
+    if (confirmationOpened) {
     return;
   }
 
   /*
-   * タイトル候補がない現段階では、
-   * 従来どおりそのまま保存する。
+   * AI解析後もタイトル候補がない場合は、
+   * 写真保存へ進まず停止する。
+   *
+   * 解析失敗を隠したまま、
+   * 従来タイトルでDrive保存されることを防ぐ。
    */
-  await executeShipmentPhotoSave(
-    files,
-    lastShipmentPhotoInfo,
-    btn
+  btn.disabled =
+    false;
+
+  alert(
+    "保存タイトルを取得できませんでした。\n" +
+    "写真はまだDriveへ保存されていません。"
+  );
+
+  log(
+    "保存タイトルを取得できませんでした"
   );
 }
 
@@ -7139,16 +7148,28 @@ async function acquireSlipInfoFromPhoto(
 
     return slipInfo;
 
-  } catch (error) {
+ 
+    } catch (error) {
     console.warn(
       "伝票情報取得失敗",
       error
     );
 
-    /*
-     * AI・OCRの失敗では、
-     * 写真保存自体を止めない。
-     */
+    const errorMessage =
+      error &&
+      error.message
+        ? error.message
+        : String(error);
+
+    alert(
+      "伝票情報の解析に失敗しました\n\n" +
+      errorMessage
+    );
+
+    log(
+      "伝票情報の解析に失敗しました"
+    );
+
     return null;
 
   } finally {
