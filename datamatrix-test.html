@@ -5664,6 +5664,167 @@ function skipShipmentPhotos() {
   log("写真なしで完了しました。続けて読み取る場合は「カメラ起動」を押してください");
 }
 
+/*
+ * =========================================================
+ * 写真保存機能 P0
+ * 写真保存エンジン
+ * =========================================================
+ *
+ * 伝票情報取得エンジンとは分離し、
+ * 写真合成済みデータをGASへ送信して
+ * Driveへ保存する処理だけを担当する。
+ */
+
+/**
+ * 合成済み写真をGASへ送信し、
+ * 保存結果を返す共通エンジン。
+ *
+ * この関数では、
+ * 顧客名・現場名の取得や
+ * 写真合成処理は行わない。
+ */
+async function savePhotoByEngine(options) {
+  const data =
+    options || {};
+
+  const action =
+    String(
+      data.action || ""
+    ).trim();
+
+  const photoBase64 =
+    String(
+      data.photoBase64 || ""
+    ).trim();
+
+  const photoInfo =
+    data.photoInfo || {};
+
+  if (!action) {
+    throw new Error(
+      "写真保存先の処理名がありません"
+    );
+  }
+
+  if (!photoBase64) {
+    throw new Error(
+      "保存する写真データがありません"
+    );
+  }
+
+  const payload = {
+    action:
+      action,
+
+    photoBase64:
+      photoBase64,
+
+    photoInfo:
+      photoInfo
+  };
+
+  /*
+   * 将来、確定した保存タイトルを
+   * GAS側へ渡すための受け口。
+   *
+   * 現段階ではcurrentSlipInfoが未設定でも
+   * 既存動作へ影響しない。
+   */
+  const slipInfo =
+    getCurrentSlipInfo();
+
+  if (slipInfo) {
+    payload.slipInfo =
+      slipInfo;
+
+    payload.confirmedTitle =
+      slipInfo.confirmedTitle || "";
+  }
+
+  const response =
+    await fetch(
+      GAS_URL,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "text/plain"
+        },
+        body:
+          JSON.stringify(payload)
+      }
+    );
+
+  const text =
+    await response.text();
+
+  let result;
+
+  try {
+    result =
+      JSON.parse(text);
+  } catch (parseError) {
+    throw new Error(
+      "写真保存結果の解析に失敗しました\n" +
+      text.slice(0, 200)
+    );
+  }
+
+  if (!result.ok) {
+    throw new Error(
+      result.message ||
+      "写真を保存できませんでした"
+    );
+  }
+
+  return result;
+}
+
+
+/**
+ * 出庫写真保存用の入口。
+ *
+ * 出庫側は保存先actionだけ指定し、
+ * 実際の送信処理はsavePhotoByEngineへ任せる。
+ */
+async function saveShipmentPhotoByEngine(
+  photoBase64,
+  photoInfo
+) {
+  return savePhotoByEngine({
+    action:
+      "saveShipmentPhoto",
+
+    photoBase64:
+      photoBase64,
+
+    photoInfo:
+      photoInfo
+  });
+}
+
+
+/**
+ * 返却写真保存用の入口。
+ *
+ * 返却側は保存先actionだけ指定し、
+ * 実際の送信処理はsavePhotoByEngineへ任せる。
+ */
+async function saveReturnPhotoByEngine(
+  photoBase64,
+  photoInfo
+) {
+  return savePhotoByEngine({
+    action:
+      "saveReturnPhoto",
+
+    photoBase64:
+      photoBase64,
+
+    photoInfo:
+      photoInfo
+  });
+}
+
 async function uploadShipmentPhotos() {
   const files = selectedShipmentPhotos.slice();
 
@@ -5702,19 +5863,11 @@ async function uploadShipmentPhotos() {
       "出庫写真を保存中"
     );
 
-    const result = await fetch(GAS_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "text/plain"
-      },
-      body: JSON.stringify({
-        action: "saveShipmentPhoto",
-        photoBase64: collageBase64,
-        photoInfo: lastShipmentPhotoInfo
-      })
-    }).then(function(response) {
-      return response.json();
-    });
+    const result =
+  await saveShipmentPhotoByEngine(
+    collageBase64,
+    lastShipmentPhotoInfo
+  );
 
     if (!result.ok) {
       stopPhotoLoading();
@@ -6636,16 +6789,12 @@ async function uploadReturnPhotos() {
     const collageBase64 = await makeReturnCollage(files, lastReturnPhotoInfo);
     log("返却写真を保存中...\n送信ID：" + (lastReturnPhotoInfo.sendId || ""));
 
-    const result = await fetch(GAS_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain" },
-      body: JSON.stringify({
-        action: "saveReturnPhoto",
-        photoBase64: collageBase64,
-        photoInfo: lastReturnPhotoInfo
-      })
-    }).then(function(response) { return response.json(); });
-
+    const result =
+  await saveReturnPhotoByEngine(
+    collageBase64,
+    lastReturnPhotoInfo
+  );
+  
     if (!result.ok) {
       alert("返却写真保存失敗\n" + result.message);
       log("返却写真保存失敗");
