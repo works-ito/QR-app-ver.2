@@ -5620,27 +5620,90 @@ function showBatchFailure(result) {
  */
 function attachSlipInfoToPhotoInfo(photoInfo) {
   const baseInfo =
-    Object.assign({}, photoInfo || {});
+    Object.assign(
+      {},
+      photoInfo || {}
+    );
 
   const slipInfo =
     getCurrentSlipInfo();
 
   if (!slipInfo) {
-    baseInfo.slipInfo = null;
-    baseInfo.saveTitleCandidate = "";
-    baseInfo.confirmedTitle = "";
+    baseInfo.slipInfo =
+      null;
+
+    baseInfo.saveTitleCandidate =
+      "";
+
+    baseInfo.confirmedTitle =
+      "";
 
     return baseInfo;
   }
 
+  const customerName =
+    sanitizePhotoTitlePart(
+      slipInfo.customerName || ""
+    );
+
+  const siteName =
+    sanitizePhotoTitlePart(
+      slipInfo.siteName || ""
+    );
+
+  /*
+   * confirmedTitleがまだ作られていない場合は、
+   * 顧客名と現場名からタイトル候補を作る。
+   */
+  let titleCandidate =
+    String(
+      slipInfo.confirmedTitle || ""
+    ).trim();
+
+  if (!titleCandidate) {
+    if (
+      customerName &&
+      siteName
+    ) {
+      titleCandidate =
+        customerName +
+        "_" +
+        siteName;
+
+    } else if (customerName) {
+      titleCandidate =
+        customerName;
+
+    } else if (siteName) {
+      titleCandidate =
+        siteName;
+    }
+  }
+
+  const updatedSlipInfo =
+    Object.assign(
+      {},
+      slipInfo,
+      {
+        customerName:
+          customerName,
+
+        siteName:
+          siteName,
+
+        confirmedTitle:
+          titleCandidate
+      }
+    );
+
   baseInfo.slipInfo =
-    slipInfo;
+    updatedSlipInfo;
 
   baseInfo.saveTitleCandidate =
-    slipInfo.confirmedTitle || "";
+    titleCandidate;
 
   baseInfo.confirmedTitle =
-    slipInfo.confirmedTitle || "";
+    titleCandidate;
 
   return baseInfo;
 }
