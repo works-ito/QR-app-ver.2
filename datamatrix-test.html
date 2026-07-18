@@ -8098,35 +8098,56 @@ async function uploadReturnPhotos() {
     );
 
   btn.disabled =
-  true;
+    true;
 
-/*
- * タイトル候補がある場合だけ、
- * 保存前の確認画面を表示する。
- */
-const confirmationOpened =
-  openPhotoTitleConfirmation({
-    photoType:
+  /*
+   * 1枚目の写真を伝票としてAI・OCR解析し、
+   * 顧客名・現場名・タイトル候補を取得する。
+   */
+  lastReturnPhotoInfo =
+    await prepareSlipInfoBeforePhotoSave(
       "return",
-
-    files:
       files,
+      lastReturnPhotoInfo
+    );
 
-    photoInfo:
-      lastReturnPhotoInfo,
+  /*
+   * タイトル候補を取得できた場合は、
+   * 保存前の確認画面を表示する。
+   */
+  const confirmationOpened =
+    openPhotoTitleConfirmation({
+      photoType:
+        "return",
 
-    button:
-      btn
-  });
+      files:
+        files,
+
+      photoInfo:
+        lastReturnPhotoInfo,
+
+      button:
+        btn
+    });
 
   if (confirmationOpened) {
     return;
   }
 
-  await executeReturnPhotoSave(
-    files,
-    lastReturnPhotoInfo,
-    btn
+  /*
+   * AI解析後もタイトル候補がない場合は、
+   * 勝手に従来タイトルで保存せず停止する。
+   */
+  btn.disabled =
+    false;
+
+  alert(
+    "保存タイトルを取得できませんでした。\n" +
+    "写真はまだDriveへ保存されていません。"
+  );
+
+  log(
+    "保存タイトルを取得できませんでした"
   );
 }
 
