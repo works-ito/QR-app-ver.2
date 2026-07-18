@@ -7232,6 +7232,12 @@ async function prepareSlipInfoBeforePhotoSave(
     attachSlipInfoToPhotoInfo(
       updatedPhotoInfo
     );
+  console.log(updatedPhotoInfo);
+
+alert(
+  "タイトル候補=" +
+  getPhotoTitleCandidate(updatedPhotoInfo)
+);
 
   return updatedPhotoInfo;
 }
