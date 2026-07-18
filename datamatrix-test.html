@@ -999,6 +999,13 @@ let currentSlipInfo = null;
  * タイトル確認中の写真保存処理を一時保持する。
  */
 let pendingPhotoTitleSave = null;
+/*
+ * P0-6
+ * 伝票写真のAI・OCR解析中フラグ。
+ *
+ * 保存ボタンの連打による二重解析を防止する。
+ */
+let slipAnalysisBusy = false;
 let lastSentLogIds = [];
 let lastPendingSendId = "";
 let pendingQuantityItem = null;
@@ -6457,26 +6464,38 @@ async function uploadShipmentPhotos() {
       "uploadShipmentPhotoBtn"
     );
 
-  btn.disabled = true;
+  btn.disabled =
+  true;
 
-  /*
-   * タイトル候補がある場合だけ、
-   * 保存前の確認画面を表示する。
-   */
-  const confirmationOpened =
-    openPhotoTitleConfirmation({
-      photoType:
-        "shipment",
+/*
+ * タイトル候補が未取得の場合、
+ * 1枚目の写真を伝票としてAI・OCR解析する。
+ */
+lastShipmentPhotoInfo =
+  await prepareSlipInfoBeforePhotoSave(
+    "shipment",
+    files,
+    lastShipmentPhotoInfo
+  );
 
-      files:
-        files,
+/*
+ * AI・OCRでタイトル候補を取得できた場合は、
+ * P0-5のタイトル確認画面を表示する。
+ */
+const confirmationOpened =
+  openPhotoTitleConfirmation({
+    photoType:
+      "shipment",
 
-      photoInfo:
-        lastShipmentPhotoInfo,
+    files:
+      files,
 
-      button:
-        btn
-    });
+    photoInfo:
+      lastShipmentPhotoInfo,
+
+    button:
+      btn
+  });
 
   if (confirmationOpened) {
     return;
@@ -6655,6 +6674,331 @@ function makeShipmentCollage(files, info) {
     }
     resolve(canvas.toDataURL("image/jpeg", 0.92));
   });
+}
+
+/*
+ * =========================================================
+ * 写真保存機能 P0-6
+ * AI・OCR伝票情報取得エンジン
+ * =========================================================
+ */
+
+/**
+ * 伝票解析用に写真を縮小し、
+ * JPEGのBase64へ変換する。
+ *
+ * スマートフォン写真をそのまま送信すると重いため、
+ * 長辺を最大1600pxへ縮小する。
+ */
+async function makeSlipAnalysisImage(file) {
+  if (!file) {
+    throw new Error(
+      "解析する伝票写真がありません"
+    );
+  }
+
+  const img =
+    await loadPhotoImage(file);
+
+  const maxSide =
+    1600;
+
+  const originalWidth =
+    img.naturalWidth ||
+    img.width;
+
+  const originalHeight =
+    img.naturalHeight ||
+    img.height;
+
+  if (
+    !originalWidth ||
+    !originalHeight
+  ) {
+    throw new Error(
+      "伝票写真のサイズを取得できません"
+    );
+  }
+
+  const scale =
+    Math.min(
+      1,
+      maxSide /
+      Math.max(
+        originalWidth,
+        originalHeight
+      )
+    );
+
+  const width =
+    Math.max(
+      1,
+      Math.round(
+        originalWidth *
+        scale
+      )
+    );
+
+  const height =
+    Math.max(
+      1,
+      Math.round(
+        originalHeight *
+        scale
+      )
+    );
+
+  const canvas =
+    document.createElement(
+      "canvas"
+    );
+
+  canvas.width =
+    width;
+
+  canvas.height =
+    height;
+
+  const ctx =
+    canvas.getContext(
+      "2d"
+    );
+
+  ctx.fillStyle =
+    "#ffffff";
+
+  ctx.fillRect(
+    0,
+    0,
+    width,
+    height
+  );
+
+  ctx.drawImage(
+    img,
+    0,
+    0,
+    width,
+    height
+  );
+
+  return canvas.toDataURL(
+    "image/jpeg",
+    0.85
+  );
+}
+
+
+/**
+ * 1枚目の伝票写真をGASへ送り、
+ * 顧客名・現場名を取得する。
+ *
+ * GAS側では action:
+ * analyzeSlipPhoto を受け取る。
+ */
+async function acquireSlipInfoFromPhoto(
+  file,
+  photoType
+) {
+  if (!file) {
+    return null;
+  }
+
+  if (slipAnalysisBusy) {
+    return null;
+  }
+
+  slipAnalysisBusy =
+    true;
+
+  startPhotoLoading(
+    "伝票情報を確認しています"
+  );
+
+  try {
+    const analysisImageBase64 =
+      await makeSlipAnalysisImage(
+        file
+      );
+
+    const response =
+      await fetch(
+        GAS_URL,
+        {
+          method:
+            "POST",
+
+          headers: {
+            "Content-Type":
+              "text/plain"
+          },
+
+          body:
+            JSON.stringify({
+              action:
+                "analyzeSlipPhoto",
+
+              photoBase64:
+                analysisImageBase64,
+
+              photoType:
+                photoType || "",
+
+              requestedFields: [
+                "customerName",
+                "siteName"
+              ]
+            })
+        }
+      );
+
+    const text =
+      await response.text();
+
+    let result;
+
+    try {
+      result =
+        JSON.parse(text);
+    } catch (parseError) {
+      throw new Error(
+        "伝票解析結果を読み取れませんでした\n" +
+        text.slice(
+          0,
+          200
+        )
+      );
+    }
+
+    if (!result.ok) {
+      throw new Error(
+        result.message ||
+        "伝票情報を取得できませんでした"
+      );
+    }
+
+    const customerName =
+      sanitizePhotoTitlePart(
+        result.customerName
+      );
+
+    const siteName =
+      sanitizePhotoTitlePart(
+        result.siteName
+      );
+
+    /*
+     * 顧客名・現場名の両方が空の場合は、
+     * 解析成功とは扱わない。
+     */
+    if (
+      !customerName &&
+      !siteName
+    ) {
+      throw new Error(
+        "顧客名・現場名を判定できませんでした"
+      );
+    }
+
+    const slipInfo =
+      setCurrentSlipInfo({
+        customerName:
+          customerName,
+
+        siteName:
+          siteName,
+
+        originalSiteName:
+          siteName,
+
+        acquisitionMethod:
+          result.acquisitionMethod ||
+          "ai_ocr",
+
+        siteNameEdited:
+          false
+      });
+
+    console.log(
+      "伝票情報取得完了",
+      slipInfo
+    );
+
+    return slipInfo;
+
+  } catch (error) {
+    console.warn(
+      "伝票情報取得失敗",
+      error
+    );
+
+    /*
+     * AI・OCRの失敗では、
+     * 写真保存自体を止めない。
+     */
+    return null;
+
+  } finally {
+    slipAnalysisBusy =
+      false;
+
+    stopPhotoLoading();
+  }
+}
+
+
+/**
+ * タイトル候補がまだない場合だけ、
+ * 1枚目の写真から伝票情報を取得する。
+ *
+ * 取得後は写真情報へ固定して、
+ * P0-5のタイトル確認画面へ渡す。
+ */
+async function prepareSlipInfoBeforePhotoSave(
+  photoType,
+  files,
+  photoInfo
+) {
+  let updatedPhotoInfo =
+    Object.assign(
+      {},
+      photoInfo || {}
+    );
+
+  /*
+   * すでにData Matrix・手入力・AI等で
+   * タイトル候補を取得済みなら再解析しない。
+   */
+  if (
+    getPhotoTitleCandidate(
+      updatedPhotoInfo
+    )
+  ) {
+    return updatedPhotoInfo;
+  }
+
+  if (
+    !Array.isArray(files) ||
+    files.length === 0
+  ) {
+    return updatedPhotoInfo;
+  }
+
+  await acquireSlipInfoFromPhoto(
+    files[0],
+    photoType
+  );
+
+  /*
+   * AI・OCRで取得できた情報を
+   * この写真案件へ固定する。
+   */
+  updatedPhotoInfo =
+    attachSlipInfoToPhotoInfo(
+      updatedPhotoInfo
+    );
+
+  return updatedPhotoInfo;
 }
 
 function loadPhotoImage(file) {
@@ -7498,26 +7842,26 @@ async function uploadReturnPhotos() {
     );
 
   btn.disabled =
-    true;
+  true;
 
-  /*
-   * タイトル候補がある場合だけ、
-   * 保存前の確認画面を表示する。
-   */
-  const confirmationOpened =
-    openPhotoTitleConfirmation({
-      photoType:
-        "return",
+/*
+ * タイトル候補がある場合だけ、
+ * 保存前の確認画面を表示する。
+ */
+const confirmationOpened =
+  openPhotoTitleConfirmation({
+    photoType:
+      "return",
 
-      files:
-        files,
+    files:
+      files,
 
-      photoInfo:
-        lastReturnPhotoInfo,
+    photoInfo:
+      lastReturnPhotoInfo,
 
-      button:
-        btn
-    });
+    button:
+      btn
+  });
 
   if (confirmationOpened) {
     return;
