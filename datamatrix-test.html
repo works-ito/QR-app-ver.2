@@ -828,6 +828,20 @@ let lastShipmentPhotoInfo = null;
 let selectedShipmentPhotos = [];
 let lastReturnPhotoInfo = null;
 let selectedReturnPhotos = [];
+/*
+ * =========================================================
+ * 写真保存機能 P0
+ * 伝票情報取得エンジン
+ * =========================================================
+ *
+ * 写真保存処理とは分離し、
+ * 顧客名・現場名・保存タイトル候補だけを保持する。
+ *
+ * 将来は acquisitionMethod を
+ * datamatrix / qr / ai_ocr / manual
+ * のいずれかで使用する。
+ */
+let currentSlipInfo = null;
 let lastSentLogIds = [];
 let lastPendingSendId = "";
 let pendingQuantityItem = null;
@@ -1488,7 +1502,159 @@ function getFirstItemValue(item, keyCandidates) {
   return "";
 }
 
+/*
+ * =========================================================
+ * 写真保存機能 P0
+ * 伝票情報取得エンジン
+ * =========================================================
+ */
 
+/**
+ * 顧客名・現場名を保存タイトルで使用できる文字へ整える。
+ *
+ * Windows・Google Drive・ファイル保存で問題になりやすい
+ * 記号を全角または空白へ置き換える。
+ */
+function sanitizePhotoTitlePart(value) {
+  return String(value || "")
+    .normalize("NFKC")
+    .trim()
+    .replace(/[\\/:*?"<>|]/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+
+/**
+ * 顧客名と現場名から保存タイトル候補を生成する。
+ *
+ * 基本形式：
+ * 顧客名_現場名
+ *
+ * 片方しか存在しない場合は、
+ * 存在する方だけを使用する。
+ */
+function buildPhotoSaveTitle(customerName, siteName) {
+  const safeCustomerName =
+    sanitizePhotoTitlePart(customerName);
+
+  const safeSiteName =
+    sanitizePhotoTitlePart(siteName);
+
+  if (
+    safeCustomerName &&
+    safeSiteName
+  ) {
+    return (
+      safeCustomerName +
+      "_" +
+      safeSiteName
+    );
+  }
+
+  if (safeCustomerName) {
+    return safeCustomerName;
+  }
+
+  if (safeSiteName) {
+    return safeSiteName;
+  }
+
+  return "案件名未設定";
+}
+
+
+/**
+ * 取得した伝票情報を共通形式へ変換して保持する。
+ *
+ * この関数は情報の整理だけを行い、
+ * 写真合成・Drive保存は行わない。
+ */
+function setCurrentSlipInfo(options) {
+  const data =
+    options || {};
+
+  const customerName =
+    sanitizePhotoTitlePart(
+      data.customerName
+    );
+
+  const siteName =
+    sanitizePhotoTitlePart(
+      data.siteName
+    );
+
+  const originalSiteName =
+    sanitizePhotoTitlePart(
+      data.originalSiteName ||
+      data.siteName
+    );
+
+  const acquisitionMethod =
+    String(
+      data.acquisitionMethod ||
+      "manual"
+    ).trim();
+
+  const confirmedTitle =
+    buildPhotoSaveTitle(
+      customerName,
+      siteName
+    );
+
+  currentSlipInfo = {
+    customerName:
+      customerName,
+
+    siteName:
+      siteName,
+
+    originalSiteName:
+      originalSiteName,
+
+    acquisitionMethod:
+      acquisitionMethod,
+
+    siteNameEdited:
+      Boolean(
+        data.siteNameEdited
+      ),
+
+    confirmedTitle:
+      confirmedTitle,
+
+    acquiredAt:
+      data.acquiredAt ||
+      new Date().toISOString()
+  };
+
+  return currentSlipInfo;
+}
+
+
+/**
+ * 現在保持している伝票情報を取得する。
+ *
+ * 外部から直接 currentSlipInfo を触らず、
+ * この関数を通して取得する。
+ */
+function getCurrentSlipInfo() {
+  if (!currentSlipInfo) {
+    return null;
+  }
+
+  return Object.assign(
+    {},
+    currentSlipInfo
+  );
+}
+
+
+/**
+ * 現在保持している伝票情報を消去する。
+ */
+function clearCurrentSlipInfo() {
+  currentSlipInfo = null;
+}
 /**
  * QR検索用のキーを統一する
  */
