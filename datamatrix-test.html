@@ -7032,6 +7032,61 @@ async function makeSlipAnalysisImage(file) {
   );
 }
 
+async function fetchWithRetry(
+  url,
+  options,
+  retryCount = 1,
+  retryDelayMs = 1200
+) {
+  let lastError = null;
+
+  for (
+    let attempt = 0;
+    attempt <= retryCount;
+    attempt++
+  ) {
+    try {
+      const response =
+        await fetch(
+          url,
+          options
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          "HTTP " +
+          response.status
+        );
+      }
+
+      return response;
+
+    } catch (error) {
+      lastError = error;
+
+      if (
+        attempt >= retryCount
+      ) {
+        break;
+      }
+
+      console.warn(
+        "通信失敗。再試行します。",
+        error
+      );
+
+      await new Promise(
+        resolve =>
+          setTimeout(
+            resolve,
+            retryDelayMs
+          )
+      );
+    }
+  }
+
+  throw lastError;
+}
 
 /**
  * 1枚目の伝票写真をGASへ送り、
@@ -7066,9 +7121,9 @@ async function acquireSlipInfoFromPhoto(
       );
 
     const response =
-      await fetch(
-        GAS_URL,
-        {
+    await fetchWithRetry(
+    GAS_URL,
+    {
           method:
             "POST",
 
