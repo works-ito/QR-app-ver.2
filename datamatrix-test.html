@@ -5441,8 +5441,48 @@ function showBatchFailure(result) {
   );
 }
 
+/*
+ * =========================================================
+ * 写真保存機能 P0-3
+ * 出庫写真への保存タイトル候補受け渡し
+ * =========================================================
+ */
+
+/**
+ * 写真情報へ、現在の伝票情報と保存タイトル候補を追加する。
+ *
+ * 伝票情報がまだ取得されていない場合は、
+ * 既存の写真保存動作を維持するため空文字を設定する。
+ */
+function attachSlipInfoToPhotoInfo(photoInfo) {
+  const baseInfo =
+    Object.assign({}, photoInfo || {});
+
+  const slipInfo =
+    getCurrentSlipInfo();
+
+  if (!slipInfo) {
+    baseInfo.slipInfo = null;
+    baseInfo.saveTitleCandidate = "";
+    baseInfo.confirmedTitle = "";
+
+    return baseInfo;
+  }
+
+  baseInfo.slipInfo =
+    slipInfo;
+
+  baseInfo.saveTitleCandidate =
+    slipInfo.confirmedTitle || "";
+
+  baseInfo.confirmedTitle =
+    slipInfo.confirmedTitle || "";
+
+  return baseInfo;
+}
+
 function showShipmentPhotoArea(items) {
-  lastShipmentPhotoInfo = {
+  const basePhotoInfo = {
     mode: "出庫",
     ids: items.slice(),
     user: document.getElementById("user").value,
@@ -5450,16 +5490,56 @@ function showShipmentPhotoArea(items) {
     createdAt: new Date().toISOString()
   };
 
+  /*
+   * 現在取得済みの伝票情報がある場合は、
+   * 保存タイトル候補と一緒に出庫写真情報へ載せる。
+   */
+  lastShipmentPhotoInfo =
+    attachSlipInfoToPhotoInfo(
+      basePhotoInfo
+    );
+
   selectedShipmentPhotos = [];
-  document.getElementById("shipmentPhotoArea").style.display = "block";
-  document.getElementById("shipmentPhotoPreview").innerText =
-    "出庫送信完了。\n1枚目は出庫伝票推奨。\nカメラで1枚ずつ追加、またはライブラリから最大6枚選択できます。";
-  document.getElementById("uploadShipmentPhotoBtn").style.display = "none";
-  document.getElementById("uploadShipmentPhotoBtn").disabled = false;
-  document.getElementById("shipmentCameraInput").value = "";
-  document.getElementById("shipmentLibraryInput").value = "";
-  log("出庫送信完了。写真添付を選択してください");
-  scrollToElement("shipmentPhotoArea");
+
+  document.getElementById(
+    "shipmentPhotoArea"
+  ).style.display = "block";
+
+  document.getElementById(
+    "shipmentPhotoPreview"
+  ).innerText =
+    "出庫送信完了。\n" +
+    "1枚目は出庫伝票推奨。\n" +
+    "カメラで1枚ずつ追加、またはライブラリから最大6枚選択できます。";
+
+  document.getElementById(
+    "uploadShipmentPhotoBtn"
+  ).style.display = "none";
+
+  document.getElementById(
+    "uploadShipmentPhotoBtn"
+  ).disabled = false;
+
+  document.getElementById(
+    "shipmentCameraInput"
+  ).value = "";
+
+  document.getElementById(
+    "shipmentLibraryInput"
+  ).value = "";
+
+  console.log(
+    "出庫写真保存情報",
+    lastShipmentPhotoInfo
+  );
+
+  log(
+    "出庫送信完了。写真添付を選択してください"
+  );
+
+  scrollToElement(
+    "shipmentPhotoArea"
+  );
 }
 
 function chooseShipmentCamera() { document.getElementById("shipmentCameraInput").click(); }
@@ -5661,6 +5741,7 @@ function skipShipmentPhotos() {
   document.getElementById("uploadShipmentPhotoBtn").disabled = false;
   selectedShipmentPhotos = [];
   lastShipmentPhotoInfo = null;
+  clearCurrentSlipInfo();
   log("写真なしで完了しました。続けて読み取る場合は「カメラ起動」を押してください");
 }
 
@@ -5730,16 +5811,30 @@ async function savePhotoByEngine(options) {
    * 現段階ではcurrentSlipInfoが未設定でも
    * 既存動作へ影響しない。
    */
-  const slipInfo =
-    getCurrentSlipInfo();
+  /*
+ * 写真画面表示時に保持した伝票情報を優先する。
+ *
+ * 写真選択中に別のcurrentSlipInfoへ変わっても、
+ * この案件の保存タイトルが変わらないようにする。
+ */
+const slipInfo =
+  photoInfo.slipInfo ||
+  getCurrentSlipInfo();
 
-  if (slipInfo) {
-    payload.slipInfo =
-      slipInfo;
+if (slipInfo) {
+  payload.slipInfo =
+    slipInfo;
 
-    payload.confirmedTitle =
-      slipInfo.confirmedTitle || "";
-  }
+  payload.saveTitleCandidate =
+    photoInfo.saveTitleCandidate ||
+    slipInfo.confirmedTitle ||
+    "";
+
+  payload.confirmedTitle =
+    photoInfo.confirmedTitle ||
+    slipInfo.confirmedTitle ||
+    "";
+}
 
   const response =
     await fetch(
@@ -5907,6 +6002,7 @@ async function uploadShipmentPhotos() {
 
     selectedShipmentPhotos = [];
     lastShipmentPhotoInfo = null;
+　　　clearCurrentSlipInfo();
 
     log(
       "写真保存完了。\n" +
