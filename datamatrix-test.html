@@ -298,6 +298,88 @@ textarea {
   width: auto;
   margin: 0;
 }
+/* ===== 写真保存機能 P0-5：タイトル確認 ===== */
+
+#photoTitleConfirmArea {
+  display:none;
+  margin-top:20px;
+  padding:16px;
+  border:3px solid #1677ff;
+  border-radius:10px;
+  background:#eef6ff;
+}
+
+#photoTitleConfirmHeading {
+  font-size:22px;
+  font-weight:bold;
+  margin-bottom:12px;
+}
+
+#photoTitleCandidateDisplay {
+  padding:16px 12px;
+  margin-bottom:16px;
+  border:2px solid #333;
+  border-radius:8px;
+  background:#fff;
+  font-size:24px;
+  font-weight:bold;
+  line-height:1.5;
+  word-break:break-word;
+  text-align:center;
+}
+
+#confirmPhotoTitleBtn {
+  background:#1677ff;
+  color:#fff;
+  border:none;
+  border-radius:10px;
+  font-weight:bold;
+}
+
+#editPhotoSiteNameBtn {
+  background:#fff3cd;
+  color:#333;
+  border:2px solid #d39e00;
+  border-radius:10px;
+  font-weight:bold;
+}
+
+#photoSiteNameEditArea {
+  display:none;
+  margin:14px 0;
+  padding:12px;
+  border:2px solid #d39e00;
+  border-radius:8px;
+  background:#fffbe6;
+}
+
+.photoTitleEditLabel {
+  margin:8px 0 5px;
+  font-size:17px;
+  font-weight:bold;
+  color:#444;
+}
+
+#photoCustomerNameDisplay {
+  margin-bottom:12px;
+  padding:10px;
+  border:1px solid #aaa;
+  background:#f5f5f5;
+  font-size:20px;
+  word-break:break-word;
+}
+
+#photoSiteNameInput {
+  font-size:24px;
+  font-weight:bold;
+}
+
+#cancelPhotoTitleConfirmBtn {
+  background:#eee;
+  color:#333;
+  border:1px solid #aaa;
+  border-radius:8px;
+}
 </style>
 </head>
 
@@ -650,6 +732,76 @@ textarea {
   <button onclick="sendReturnBatchAfterMemo()">写真登録へ進む</button>
 </div>
 
+<!--
+  =========================================================
+  写真保存機能 P0-5
+  保存タイトル確認画面
+  =========================================================
+-->
+<div id="photoTitleConfirmArea">
+
+  <div id="photoTitleConfirmHeading">
+    保存タイトルを確認してください
+  </div>
+
+  <div id="photoTitleCandidateDisplay">
+    タイトル未取得
+  </div>
+
+  <button
+    id="confirmPhotoTitleBtn"
+    type="button"
+    onclick="confirmPhotoTitleAndSave()"
+  >
+    このタイトルで保存
+  </button>
+
+  <button
+    id="editPhotoSiteNameBtn"
+    type="button"
+    onclick="editPhotoSiteName()"
+  >
+    現場名を修正
+  </button>
+
+  <div id="photoSiteNameEditArea">
+
+    <div class="photoTitleEditLabel">
+      顧客名
+    </div>
+
+    <div id="photoCustomerNameDisplay"></div>
+
+    <div class="photoTitleEditLabel">
+      現場名
+    </div>
+
+    <input
+      type="text"
+      id="photoSiteNameInput"
+      autocomplete="off"
+      placeholder="現場名を入力"
+    >
+
+    <button
+      type="button"
+      onclick="applyEditedPhotoSiteName()"
+    >
+      修正内容を反映
+    </button>
+
+  </div>
+
+  <button
+    id="cancelPhotoTitleConfirmBtn"
+    type="button"
+    onclick="cancelPhotoTitleConfirmation()"
+  >
+    写真選択画面へ戻る
+  </button>
+
+</div>
+
 <div id="shipmentPhotoArea">
   <div style="font-weight:bold; margin-bottom:10px;">出庫写真の添付</div>
   <p>1枚目は出庫伝票の撮影推奨。最大6枚まで。</p>
@@ -842,6 +994,11 @@ let selectedReturnPhotos = [];
  * のいずれかで使用する。
  */
 let currentSlipInfo = null;
+/*
+ * P0-5
+ * タイトル確認中の写真保存処理を一時保持する。
+ */
+let pendingPhotoTitleSave = null;
 let lastSentLogIds = [];
 let lastPendingSendId = "";
 let pendingQuantityItem = null;
@@ -5752,6 +5909,348 @@ function skipShipmentPhotos() {
 
 /*
  * =========================================================
+ * 写真保存機能 P0-5
+ * 保存タイトル確認エンジン
+ * =========================================================
+ */
+
+/**
+ * 写真情報から保存タイトル候補を取得する。
+ */
+function getPhotoTitleCandidate(photoInfo) {
+  const info =
+    photoInfo || {};
+
+  const slipInfo =
+    info.slipInfo ||
+    getCurrentSlipInfo();
+
+  return String(
+    info.confirmedTitle ||
+    info.saveTitleCandidate ||
+    (
+      slipInfo &&
+      slipInfo.confirmedTitle
+    ) ||
+    ""
+  ).trim();
+}
+
+
+/**
+ * 保存タイトル候補がある場合だけ、
+ * タイトル確認画面を表示する。
+ *
+ * 候補がない場合はfalseを返し、
+ * 従来どおりそのまま保存する。
+ */
+function openPhotoTitleConfirmation(options) {
+  const data =
+    options || {};
+
+  const photoInfo =
+    data.photoInfo || {};
+
+  const titleCandidate =
+    getPhotoTitleCandidate(
+      photoInfo
+    );
+
+  /*
+   * OCR・手入力・Data Matrixが未接続で
+   * タイトル候補がない場合は確認画面を出さない。
+   */
+  if (!titleCandidate) {
+    return false;
+  }
+
+  pendingPhotoTitleSave = {
+    photoType:
+      String(
+        data.photoType || ""
+      ),
+
+    files:
+      Array.isArray(data.files)
+        ? data.files.slice()
+        : [],
+
+    photoInfo:
+      photoInfo,
+
+    button:
+      data.button || null
+  };
+
+  const slipInfo =
+    photoInfo.slipInfo ||
+    getCurrentSlipInfo() ||
+    {};
+
+  document.getElementById(
+    "photoTitleCandidateDisplay"
+  ).innerText =
+    titleCandidate;
+
+  document.getElementById(
+    "photoCustomerNameDisplay"
+  ).innerText =
+    slipInfo.customerName ||
+    "顧客名未取得";
+
+  document.getElementById(
+    "photoSiteNameInput"
+  ).value =
+    slipInfo.siteName || "";
+
+  document.getElementById(
+    "photoSiteNameEditArea"
+  ).style.display =
+    "none";
+
+  document.getElementById(
+    "photoTitleConfirmArea"
+  ).style.display =
+    "block";
+
+  log(
+    "保存タイトルを確認してください"
+  );
+
+  scrollToElement(
+    "photoTitleConfirmArea"
+  );
+
+  return true;
+}
+
+
+/**
+ * 「現場名を修正」を押したとき、
+ * 修正欄を表示する。
+ */
+function editPhotoSiteName() {
+  if (!pendingPhotoTitleSave) {
+    alert(
+      "タイトル確認情報がありません"
+    );
+
+    return;
+  }
+
+  document.getElementById(
+    "photoSiteNameEditArea"
+  ).style.display =
+    "block";
+
+  scrollToElement(
+    "photoSiteNameEditArea"
+  );
+
+  setTimeout(function() {
+    document.getElementById(
+      "photoSiteNameInput"
+    ).focus();
+  }, 300);
+}
+
+
+/**
+ * 修正された現場名を反映し、
+ * 保存タイトル候補を再生成する。
+ */
+function applyEditedPhotoSiteName() {
+  if (!pendingPhotoTitleSave) {
+    alert(
+      "タイトル確認情報がありません"
+    );
+
+    return;
+  }
+
+  const siteName =
+    document.getElementById(
+      "photoSiteNameInput"
+    ).value.trim();
+
+  if (!siteName) {
+    alert(
+      "現場名を入力してください"
+    );
+
+    document.getElementById(
+      "photoSiteNameInput"
+    ).focus();
+
+    return;
+  }
+
+  const oldSlipInfo =
+    pendingPhotoTitleSave
+      .photoInfo
+      .slipInfo ||
+    getCurrentSlipInfo() ||
+    {};
+
+  const updatedSlipInfo =
+    setCurrentSlipInfo({
+      customerName:
+        oldSlipInfo.customerName || "",
+
+      siteName:
+        siteName,
+
+      originalSiteName:
+        oldSlipInfo.originalSiteName ||
+        oldSlipInfo.siteName ||
+        siteName,
+
+      acquisitionMethod:
+        oldSlipInfo.acquisitionMethod ||
+        "manual",
+
+      siteNameEdited:
+        true,
+
+      acquiredAt:
+        oldSlipInfo.acquiredAt ||
+        new Date().toISOString()
+    });
+
+  /*
+   * 写真画面を開いた時点の情報も更新する。
+   */
+  pendingPhotoTitleSave.photoInfo =
+    attachSlipInfoToPhotoInfo(
+      pendingPhotoTitleSave.photoInfo
+    );
+
+  document.getElementById(
+    "photoTitleCandidateDisplay"
+  ).innerText =
+    updatedSlipInfo.confirmedTitle;
+
+  document.getElementById(
+    "photoSiteNameEditArea"
+  ).style.display =
+    "none";
+
+  log(
+    "現場名を修正しました\n" +
+    "保存タイトルを確認してください"
+  );
+}
+
+
+/**
+ * タイトル確認を取り消し、
+ * 元の写真選択画面へ戻る。
+ */
+function cancelPhotoTitleConfirmation() {
+  if (
+    pendingPhotoTitleSave &&
+    pendingPhotoTitleSave.button
+  ) {
+    pendingPhotoTitleSave
+      .button
+      .disabled = false;
+  }
+
+  pendingPhotoTitleSave = null;
+
+  document.getElementById(
+    "photoTitleConfirmArea"
+  ).style.display =
+    "none";
+
+  document.getElementById(
+    "photoSiteNameEditArea"
+  ).style.display =
+    "none";
+
+  log(
+    "写真内容を確認してください"
+  );
+}
+
+
+/**
+ * 確認済みタイトルで写真保存を再開する。
+ */
+async function confirmPhotoTitleAndSave() {
+  if (!pendingPhotoTitleSave) {
+    alert(
+      "保存する写真情報がありません"
+    );
+
+    return;
+  }
+
+  const pending =
+    pendingPhotoTitleSave;
+
+  const titleCandidate =
+    getPhotoTitleCandidate(
+      pending.photoInfo
+    );
+
+  if (!titleCandidate) {
+    alert(
+      "保存タイトルがありません"
+    );
+
+    return;
+  }
+
+  document.getElementById(
+    "photoTitleConfirmArea"
+  ).style.display =
+    "none";
+
+  document.getElementById(
+    "photoSiteNameEditArea"
+  ).style.display =
+    "none";
+
+  pendingPhotoTitleSave = null;
+
+  if (
+    pending.photoType ===
+    "shipment"
+  ) {
+    await executeShipmentPhotoSave(
+      pending.files,
+      pending.photoInfo,
+      pending.button
+    );
+
+    return;
+  }
+
+  if (
+    pending.photoType ===
+    "return"
+  ) {
+    await executeReturnPhotoSave(
+      pending.files,
+      pending.photoInfo,
+      pending.button
+    );
+
+    return;
+  }
+
+  if (pending.button) {
+    pending.button.disabled =
+      false;
+  }
+
+  alert(
+    "写真の種類を判定できません"
+  );
+}
+/*
+ * =========================================================
  * 写真保存機能 P0
  * 写真保存エンジン
  * =========================================================
@@ -5926,28 +6425,86 @@ async function saveReturnPhotoByEngine(
 }
 
 async function uploadShipmentPhotos() {
-  const files = selectedShipmentPhotos.slice();
+  const files =
+    selectedShipmentPhotos.slice();
 
   if (!lastShipmentPhotoInfo) {
-    alert("出庫情報がありません");
+    alert(
+      "出庫情報がありません"
+    );
+
     return;
   }
 
   if (files.length === 0) {
-    alert("写真を選択してください");
+    alert(
+      "写真を選択してください"
+    );
+
     return;
   }
 
   if (files.length > 6) {
-    alert("写真は最大6枚までです");
+    alert(
+      "写真は最大6枚までです"
+    );
+
     return;
   }
 
   const btn =
-    document.getElementById("uploadShipmentPhotoBtn");
+    document.getElementById(
+      "uploadShipmentPhotoBtn"
+    );
 
   btn.disabled = true;
 
+  /*
+   * タイトル候補がある場合だけ、
+   * 保存前の確認画面を表示する。
+   */
+  const confirmationOpened =
+    openPhotoTitleConfirmation({
+      photoType:
+        "shipment",
+
+      files:
+        files,
+
+      photoInfo:
+        lastShipmentPhotoInfo,
+
+      button:
+        btn
+    });
+
+  if (confirmationOpened) {
+    return;
+  }
+
+  /*
+   * タイトル候補がない現段階では、
+   * 従来どおりそのまま保存する。
+   */
+  await executeShipmentPhotoSave(
+    files,
+    lastShipmentPhotoInfo,
+    btn
+  );
+}
+
+
+/**
+ * 出庫写真の合成・保存を実行する。
+ *
+ * タイトル確認の有無にかかわらず、
+ * 最終的にはこの関数へ集約する。
+ */
+async function executeShipmentPhotoSave(
+  files,
+  photoInfo,
+  btn
+) {
   startPhotoLoading(
     "写真を合成しています"
   );
@@ -5956,7 +6513,7 @@ async function uploadShipmentPhotos() {
     const collageBase64 =
       await makeShipmentCollage(
         files,
-        lastShipmentPhotoInfo
+        photoInfo
       );
 
     startPhotoLoading(
@@ -5964,10 +6521,10 @@ async function uploadShipmentPhotos() {
     );
 
     const result =
-  await saveShipmentPhotoByEngine(
-    collageBase64,
-    lastShipmentPhotoInfo
-  );
+      await saveShipmentPhotoByEngine(
+        collageBase64,
+        photoInfo
+      );
 
     if (!result.ok) {
       stopPhotoLoading();
@@ -5977,37 +6534,51 @@ async function uploadShipmentPhotos() {
         result.message
       );
 
-      log("写真保存失敗");
+      log(
+        "写真保存失敗"
+      );
+
       btn.disabled = false;
+
       return;
     }
 
     stopPhotoLoading();
 
-    alert("出庫写真を保存しました");
+    alert(
+      "出庫写真を保存しました"
+    );
 
     document.getElementById(
       "shipmentPhotoArea"
-    ).style.display = "none";
+    ).style.display =
+      "none";
 
     document.getElementById(
       "shipmentCameraInput"
-    ).value = "";
+    ).value =
+      "";
 
     document.getElementById(
       "shipmentLibraryInput"
-    ).value = "";
+    ).value =
+      "";
 
     document.getElementById(
       "shipmentPhotoPreview"
-    ).innerText = "";
+    ).innerText =
+      "";
 
-    btn.style.display = "none";
-    btn.disabled = false;
+    btn.style.display =
+      "none";
+
+    btn.disabled =
+      false;
 
     selectedShipmentPhotos = [];
     lastShipmentPhotoInfo = null;
-　　　clearCurrentSlipInfo();
+
+    clearCurrentSlipInfo();
 
     log(
       "写真保存完了。\n" +
@@ -6019,11 +6590,20 @@ async function uploadShipmentPhotos() {
 
     alert(
       "写真保存エラー\n" +
-      err
+      (
+        err &&
+        err.message
+          ? err.message
+          : String(err)
+      )
     );
 
-    log("写真保存エラー");
-    btn.disabled = false;
+    log(
+      "写真保存エラー"
+    );
+
+    btn.disabled =
+      false;
   }
 }
 
@@ -6885,97 +7465,256 @@ photoCount:
   }
 }
 async function uploadReturnPhotos() {
-  const files = selectedReturnPhotos.slice();
+  const files =
+    selectedReturnPhotos.slice();
 
   if (!lastReturnPhotoInfo) {
-    alert("返却送信情報がありません");
-    return;
-  }
-  if (files.length === 0) {
-    alert("写真を選択してください");
-    return;
-  }
-  if (files.length > 6) {
-    alert("写真は最大6枚までです");
+    alert(
+      "返却送信情報がありません"
+    );
+
     return;
   }
 
-  const btn = document.getElementById("uploadReturnPhotoBtn");
-  btn.disabled = true;
-  log("返却写真をA4コラージュ化しています...");
+  if (files.length === 0) {
+    alert(
+      "写真を選択してください"
+    );
+
+    return;
+  }
+
+  if (files.length > 6) {
+    alert(
+      "写真は最大6枚までです"
+    );
+
+    return;
+  }
+
+  const btn =
+    document.getElementById(
+      "uploadReturnPhotoBtn"
+    );
+
+  btn.disabled =
+    true;
+
+  /*
+   * タイトル候補がある場合だけ、
+   * 保存前の確認画面を表示する。
+   */
+  const confirmationOpened =
+    openPhotoTitleConfirmation({
+      photoType:
+        "return",
+
+      files:
+        files,
+
+      photoInfo:
+        lastReturnPhotoInfo,
+
+      button:
+        btn
+    });
+
+  if (confirmationOpened) {
+    return;
+  }
+
+  await executeReturnPhotoSave(
+    files,
+    lastReturnPhotoInfo,
+    btn
+  );
+}
+
+
+/**
+ * 返却写真の合成・保存を実行する。
+ */
+async function executeReturnPhotoSave(
+  files,
+  photoInfo,
+  btn
+) {
+  startPhotoLoading(
+    "返却写真を合成しています"
+  );
 
   try {
-    const collageBase64 = await makeReturnCollage(files, lastReturnPhotoInfo);
-    log("返却写真を保存中...\n送信ID：" + (lastReturnPhotoInfo.sendId || ""));
+    const collageBase64 =
+      await makeReturnCollage(
+        files,
+        photoInfo
+      );
+
+    startPhotoLoading(
+      "返却写真を保存中"
+    );
 
     const result =
-  await saveReturnPhotoByEngine(
-    collageBase64,
-    lastReturnPhotoInfo
-  );
-  
+      await saveReturnPhotoByEngine(
+        collageBase64,
+        photoInfo
+      );
+
     if (!result.ok) {
-      alert("返却写真保存失敗\n" + result.message);
-      log("返却写真保存失敗");
-      btn.disabled = false;
+      stopPhotoLoading();
+
+      alert(
+        "返却写真保存失敗\n" +
+        result.message
+      );
+
+      log(
+        "返却写真保存失敗"
+      );
+
+      btn.disabled =
+        false;
+
       return;
     }
 
-    alert("返却写真を保存しました");
-    document.getElementById("returnPhotoArea").style.display = "none";
-    document.getElementById("returnCameraInput").value = "";
-    document.getElementById("returnLibraryInput").value = "";
-    document.getElementById("returnPhotoPreview").innerText = "";
-    btn.style.display = "none";
-    btn.disabled = false;
-    
+    stopPhotoLoading();
+
+    alert(
+      "返却写真を保存しました"
+    );
+
+    document.getElementById(
+      "returnPhotoArea"
+    ).style.display =
+      "none";
+
+    document.getElementById(
+      "returnCameraInput"
+    ).value =
+      "";
+
+    document.getElementById(
+      "returnLibraryInput"
+    ).value =
+      "";
+
+    document.getElementById(
+      "returnPhotoPreview"
+    ).innerText =
+      "";
+
+    btn.style.display =
+      "none";
+
+    btn.disabled =
+      false;
+
     selectedReturnPhotos = [];
-　　　lastReturnPhotoInfo = null;
-　　clearCurrentSlipInfo();
-/*
- * QRなし返却完了後は、
- * 通常の最初のQR読取画面へ戻す。
- */
-scanWorkflowPhase = SCAN_PHASE_DETECT;
-returnQrMode = "";
+    lastReturnPhotoInfo = null;
 
-detectedManagementType = "";
-detectedManagementTypeLabel = "";
-firstDetectedQrText = "";
-firstDetectedManagedResult = null;
-firstDetectedQuantityItem = null;
-firstDetectedCurrentState = "";
+    clearCurrentSlipInfo();
 
-activeManagementRestriction = "";
+    /*
+     * QRなし返却完了後は、
+     * 通常の最初のQR読取画面へ戻す。
+     */
+    scanWorkflowPhase =
+      SCAN_PHASE_DETECT;
 
-document.getElementById("mode").innerHTML =
-  '<option value="">作業区分を選択</option>';
+    returnQrMode =
+      "";
 
-document.getElementById("mode").value = "";
+    detectedManagementType =
+      "";
 
-document.getElementById("settingsPanel").open = false;
-document.getElementById("settingsPanel").style.display = "none";
+    detectedManagementTypeLabel =
+      "";
 
-document.getElementById("startBtn").style.display = "block";
-document.getElementById("stopBtn").style.display = "none";
-document.getElementById("resetBtn").style.display = "none";
+    firstDetectedQrText =
+      "";
 
-const noQrReturnBtn =
-  document.getElementById("startNoQrReturnBtn");
+    firstDetectedManagedResult =
+      null;
 
-if (noQrReturnBtn) {
-  noQrReturnBtn.style.display = "block";
-}
+    firstDetectedQuantityItem =
+      null;
 
-log(
-  "返却写真保存完了。\n" +
-  "続けて作業する場合は、上のボタンを押してください"
-);
+    firstDetectedCurrentState =
+      "";
+
+    activeManagementRestriction =
+      "";
+
+    document.getElementById(
+      "mode"
+    ).innerHTML =
+      '<option value="">作業区分を選択</option>';
+
+    document.getElementById(
+      "mode"
+    ).value =
+      "";
+
+    document.getElementById(
+      "settingsPanel"
+    ).open =
+      false;
+
+    document.getElementById(
+      "settingsPanel"
+    ).style.display =
+      "none";
+
+    document.getElementById(
+      "startBtn"
+    ).style.display =
+      "block";
+
+    document.getElementById(
+      "stopBtn"
+    ).style.display =
+      "none";
+
+    document.getElementById(
+      "resetBtn"
+    ).style.display =
+      "none";
+
+    const noQrReturnBtn =
+      document.getElementById(
+        "startNoQrReturnBtn"
+      );
+
+    if (noQrReturnBtn) {
+      noQrReturnBtn.style.display =
+        "block";
+    }
+
+    log(
+      "返却写真保存完了。\n" +
+      "続けて作業する場合は、上のボタンを押してください"
+    );
 
   } catch (err) {
-    alert("返却写真保存エラー\n" + err);
-    log("返却写真保存エラー");
-    btn.disabled = false;
+    stopPhotoLoading();
+
+    alert(
+      "返却写真保存エラー\n" +
+      (
+        err &&
+        err.message
+          ? err.message
+          : String(err)
+      )
+    );
+
+    log(
+      "返却写真保存エラー"
+    );
+
+    btn.disabled =
+      false;
   }
 }
 
