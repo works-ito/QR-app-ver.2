@@ -6139,9 +6139,11 @@ function applyEditedPhotoSiteName() {
   }
 
   const siteName =
-    document.getElementById(
-      "photoSiteNameInput"
-    ).value.trim();
+    sanitizePhotoTitlePart(
+      document.getElementById(
+        "photoSiteNameInput"
+      ).value.trim()
+    );
 
   if (!siteName) {
     alert(
@@ -6162,43 +6164,59 @@ function applyEditedPhotoSiteName() {
     getCurrentSlipInfo() ||
     {};
 
-  const updatedSlipInfo =
-    setCurrentSlipInfo({
-      customerName:
-        oldSlipInfo.customerName || "",
+  /*
+   * 修正後の現場名を現在の伝票情報へ反映する。
+   */
+  setCurrentSlipInfo({
+    customerName:
+      oldSlipInfo.customerName || "",
 
-      siteName:
-        siteName,
+    siteName:
+      siteName,
 
-      originalSiteName:
-        oldSlipInfo.originalSiteName ||
-        oldSlipInfo.siteName ||
-        siteName,
+    originalSiteName:
+      oldSlipInfo.originalSiteName ||
+      oldSlipInfo.siteName ||
+      siteName,
 
-      acquisitionMethod:
-        oldSlipInfo.acquisitionMethod ||
-        "manual",
+    acquisitionMethod:
+      oldSlipInfo.acquisitionMethod ||
+      "manual",
 
-      siteNameEdited:
-        true,
+    siteNameEdited:
+      true,
 
-      acquiredAt:
-        oldSlipInfo.acquiredAt ||
-        new Date().toISOString()
-    });
+    acquiredAt:
+      oldSlipInfo.acquiredAt ||
+      new Date().toISOString()
+  });
 
   /*
-   * 写真画面を開いた時点の情報も更新する。
+   * 保存待ちの写真情報にも、
+   * 修正後の伝票情報とタイトル候補を反映する。
    */
   pendingPhotoTitleSave.photoInfo =
     attachSlipInfoToPhotoInfo(
       pendingPhotoTitleSave.photoInfo
     );
 
+  const updatedTitle =
+    getPhotoTitleCandidate(
+      pendingPhotoTitleSave.photoInfo
+    );
+
+  if (!updatedTitle) {
+    alert(
+      "修正後の保存タイトルを作成できませんでした"
+    );
+
+    return;
+  }
+
   document.getElementById(
     "photoTitleCandidateDisplay"
   ).innerText =
-    updatedSlipInfo.confirmedTitle;
+    updatedTitle;
 
   document.getElementById(
     "photoSiteNameEditArea"
@@ -6208,6 +6226,10 @@ function applyEditedPhotoSiteName() {
   log(
     "現場名を修正しました\n" +
     "保存タイトルを確認してください"
+  );
+
+  scrollToElement(
+    "photoTitleConfirmArea"
   );
 }
 
