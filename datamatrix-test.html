@@ -6390,15 +6390,18 @@ async function savePhotoByEngine(options) {
   }
 
   const payload = {
-    action:
-      action,
+  action:
+    action,
 
-    photoBase64:
-      photoBase64,
+  photoRequestId:
+    photoRequestId,
 
-    photoInfo:
-      photoInfo
-  };
+  photoBase64:
+    photoBase64,
+
+  photoInfo:
+    photoInfo
+};
 
   /*
    * 将来、確定した保存タイトルを
