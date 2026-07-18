@@ -5498,6 +5498,11 @@ function showShipmentPhotoArea(items) {
     attachSlipInfoToPhotoInfo(
       basePhotoInfo
     );
+　
+　console.log(
+  "返却写真保存情報",
+  lastReturnPhotoInfo
+);
 
   selectedShipmentPhotos = [];
 
@@ -6260,13 +6265,31 @@ function showReturnPhotoArea(info, photoRequired = false) {
     uploadButton.innerText =
       "返却写真を保存";
   }
-  lastReturnPhotoInfo = Object.assign({}, info || {}, {
-    mode: "返却",
-    photoRequired: photoRequired,
-    createdAt: (info && info.createdAt)
-      ? info.createdAt
-      : new Date().toISOString()
+  const basePhotoInfo =
+  Object.assign({}, info || {}, {
+    mode:
+      "返却",
+
+    photoRequired:
+      photoRequired,
+
+    createdAt:
+      (
+        info &&
+        info.createdAt
+      )
+        ? info.createdAt
+        : new Date().toISOString()
   });
+
+/*
+ * 返却写真情報にも、
+ * 現在の伝票情報と保存タイトル候補を載せる。
+ */
+lastReturnPhotoInfo =
+  attachSlipInfoToPhotoInfo(
+    basePhotoInfo
+  );
 
   selectedReturnPhotos = [];
 
@@ -6539,7 +6562,7 @@ function skipReturnPhotos() {
 
   selectedReturnPhotos = [];
   lastReturnPhotoInfo = null;
-
+　clearCurrentSlipInfo();
   log(
     "返却写真なしで完了しました。" +
     "続けて読み取る場合は「QRを読み取る」を押してください"
@@ -6905,9 +6928,10 @@ async function uploadReturnPhotos() {
     document.getElementById("returnPhotoPreview").innerText = "";
     btn.style.display = "none";
     btn.disabled = false;
+    
     selectedReturnPhotos = [];
-lastReturnPhotoInfo = null;
-
+　　　lastReturnPhotoInfo = null;
+　　clearCurrentSlipInfo();
 /*
  * QRなし返却完了後は、
  * 通常の最初のQR読取画面へ戻す。
