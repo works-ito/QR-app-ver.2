@@ -6626,53 +6626,203 @@ async function executeShipmentPhotoSave(
   }
 }
 
+/**
+ * 出庫写真を1枚の合成画像にする。
+ *
+ * iPhoneでのメモリ使用量と
+ * GASへの送信データ量を抑えるため、
+ * 保存用画像を適正サイズへ縮小する。
+ */
 function makeShipmentCollage(files, info) {
-  return new Promise(async function(resolve) {
-    const images = [];
-    for (const file of files) {
-      const img = await loadPhotoImage(file);
-      images.push(img);
+  return new Promise(async function(resolve, reject) {
+    try {
+      const images = [];
+
+      for (const file of files) {
+        const img =
+          await loadPhotoImage(file);
+
+        images.push(img);
+      }
+
+      const cols = 3;
+      const rows = 2;
+
+      /*
+       * 旧設定
+       * cellW: 1100
+       * cellH: 825
+       *
+       * 新設定では約半分の画素数に抑える。
+       */
+      const cellW = 800;
+      const cellH = 600;
+      const headerH = 120;
+
+      const canvas =
+        document.createElement(
+          "canvas"
+        );
+
+      canvas.width =
+        cols * cellW;
+
+      canvas.height =
+        rows * cellH +
+        headerH;
+
+      const ctx =
+        canvas.getContext(
+          "2d"
+        );
+
+      if (!ctx) {
+        throw new Error(
+          "写真合成用画面を作成できません"
+        );
+      }
+
+      ctx.fillStyle =
+        "#ffffff";
+
+      ctx.fillRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
+
+      ctx.fillStyle =
+        "#000000";
+
+      ctx.font =
+        "28px sans-serif";
+
+      ctx.fillText(
+        "出庫写真",
+        16,
+        34
+      );
+
+      ctx.font =
+        "20px sans-serif";
+
+      ctx.fillText(
+        "日時：" +
+        new Date().toLocaleString(
+          "ja-JP"
+        ),
+        16,
+        68
+      );
+
+      ctx.fillText(
+        "担当：" +
+        (info.user || ""),
+        16,
+        100
+      );
+
+      const idText =
+        (info.ids || []).join(" ");
+
+      ctx.fillText(
+        "QR：" +
+        idText.slice(0, 78),
+        390,
+        68
+      );
+
+      if (idText.length > 78) {
+        ctx.fillText(
+          idText.slice(78, 156),
+          390,
+          100
+        );
+      }
+
+      for (let i = 0; i < 6; i++) {
+        const x =
+          (i % cols) *
+          cellW;
+
+        const y =
+          Math.floor(i / cols) *
+          cellH +
+          headerH;
+
+        ctx.strokeStyle =
+          "#cccccc";
+
+        ctx.strokeRect(
+          x,
+          y,
+          cellW,
+          cellH
+        );
+
+        ctx.fillStyle =
+          "#f5f5f5";
+
+        ctx.fillRect(
+          x + 1,
+          y + 1,
+          cellW - 2,
+          cellH - 2
+        );
+
+        if (images[i]) {
+          drawImageCover(
+            ctx,
+            images[i],
+            x,
+            y,
+            cellW,
+            cellH
+          );
+        }
+
+        ctx.fillStyle =
+          "rgba(0,0,0,0.65)";
+
+        ctx.fillRect(
+          x + 8,
+          y + 8,
+          72,
+          34
+        );
+
+        ctx.fillStyle =
+          "#ffffff";
+
+        ctx.font =
+          "22px sans-serif";
+
+        ctx.fillText(
+          (i + 1) + "枚目",
+          x + 14,
+          y + 33
+        );
+      }
+
+      /*
+       * 0.92から0.85へ変更し、
+       * 文字が読める品質を保ちながら
+       * 送信データ量を抑える。
+       */
+      const collageBase64 =
+        canvas.toDataURL(
+          "image/jpeg",
+          0.85
+        );
+
+      resolve(
+        collageBase64
+      );
+
+    } catch (error) {
+      reject(error);
     }
-
-    const cols = 3;
-    const rows = 2;
-    const cellW = 1100;
-    const cellH = 825;
-    const headerH = 180;
-
-    const canvas = document.createElement("canvas");
-    canvas.width = cols * cellW;
-    canvas.height = rows * cellH + headerH;
-    const ctx = canvas.getContext("2d");
-
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#000000";
-    ctx.font = "38px sans-serif";
-    ctx.fillText("出庫写真", 20, 48);
-    ctx.font = "28px sans-serif";
-    ctx.fillText("日時：" + new Date().toLocaleString("ja-JP"), 20, 88);
-    ctx.fillText("担当：" + (info.user || ""), 20, 128);
-
-    const idText = (info.ids || []).join(" ");
-    ctx.fillText("QR：" + idText.slice(0, 78), 520, 88);
-    if (idText.length > 78) ctx.fillText(idText.slice(78, 156), 520, 128);
-
-    for (let i = 0; i < 6; i++) {
-      const x = (i % cols) * cellW;
-      const y = Math.floor(i / cols) * cellH + headerH;
-      ctx.strokeStyle = "#cccccc";
-      ctx.strokeRect(x, y, cellW, cellH);
-      ctx.fillStyle = "#f5f5f5";
-      ctx.fillRect(x + 1, y + 1, cellW - 2, cellH - 2);
-      if (images[i]) drawImageCover(ctx, images[i], x, y, cellW, cellH);
-      ctx.fillStyle = "rgba(0,0,0,0.65)";
-      ctx.fillRect(x + 10, y + 10, 92, 44);
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "30px sans-serif";
-      ctx.fillText((i + 1) + "枚目", x + 18, y + 42);
-    }
-    resolve(canvas.toDataURL("image/jpeg", 0.92));
   });
 }
 
