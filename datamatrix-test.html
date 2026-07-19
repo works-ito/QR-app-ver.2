@@ -6517,11 +6517,15 @@ if (slipInfo) {
  */
 async function saveShipmentPhotoByEngine(
   photoBase64,
-  photoInfo
+  photoInfo,
+  photoRequestId
 ) {
   return savePhotoByEngine({
     action:
       "saveShipmentPhoto",
+
+    photoRequestId:
+      photoRequestId,
 
     photoBase64:
       photoBase64,
@@ -6660,8 +6664,10 @@ const confirmationOpened =
 async function executeShipmentPhotoSave(
   files,
   photoInfo,
-  btn
+  btn,
+  photoRequestId
 ) {
+  
   startPhotoLoading(
     "写真を合成しています"
   );
@@ -6678,10 +6684,11 @@ async function executeShipmentPhotoSave(
     );
 
     const result =
-      await saveShipmentPhotoByEngine(
-        collageBase64,
-        photoInfo
-      );
+    await saveShipmentPhotoByEngine(
+     collageBase64,
+     photoInfo,
+     photoRequestId
+    );
 
     if (!result.ok) {
       stopPhotoLoading();
