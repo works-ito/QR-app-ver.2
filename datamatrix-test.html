@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+pl<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -6332,7 +6332,8 @@ async function confirmPhotoTitleAndSave() {
     await executeReturnPhotoSave(
       pending.files,
       pending.photoInfo,
-      pending.button
+      pending.button,
+      pending.photoRequestId
     );
 
     return;
@@ -6544,11 +6545,15 @@ async function saveShipmentPhotoByEngine(
  */
 async function saveReturnPhotoByEngine(
   photoBase64,
-  photoInfo
+  photoInfo,
+  photoRequestId
 ) {
   return savePhotoByEngine({
     action:
       "saveReturnPhoto",
+
+    photoRequestId:
+      photoRequestId,
 
     photoBase64:
       photoBase64,
@@ -8173,7 +8178,10 @@ photoCount:
 async function uploadReturnPhotos() {
   const files =
     selectedReturnPhotos.slice();
-
+    
+  const photoRequestId =
+    createPhotoRequestId();
+  
   if (!lastReturnPhotoInfo) {
     alert(
       "返却送信情報がありません"
@@ -8232,6 +8240,8 @@ async function uploadReturnPhotos() {
       photoInfo:
         lastReturnPhotoInfo,
 
+      photoRequestId:
+        photoRequestId
       button:
         btn
     });
