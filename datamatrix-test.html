@@ -6048,6 +6048,11 @@ function openPhotoTitleConfirmation(options) {
     photoInfo:
       photoInfo,
 
+    photoRequestId:
+      String(
+       data.photoRequestId || ""
+      ).trim(),
+  
     button:
       data.button || null
   };
@@ -6307,17 +6312,18 @@ async function confirmPhotoTitleAndSave() {
   pendingPhotoTitleSave = null;
 
   if (
-    pending.photoType ===
-    "shipment"
-  ) {
-    await executeShipmentPhotoSave(
-      pending.files,
-      pending.photoInfo,
-      pending.button
-    );
+  pending.photoType ===
+  "shipment"
+) {
+  await executeShipmentPhotoSave(
+    pending.files,
+    pending.photoInfo,
+    pending.button,
+    pending.photoRequestId
+  );
 
-    return;
-  }
+  return;
+}
 
   if (
     pending.photoType ===
@@ -6400,16 +6406,11 @@ async function savePhotoByEngine(options) {
     
   const photoRequestId =
   String(
-    data.photoRequestId || ""
+    data.photoRequestId ||
+    photoInfo.photoRequestId ||
+    ""
   ).trim() ||
-  (
-    "PHOTO-" +
-    Date.now() +
-    "-" +
-    Math.random()
-      .toString(36)
-      .slice(2, 8)
-  );
+  createPhotoRequestId();
   
   if (!action) {
     throw new Error(
@@ -6556,7 +6557,10 @@ async function saveReturnPhotoByEngine(
 async function uploadShipmentPhotos() {
   const files =
     selectedShipmentPhotos.slice();
-
+    
+  const photoRequestId =
+  createPhotoRequestId();
+  
   if (!lastShipmentPhotoInfo) {
     alert(
       "出庫情報がありません"
@@ -6614,6 +6618,9 @@ const confirmationOpened =
 
     photoInfo:
       lastShipmentPhotoInfo,
+
+    photoRequestId:
+      photoRequestId,
 
     button:
       btn
