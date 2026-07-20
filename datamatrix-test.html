@@ -5238,18 +5238,35 @@ showSendStatus(
 
 alert("まとめて送信完了\n" + result.successCount + "件");
 
-    const sentItems = scannedRecords.map(function(record) {
+    const sentItems =
+  scannedRecords.map(
+    function(record) {
       return record.qrText;
-    });
-    const sentMode = mode;
-
-    resetScan();
-
-    if (sentMode === "出庫") {
-      showShipmentPhotoArea(sentItems);
-    } else {
-      log("送信完了。続けて読み取る場合は「カメラ起動」を押してください");
     }
+  );
+
+const sentMode =
+  mode;
+
+/*
+ * resetScan()より前に、
+ * 今回送信した送信IDを退避する。
+ */
+const sentSendId =
+  lastPendingSendId || "";
+
+resetScan();
+
+if (sentMode === "出庫") {
+  showShipmentPhotoArea(
+    sentItems,
+    sentSendId
+  );
+} else {
+  log(
+    "送信完了。続けて読み取る場合は「カメラ起動」を押してください"
+  );
+}
 
   } catch (err) {
     showSendStatus("送信エラーが発生しました", "error");
@@ -5708,14 +5725,35 @@ function attachSlipInfoToPhotoInfo(photoInfo) {
   return baseInfo;
 }
 
-function showShipmentPhotoArea(items) {
+function showShipmentPhotoArea(
+  items,
+  sendId
+) {
   const basePhotoInfo = {
-    mode: "出庫",
-    ids: items.slice(),
-    user: document.getElementById("user").value,
-    location: document.getElementById("location").value,
-    createdAt: new Date().toISOString()
-  };
+  mode:
+    "出庫",
+
+  ids:
+    items.slice(),
+
+  user:
+    document.getElementById(
+      "user"
+    ).value,
+
+  location:
+    document.getElementById(
+      "location"
+    ).value,
+
+  sendId:
+    String(
+      sendId || ""
+    ).trim(),
+
+  createdAt:
+    new Date().toISOString()
+};
 
   /*
    * 現在取得済みの伝票情報がある場合は、
@@ -5748,7 +5786,7 @@ function showShipmentPhotoArea(items) {
     "uploadShipmentPhotoBtn"
   ).style.display = "none";
 
-  document.getElementById(
+  document.getElementById(5
     "uploadShipmentPhotoBtn"
   ).disabled = false;
 
