@@ -770,12 +770,7 @@ textarea {
       顧客名
     </div>
 
-    <input
-      type="text"
-      id="photoCustomerNameInput"
-      autocomplete="off"
-      placeholder="顧客名を入力"
-　　　>
+    <div id="photoCustomerNameDisplay"></div>
 
     <div class="photoTitleEditLabel">
       現場名
@@ -6111,9 +6106,10 @@ function openPhotoTitleConfirmation(options) {
     titleCandidate;
 
   document.getElementById(
-     "photoCustomerNameInput"
-　　).value =
-     slipInfo.customerName || "";
+    "photoCustomerNameDisplay"
+　　　).innerText =
+     slipInfo.customerName ||
+    "顧客名未取得";
 
   document.getElementById(
     "photoSiteNameInput"
@@ -6184,12 +6180,7 @@ function applyEditedPhotoSiteName() {
 
     return;
   }
-　const customerName =
-  sanitizePhotoTitlePart(
-    document.getElementById(
-      "photoCustomerNameInput"
-    ).value.trim()
-  );
+
   const siteName =
     sanitizePhotoTitlePart(
       document.getElementById(
@@ -6221,7 +6212,7 @@ function applyEditedPhotoSiteName() {
    */
   setCurrentSlipInfo({
     customerName:
-      customerName,
+     oldSlipInfo.customerName || "",
 
     siteName:
       siteName,
