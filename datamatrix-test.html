@@ -5252,16 +5252,10 @@ const sentMode =
  * resetScan()より前に、
  * 今回送信した送信IDを退避する。
  */
-const sentSendId =
-  lastPendingSendId || "";
-
 resetScan();
 
 if (sentMode === "出庫") {
-  showShipmentPhotoArea(
-    sentItems,
-    sentSendId
-  );
+  showShipmentPhotoArea(sentItems);
 } else {
   log(
     "送信完了。続けて読み取る場合は「カメラ起動」を押してください"
@@ -5725,10 +5719,7 @@ function attachSlipInfoToPhotoInfo(photoInfo) {
   return baseInfo;
 }
 
-function showShipmentPhotoArea(
-  items,
-  sendId
-) {
+function showShipmentPhotoArea(items) {
   const basePhotoInfo = {
   mode:
     "出庫",
@@ -5745,11 +5736,6 @@ function showShipmentPhotoArea(
     document.getElementById(
       "location"
     ).value,
-
-  sendId:
-    String(
-      sendId || ""
-    ).trim(),
 
   createdAt:
     new Date().toISOString()
