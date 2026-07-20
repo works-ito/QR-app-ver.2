@@ -361,7 +361,7 @@ textarea {
   color:#444;
 }
 
-#photoCustomerNameDisplay {
+#photoCustomerNameInput {
   margin-bottom:12px;
   padding:10px;
   border:1px solid #aaa;
@@ -762,7 +762,7 @@ textarea {
     type="button"
     onclick="editPhotoSiteName()"
   >
-    現場名を修正
+    顧客名・現場名を修正
   </button>
 
   <div id="photoSiteNameEditArea">
@@ -771,7 +771,12 @@ textarea {
       顧客名
     </div>
 
-    <div id="photoCustomerNameDisplay"></div>
+    <input
+      type="text"
+      id="photoCustomerNameInput"
+      autocomplete="off"
+      placeholder="顧客名を入力"
+    >
 
     <div class="photoTitleEditLabel">
       現場名
@@ -5253,10 +5258,18 @@ const sentMode =
  * resetScan()より前に、
  * 今回送信した送信IDを退避する。
  */
+const sentSendId =
+  String(
+    lastPendingSendId || ""
+  ).trim();
+
 resetScan();
 
 if (sentMode === "出庫") {
-  showShipmentPhotoArea(sentItems);
+  showShipmentPhotoArea(
+    sentItems,
+    sentSendId
+  );
 } else {
   log(
     "送信完了。続けて読み取る場合は「カメラ起動」を押してください"
@@ -5720,7 +5733,10 @@ function attachSlipInfoToPhotoInfo(photoInfo) {
   return baseInfo;
 }
 
-function showShipmentPhotoArea(items) {
+function showShipmentPhotoArea(
+  items,
+  sendId
+) {
   const basePhotoInfo = {
   mode:
     "出庫",
@@ -5738,6 +5754,11 @@ function showShipmentPhotoArea(items) {
       "location"
     ).value,
 
+  sendId:
+    String(
+      sendId || ""
+    ).trim(),
+
   createdAt:
     new Date().toISOString()
 };
@@ -5752,8 +5773,8 @@ function showShipmentPhotoArea(items) {
     );
 　
 　console.log(
-  "返却写真保存情報",
-  lastReturnPhotoInfo
+  "出庫写真保存情報",
+  lastShipmentPhotoInfo
 );
 
   selectedShipmentPhotos = [];
@@ -6093,10 +6114,9 @@ function openPhotoTitleConfirmation(options) {
     titleCandidate;
 
   document.getElementById(
-    "photoCustomerNameDisplay"
-　　　).innerText =
-     slipInfo.customerName ||
-    "顧客名未取得";
+    "photoCustomerNameInput"
+  ).value =
+    slipInfo.customerName || "";
 
   document.getElementById(
     "photoSiteNameInput"
@@ -6149,14 +6169,14 @@ function editPhotoSiteName() {
 
   setTimeout(function() {
     document.getElementById(
-      "photoSiteNameInput"
+      "photoCustomerNameInput"
     ).focus();
   }, 300);
 }
 
 
 /**
- * 修正された現場名を反映し、
+ * 修正された顧客名・現場名を反映し、
  * 保存タイトル候補を再生成する。
  */
 function applyEditedPhotoSiteName() {
@@ -6168,12 +6188,31 @@ function applyEditedPhotoSiteName() {
     return;
   }
 
+  const customerName =
+    sanitizePhotoTitlePart(
+      document.getElementById(
+        "photoCustomerNameInput"
+      ).value.trim()
+    );
+
   const siteName =
     sanitizePhotoTitlePart(
       document.getElementById(
         "photoSiteNameInput"
       ).value.trim()
     );
+
+  if (!customerName) {
+    alert(
+      "顧客名を入力してください"
+    );
+
+    document.getElementById(
+      "photoCustomerNameInput"
+    ).focus();
+
+    return;
+  }
 
   if (!siteName) {
     alert(
@@ -6195,11 +6234,11 @@ function applyEditedPhotoSiteName() {
     {};
 
   /*
-   * 修正後の現場名を現在の伝票情報へ反映する。
+   * 修正後の顧客名・現場名を現在の伝票情報へ反映する。
    */
   setCurrentSlipInfo({
     customerName:
-     oldSlipInfo.customerName || "",
+      customerName,
 
     siteName:
       siteName,
@@ -6254,7 +6293,7 @@ function applyEditedPhotoSiteName() {
     "none";
 
   log(
-    "現場名を修正しました\n" +
+    "顧客名・現場名を修正しました\n" +
     "保存タイトルを確認してください"
   );
 
