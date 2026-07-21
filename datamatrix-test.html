@@ -816,7 +816,11 @@ textarea {
 
 <div id="shipmentPhotoArea">
   <div style="font-weight:bold; margin-bottom:10px;">出庫写真の添付</div>
-  <p>1枚目は出庫伝票の撮影推奨。最大6枚まで。</p>
+  <p>1枚目は必ず伝票写真を選択してください。
+    （タイトルの自動作成に使用します）
+
+     伝票写真を含めて最大6枚まで追加できます。
+</p>
 
   <button onclick="skipShipmentPhotos()">写真なしで完了</button>
 
@@ -887,8 +891,10 @@ textarea {
 </div>
 
 <p id="returnPhotoDescription">
-  QR未取付機・返却伝票・破損・付属品不足などがある場合に保存。
-  最大6枚まで。
+  1枚目は必ず伝票写真を選択してください。
+    （タイトルの自動作成に使用します）
+
+     伝票写真を含めて最大6枚まで追加できます。
 </p>
 
   <button onclick="skipReturnPhotos()">
@@ -7658,9 +7664,10 @@ lastReturnPhotoInfo =
 
   if (photoRequired) {
     document.getElementById("returnPhotoPreview").innerText =
-      "QRなし返却は写真保存が必須です。\n" +
-      "返却伝票と、QR未取付機の管理番号が確認できる写真を追加してください。\n" +
-      "カメラで1枚ずつ追加、またはライブラリから最大6枚選択できます。";
+      "1枚目は必ず伝票写真を選択してください。
+      （タイトルの自動作成に使用します）
+
+       伝票写真を含めて最大6枚まで追加できます。";
   } else {
     document.getElementById("returnPhotoPreview").innerText =
       "返却送信完了。\n" +
@@ -7901,8 +7908,10 @@ function skipReturnPhotos() {
   lastReturnPhotoInfo.photoRequired === true
 ) {
   notifyScanError(
-    "QRなし返却では写真保存が必須です。\n\n" +
-    "返却伝票と、QR未取付機の管理番号が分かる写真を追加してください。"
+    "1枚目は必ず伝票写真を選択してください。
+     （タイトルの自動作成に使用します）
+
+      伝票写真を含めて最大6枚まで追加できます。"
   );
 
   log(
