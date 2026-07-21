@@ -8351,10 +8351,12 @@ async function uploadReturnPhotos() {
 /**
  * 返却写真の合成・保存を実行する。
  */
-async function executeReturnPhotoSave(
+
+  async function executeReturnPhotoSave(
   files,
   photoInfo,
-  btn
+  btn,
+  photoRequestId
 ) {
   startPhotoLoading(
     "返却写真を合成しています"
@@ -8374,7 +8376,8 @@ async function executeReturnPhotoSave(
     const result =
       await saveReturnPhotoByEngine(
         collageBase64,
-        photoInfo
+        photoInfo,
+        photoRequestId
       );
 
     if (!result.ok) {
