@@ -5796,11 +5796,12 @@ function showShipmentPhotoArea(
   ).style.display = "block";
 
   document.getElementById(
-    "shipmentPhotoPreview"
-  ).innerText =
-    "出庫送信完了。\n" +
-    "1枚目は出庫伝票推奨。\n" +
-    "カメラで1枚ずつ追加、またはライブラリから最大6枚選択できます。";
+  "shipmentPhotoPreview"
+).innerText =
+  "出庫送信完了。\n" +
+  "1枚目は必ず伝票写真を選択してください。\n" +
+  "（タイトルの自動作成に使用します）\n\n" +
+  "伝票写真を含めて最大6枚まで追加できます。";
 
   document.getElementById(
     "uploadShipmentPhotoBtn"
@@ -7671,9 +7672,9 @@ lastReturnPhotoInfo =
        伝票写真を含めて最大6枚まで追加できます。";
   } else {
     document.getElementById("returnPhotoPreview").innerText =
-      "返却送信完了。\n" +
-      "QR未取付機・返却伝票・破損・付属品不足などがある場合は写真を保存してください。\n" +
-      "カメラで1枚ずつ追加、またはライブラリから最大6枚選択できます。";
+  "返却送信完了。\n" +
+  "QR未取付機・返却伝票・破損・付属品不足などがある場合は写真を保存してください。\n\n" +
+  "写真は最大6枚まで追加できます。";
   }
 
   document.getElementById("uploadReturnPhotoBtn").style.display = "none";
