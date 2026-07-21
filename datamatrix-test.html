@@ -7665,12 +7665,11 @@ lastReturnPhotoInfo =
   document.getElementById("returnPhotoArea").style.display = "block";
 
   if (photoRequired) {
-    document.getElementById("returnPhotoPreview").innerText =
-      "1枚目は必ず伝票写真を選択してください。
-      （タイトルの自動作成に使用します）
-
-       伝票写真を含めて最大6枚まで追加できます。";
-  } else {
+  document.getElementById("returnPhotoPreview").innerText =
+    "1枚目は必ず伝票写真を選択してください。\n" +
+    "（タイトルの自動作成に使用します）\n\n" +
+    "伝票写真を含めて最大6枚まで追加できます。";
+} else {
     document.getElementById("returnPhotoPreview").innerText =
   "返却送信完了。\n" +
   "QR未取付機・返却伝票・破損・付属品不足などがある場合は写真を保存してください。\n\n" +
@@ -7910,11 +7909,11 @@ function skipReturnPhotos() {
   lastReturnPhotoInfo.photoRequired === true
 ) {
   notifyScanError(
-    "1枚目は必ず伝票写真を選択してください。
-     （タイトルの自動作成に使用します）
-
-      伝票写真を含めて最大6枚まで追加できます。"
-  );
+  "QRなし返却は写真必須です。\n\n" +
+  "1枚目は必ず伝票写真を選択してください。\n" +
+  "（タイトルの自動作成に使用します）\n\n" +
+  "伝票写真を含めて最大6枚まで追加できます。"
+);
 
   log(
     "QRなし返却は写真必須です。\n" +
