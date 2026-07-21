@@ -570,7 +570,7 @@ textarea {
 <button id="resetBtn" onclick="resetScan()" style="display:none;">読取リセット</button>
 <button id="undoBtn" onclick="undoLastScan()" style="display:none;">最後の読取取消</button>
 <button id="cancelLastSendBtn" onclick="cancelLastSend()" style="display:none; background:#ffe0e0;">
-  直前送信を取消
+  直前送信を取消(5分間有効)
 </button>
 <div id="status">未クリック</div>
 <div id="lastRead"></div>
@@ -5230,7 +5230,7 @@ async function sendBatchToSheet() {
 
   stopQr();
   document.getElementById("sendBatchBtn").disabled = true;
-  startBatchLoading("まとめて送信中");
+  startBatchLoading("送信中");
   
   try {
     const records = scannedRecords.map(buildBatchRecordData);
@@ -5359,7 +5359,7 @@ async function sendRecBatchAfterMemo() {
 
   const btn = document.querySelector("#recSendArea button");
   btn.disabled = true;
-  startBatchLoading("REC送信中");
+  startBatchLoading("送信中");
 
   try {
     const records = pendingRecRecords.map(buildBatchRecordData);
@@ -9049,8 +9049,8 @@ async function cancelLastSend() {
 
   const btn = document.getElementById("cancelLastSendBtn");
   btn.disabled = true;
-  startBatchLoading("直前取消中");
   log("直前送信を取消中...\n送信ID：" + sendId);
+  startBatchLoading("直前取消中");
 
   try {
     const response = await fetch(GAS_URL, {
