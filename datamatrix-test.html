@@ -6537,7 +6537,16 @@ async function savePhotoByEngine(options) {
 
   photoInfo:
     photoInfo
-};
+　};
+
+  /*
+   * 写真種別ごとに必要な追加情報を、
+   * 共通の送信データへ載せる。
+   */
+  Object.assign(
+    payload,
+    data.extraPayload || {}
+  );
 
   /*
    * 将来、確定した保存タイトルを
@@ -6636,7 +6645,33 @@ async function saveShipmentPhotoByEngine(
   });
 }
 
+async function saveIrregularPhotoByEngine(
+  photoBase64,
+  photoInfo,
+  photoRequestId
+) {
+  return await savePhotoByEngine({
+  action:
+    "saveIrregularRegistration",
 
+  photoBase64:
+    photoBase64,
+
+  photoInfo:
+    photoInfo,
+
+  photoRequestId:
+    photoRequestId,
+
+  extraPayload: {
+    record:
+      photoInfo.irregularRecord,
+
+    irregularCaseId:
+      photoInfo.irregularCaseId || ""
+  }
+});
+}
 /**
  * 返却写真保存用の入口。
  *
@@ -8368,6 +8403,230 @@ photoCount:
     btn.disabled = false;
   }
 }
+
+/**
+ * タイトル確認後に、
+ * イレギュラー受付写真の合成・保存を実行する。
+ */
+async function executeIrregularPhotoSave(
+  files,
+  photoInfo,
+  btn,
+  photoRequestId
+) {
+  const irregularRecord =
+    (
+      photoInfo &&
+      photoInfo.irregularRecord
+    )
+      ? photoInfo.irregularRecord
+      : pendingIrregularRecord;
+
+  if (!irregularRecord) {
+    alert(
+      "イレギュラー受付情報がありません"
+    );
+
+    if (btn) {
+      btn.disabled = false;
+    }
+
+    return;
+  }
+　  /*
+   * 保存単位を識別する受付IDを確定し、
+   * 写真枚数も受付情報へ反映する。
+   */
+  const irregularCaseId =
+    photoInfo.irregularCaseId ||
+    createIrregularCaseId();
+
+  photoInfo.irregularCaseId =
+    irregularCaseId;
+
+  photoInfo.irregularRecord =
+    Object.assign(
+      {},
+      irregularRecord,
+      {
+        photoCount:
+          files.length
+      }
+    );
+  startPhotoLoading(
+    "イレギュラー受付写真を合成しています"
+  );
+
+  try {
+    const collageBase64 =
+      await makeIrregularCollage(
+        files,
+        irregularRecord
+      );
+
+    startPhotoLoading(
+      "イレギュラー受付を保存中"
+    );
+
+    const result =
+      await saveIrregularPhotoByEngine(
+        collageBase64,
+        photoInfo,
+        photoRequestId
+      );
+
+    if (!result.ok) {
+      stopPhotoLoading();
+
+      alert(
+        "イレギュラー受付保存失敗\n" +
+        (
+          result.message ||
+          "保存できませんでした"
+        )
+      );
+
+      log(
+        "イレギュラー受付保存失敗"
+      );
+
+      if (btn) {
+        btn.disabled = false;
+      }
+
+      return;
+    }
+
+    stopPhotoLoading();
+
+    alert(
+      "イレギュラー受付を保存しました"
+    );
+　    document.getElementById(
+      "returnPhotoArea"
+    ).style.display =
+      "none";
+
+    document.getElementById(
+      "returnCameraInput"
+    ).value =
+      "";
+
+    document.getElementById(
+      "returnLibraryInput"
+    ).value =
+      "";
+
+    document.getElementById(
+      "returnPhotoPreview"
+    ).innerText =
+      "";
+
+    if (btn) {
+      btn.style.display =
+        "none";
+
+      btn.disabled =
+        false;
+    }
+
+    selectedReturnPhotos = [];
+    lastReturnPhotoInfo = null;
+
+    pendingIrregularNumberType = "";
+    pendingIrregularEnteredNumber = "";
+    pendingIrregularNote = "";
+    pendingIrregularManagementType = "";
+    pendingIrregularManagedResult = null;
+    pendingIrregularQuantityItem = null;
+    pendingIrregularRecord = null;
+
+    irregularFlowActive = false;
+
+    clearCurrentSlipInfo();
+
+    scanWorkflowPhase =
+      SCAN_PHASE_DETECT;
+
+    detectedManagementType = "";
+    detectedManagementTypeLabel = "";
+    firstDetectedQrText = "";
+    firstDetectedManagedResult = null;
+    firstDetectedQuantityItem = null;
+    firstDetectedCurrentState = "";
+
+    activeManagementRestriction = "";
+
+    document.getElementById(
+      "mode"
+    ).innerHTML =
+      '<option value="">作業区分を選択</option>';
+
+    document.getElementById(
+      "mode"
+    ).value =
+      "";
+
+    document.getElementById(
+      "settingsPanel"
+    ).open =
+      false;
+
+    document.getElementById(
+      "settingsPanel"
+    ).style.display =
+      "none";
+
+    document.getElementById(
+      "startBtn"
+    ).style.display =
+      "block";
+
+    document.getElementById(
+      "startNoQrReturnBtn"
+    ).style.display =
+      "block";
+
+    document.getElementById(
+      "stopBtn"
+    ).style.display =
+      "none";
+
+    document.getElementById(
+      "resetBtn"
+    ).style.display =
+      "none";
+
+    await refreshInventoryAfterSend();
+
+    log(
+      "イレギュラー受付保存完了\n" +
+      "続けて作業する場合は、上のボタンを押してください"
+    );
+    
+  } catch (error) {
+    stopPhotoLoading();
+
+    alert(
+      "イレギュラー受付保存エラー\n" +
+      (
+        error &&
+        error.message
+          ? error.message
+          : String(error)
+      )
+    );
+
+    log(
+      "イレギュラー受付保存エラー"
+    );
+
+    if (btn) {
+      btn.disabled = false;
+    }
+  }
+}
+
 async function uploadReturnPhotos() {
   const files =
     selectedReturnPhotos.slice();
