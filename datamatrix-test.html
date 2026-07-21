@@ -816,10 +816,9 @@ textarea {
 
 <div id="shipmentPhotoArea">
   <div style="font-weight:bold; margin-bottom:10px;">出庫写真の添付</div>
-  <p>1枚目は必ず伝票写真を選択してください。
-    （タイトルの自動作成に使用します）
-
-     伝票写真を含めて最大6枚まで追加できます。
+  <p>
+  1枚目は必ず伝票写真を選択してください。<br>
+  （タイトルの自動作成に使用します）
 </p>
 
   <button onclick="skipShipmentPhotos()">写真なしで完了</button>
@@ -891,10 +890,8 @@ textarea {
 </div>
 
 <p id="returnPhotoDescription">
-  1枚目は必ず伝票写真を選択してください。
-    （タイトルの自動作成に使用します）
-
-     伝票写真を含めて最大6枚まで追加できます。
+  1枚目は必ず伝票写真を選択してください。<br>
+  （タイトルの自動作成に使用します）
 </p>
 
   <button onclick="skipReturnPhotos()">
@@ -5798,9 +5795,8 @@ function showShipmentPhotoArea(
   document.getElementById(
   "shipmentPhotoPreview"
 ).innerText =
-  "出庫送信完了。\n" +
-  "1枚目は必ず伝票写真を選択してください。\n" +
-  "（タイトルの自動作成に使用します）\n\n" +
+  "出庫送信完了。\n\n" +
+  "付属品・機械全体など、出庫時の状態が分かる写真を追加してください。\n\n" +
   "伝票写真を含めて最大6枚まで追加できます。";
 
   document.getElementById(
@@ -7596,7 +7592,7 @@ function showIrregularPhotoArea() {
 }
 
 function showReturnPhotoArea(info, photoRequired = false) {
-    /*
+  /*
    * 通常の返却写真画面として表示するため、
    * イレギュラー用に変更した表示と保存処理を元へ戻す。
    */
@@ -7620,11 +7616,13 @@ function showReturnPhotoArea(info, photoRequired = false) {
       "返却写真の添付";
   }
 
+  /*
+   * ボタン上側は通常返却・QRなし返却とも共通。
+   */
   if (description) {
     description.innerText =
-    "1枚目は必ず伝票写真を選択してください。\n" +
-    "（タイトルの自動作成に使用します）\n\n" +
-    "伝票写真を含めて最大6枚まで追加できます。";
+      "1枚目は必ず伝票写真を選択してください。\n" +
+      "（タイトルの自動作成に使用します）";
   }
 
   if (uploadButton) {
@@ -7634,54 +7632,76 @@ function showReturnPhotoArea(info, photoRequired = false) {
     uploadButton.innerText =
       "返却写真を保存";
   }
+
   const basePhotoInfo =
-  Object.assign({}, info || {}, {
-    mode:
-      "返却",
+    Object.assign({}, info || {}, {
+      mode:
+        "返却",
 
-    photoRequired:
-      photoRequired,
+      photoRequired:
+        photoRequired,
 
-    createdAt:
-      (
-        info &&
-        info.createdAt
-      )
-        ? info.createdAt
-        : new Date().toISOString()
-  });
+      createdAt:
+        (
+          info &&
+          info.createdAt
+        )
+          ? info.createdAt
+          : new Date().toISOString()
+    });
 
-/*
- * 返却写真情報にも、
- * 現在の伝票情報と保存タイトル候補を載せる。
- */
-lastReturnPhotoInfo =
-  attachSlipInfoToPhotoInfo(
-    basePhotoInfo
-  );
+  /*
+   * 返却写真情報にも、
+   * 現在の伝票情報と保存タイトル候補を載せる。
+   */
+  lastReturnPhotoInfo =
+    attachSlipInfoToPhotoInfo(
+      basePhotoInfo
+    );
 
   selectedReturnPhotos = [];
 
-  document.getElementById("returnPhotoArea").style.display = "block";
+  document.getElementById(
+    "returnPhotoArea"
+  ).style.display = "block";
 
+  /*
+   * ボタン下側は作業区分ごとに表示を変える。
+   */
   if (photoRequired) {
-  document.getElementById("returnPhotoPreview").innerText =
-    "1枚目は必ず伝票写真を選択してください。\n" +
-    "（タイトルの自動作成に使用します）\n\n" +
-    "伝票写真を含めて最大6枚まで追加できます。";
-} else {
-    document.getElementById("returnPhotoPreview").innerText =
-  "返却送信完了。\n" +
-  "QR未取付機・返却伝票・破損・付属品不足などがある場合は写真を保存してください。\n\n" +
-  "写真は最大6枚まで追加できます。";
+    document.getElementById(
+      "returnPhotoPreview"
+    ).innerText =
+      "QR未取付箇所・管理番号・返却伝票・破損・付属品不足など、返却状況が分かる写真を追加してください。\n\n" +
+      "伝票写真を含めて最大6枚まで追加できます。";
+  } else {
+    document.getElementById(
+      "returnPhotoPreview"
+    ).innerText =
+      "返却送信完了。\n\n" +
+      "返却時の状態・破損・付属品不足などが分かる写真を追加してください。\n\n" +
+      "伝票写真を含めて最大6枚まで追加できます。";
   }
 
-  document.getElementById("uploadReturnPhotoBtn").style.display = "none";
-  document.getElementById("uploadReturnPhotoBtn").disabled = false;
-  document.getElementById("returnCameraInput").value = "";
-  document.getElementById("returnLibraryInput").value = "";
+  document.getElementById(
+    "uploadReturnPhotoBtn"
+  ).style.display = "none";
 
-  scrollToElement("returnPhotoArea");
+  document.getElementById(
+    "uploadReturnPhotoBtn"
+  ).disabled = false;
+
+  document.getElementById(
+    "returnCameraInput"
+  ).value = "";
+
+  document.getElementById(
+    "returnLibraryInput"
+  ).value = "";
+
+  scrollToElement(
+    "returnPhotoArea"
+  );
 }
 
 function chooseReturnCamera() { document.getElementById("returnCameraInput").click(); }
