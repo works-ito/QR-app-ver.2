@@ -387,6 +387,19 @@ textarea {
   border:1px solid #aaa;
   border-radius:8px;
 }
+/* 写真画面の説明文（ボタン上） */
+#shipmentPhotoDescription,
+#returnPhotoDescription {
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+/* 写真画面の案内（ボタン下） */
+#shipmentPhotoPreview,
+#returnPhotoPreview {
+  font-size: 16px;
+  line-height: 1.5;
+}
 </style>
 </head>
 
@@ -816,7 +829,7 @@ textarea {
 
 <div id="shipmentPhotoArea">
   <div style="font-weight:bold; margin-bottom:10px;">出庫写真の添付</div>
-  <p>
+  <p id="shipmentPhotoDescription">
   1枚目は必ず伝票写真を選択してください。<br>
   （タイトルの自動作成に使用します）
 </p>
