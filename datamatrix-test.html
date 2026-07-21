@@ -8037,6 +8037,9 @@ async function uploadIrregularPhotos() {
 
   const files =
     selectedReturnPhotos.slice();
+    
+  const photoRequestId =
+    createPhotoRequestId();
 
   if (files.length === 0) {
     alert(
@@ -8103,6 +8106,9 @@ async function uploadIrregularPhotos() {
         photoInfo:
           lastReturnPhotoInfo,
 
+　　　　　 photoRequestId:
+          photoRequestId,
+          
         button:
           btn
       });
