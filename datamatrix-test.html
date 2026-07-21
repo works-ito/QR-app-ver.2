@@ -6424,6 +6424,20 @@ async function confirmPhotoTitleAndSave() {
 
     return;
   }
+  
+    if (
+    pending.photoType ===
+    "irregular"
+  ) {
+    await executeIrregularPhotoSave(
+      pending.files,
+      pending.photoInfo,
+      pending.button,
+      pending.photoRequestId
+    );
+
+    return;
+  }
 
   if (pending.button) {
     pending.button.disabled =
@@ -7497,11 +7511,41 @@ function showIrregularPhotoArea() {
   selectedReturnPhotos = [];
 
   /*
-   * 返却写真情報は使用しない。
-   * イレギュラー受付情報は
-   * pendingIrregularRecord に保持している。
-   */
-  lastReturnPhotoInfo = null;
+ * イレギュラー受付情報を、
+ * 共通の写真保存フローで扱える形式へ変換する。
+ */
+lastReturnPhotoInfo = {
+  photoType:
+    "irregular",
+
+  mode:
+    pendingIrregularRecord.mode || "",
+
+  user:
+    pendingIrregularRecord.user || "",
+
+  location:
+    pendingIrregularRecord.location || "",
+
+  ids: [
+    pendingIrregularRecord.qrText || "番号不明"
+  ],
+
+  irregularCaseId:
+    "",
+
+  irregularRecord:
+    Object.assign(
+      {},
+      pendingIrregularRecord
+    ),
+
+  photoRequired:
+    true,
+
+  createdAt:
+    new Date().toISOString()
+};
 
   const title =
     document.getElementById(
@@ -8037,6 +8081,36 @@ async function uploadIrregularPhotos() {
   );
 
   try {
+        /*
+     * 1枚目の写真から伝票情報を取得し、
+     * 共通のタイトル確認画面へ渡す。
+     */
+    lastReturnPhotoInfo =
+      await prepareSlipInfoBeforePhotoSave(
+        "irregular",
+        files,
+        lastReturnPhotoInfo
+      );
+
+    const confirmationOpened =
+      openPhotoTitleConfirmation({
+        photoType:
+          "irregular",
+
+        files:
+          files,
+
+        photoInfo:
+          lastReturnPhotoInfo,
+
+        button:
+          btn
+      });
+
+    if (confirmationOpened) {
+      stopPhotoLoading();
+      return;
+    }
     /*
      * 写真を1枚の受付画像へ合成する。
      */
