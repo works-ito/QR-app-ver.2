@@ -421,7 +421,7 @@ textarea {
   <button
     id="startNoQrReturnBtn"
     type="button"
-    onclick="startNoQrReturn()"
+    onclick="startIrregularReturn()"
     style="
       margin-top:4px;
       background:#fff3cd;
@@ -666,6 +666,49 @@ textarea {
     </label>
   </div>
 
+  <div style="
+  font-size:18px;
+  font-weight:bold;
+  margin:18px 0 8px;
+">
+  返却伝票
+</div>
+
+<div class="radioRow">
+  <label>
+    <input
+      type="radio"
+      name="irregularSlipStatus"
+      value="伝票あり"
+      checked
+      onchange="updateIrregularSlipGuide()"
+    >
+    伝票あり
+  </label>
+
+  <label>
+    <input
+      type="radio"
+      name="irregularSlipStatus"
+      value="伝票なし"
+      onchange="updateIrregularSlipGuide()"
+    >
+    伝票なし
+  </label>
+</div>
+
+<div
+  id="irregularSlipGuide"
+  style="
+    font-size:16px;
+    line-height:1.5;
+    margin:0 0 14px;
+    color:#555;
+  "
+>
+  伝票がある場合は、1枚目に返却伝票を撮影します。
+</div>
+  
   <div style="
     font-size:18px;
     font-weight:bold;
@@ -1074,6 +1117,7 @@ const IRREGULAR_QR_TEXT = "WORKS-IRREGULAR-QR";
 let pendingIrregularNumberType = "";
 let pendingIrregularEnteredNumber = "";
 let pendingIrregularNote = "";
+let pendingIrregularSlipStatus = "";
 let pendingIrregularManagementType = "";
 let pendingIrregularManagedResult = null;
 let pendingIrregularQuantityItem = null;
@@ -3636,6 +3680,33 @@ function isIrregularQr(text) {
   return normalizeLookupKey(text) ===
     normalizeLookupKey(IRREGULAR_QR_TEXT);
 }
+
+/*
+ * ホーム画面の「イレギュラー返却」から
+ * 共通イレギュラー返却フローを開始する。
+ *
+ * 固定イレギュラーQRから入る場合も、
+ * 最終的には同じ startIrregularFlow() を使用する。
+ */
+function startIrregularReturn() {
+  startIrregularFlow();
+
+  const title =
+    document.getElementById(
+      "irregularTitle"
+    );
+
+  if (title) {
+    title.innerText =
+      "イレギュラー返却";
+  }
+
+  log(
+    "イレギュラー返却\n" +
+    "管理番号または品目コードを確認してください"
+  );
+}
+  
 /*
  * イレギュラーQR専用画面を開始する。
  */
@@ -3703,6 +3774,8 @@ function startIrregularFlow() {
 
   scrollToElement("irregularArea");
 
+  updateIrregularSlipGuide();
+  
   setTimeout(function() {
     document.getElementById(
       "irregularNumberInput"
@@ -3744,6 +3817,46 @@ function toggleIrregularNumberInput() {
   }
 }
 
+  /*
+ * 返却伝票の有無に応じて、
+ * 案内文を切り替える。
+ */
+function updateIrregularSlipGuide() {
+
+  const selected =
+    document.querySelector(
+      'input[name="irregularSlipStatus"]:checked'
+    );
+
+  const guide =
+    document.getElementById(
+      "irregularSlipGuide"
+    );
+
+  if (
+    !selected ||
+    !guide
+  ) {
+    return;
+  }
+
+  if (
+    selected.value ===
+    "伝票あり"
+  ) {
+
+    guide.innerText =
+      "1枚目に返却伝票を撮影してください。\n必要に応じて機械・管理番号・QRラベルも撮影してください。";
+
+  } else {
+
+    guide.innerText =
+      "返却伝票が無い場合は、機械全体・管理番号・QRラベルの状態が分かる写真を撮影してください。";
+
+  }
+
+}
+  
 
 /*
  * 入力内容の一次確認。
