@@ -3172,14 +3172,42 @@ if (mode === "交換完了") {
 
   if (dateModes.includes(mode)) ensureRecDateDefault();
 
-  if (mode === "返却") {
-    document.getElementById("returnMethodArea").style.display = "block";
-    log("返却方法を選択してください");
-    scrollToElement("returnMethodArea");
-  } else {
-    document.getElementById("returnMethodArea").style.display = "none";
+  /*
+ * 通常の返却フローだけ、
+ * QRあり／QRなしの選択画面を表示する。
+ *
+ * イレギュラー受付では専用フローを継続するため、
+ * 通常返却の選択画面は表示しない。
+ */
+if (
+  mode === "返却" &&
+  !irregularFlowActive
+) {
+  document.getElementById(
+    "returnMethodArea"
+  ).style.display = "block";
+
+  log(
+    "返却方法を選択してください"
+  );
+
+  scrollToElement(
+    "returnMethodArea"
+  );
+
+} else {
+  document.getElementById(
+    "returnMethodArea"
+  ).style.display = "none";
+
+  /*
+   * イレギュラー受付中は、
+   * 専用フローの状態を壊さない。
+   */
+  if (!irregularFlowActive) {
     returnQrMode = "";
   }
+}
 }
 function startNoQrReturn() {
   /*
