@@ -2312,6 +2312,152 @@ async function loadInventoryCache() {
   });
 }
 
+/*
+ * IndexedDBに保存された在庫データを、
+ * アプリ内の配列・検索Mapへ復元する。
+ */
+async function restoreInventoryCache() {
+  try {
+    const cache =
+      await loadInventoryCache();
+
+    if (!cache) {
+      console.log(
+        "在庫データキャッシュなし"
+      );
+
+      return false;
+    }
+
+    individualItems =
+      Array.isArray(
+        cache.individualItems
+      )
+        ? cache.individualItems
+        : [];
+
+    simpleItems =
+      Array.isArray(
+        cache.simpleItems
+      )
+        ? cache.simpleItems
+        : [];
+
+    recItems =
+      Array.isArray(
+        cache.recItems
+      )
+        ? cache.recItems
+        : [];
+
+    quantityItems =
+      Array.isArray(
+        cache.quantityItems
+      )
+        ? cache.quantityItems
+        : [];
+
+    /*
+     * 復元した配列から、
+     * QR検索用Mapを作り直す。
+     */
+    buildAppInitialDataMaps();
+
+    updateInventoryUpdatedAtDisplay(
+    cache.updatedAt || "",
+    ""
+    );
+    
+    appInitialDataLoaded = true;
+    appInitialDataError = "";
+
+    console.log(
+      "在庫データキャッシュ復元完了",
+      {
+        updatedAt:
+          cache.updatedAt || "",
+
+        individual:
+          individualItems.length,
+
+        simple:
+          simpleItems.length,
+
+        rec:
+          recItems.length,
+
+        quantity:
+          quantityItems.length
+      }
+    );
+
+    return cache;
+
+  } catch (error) {
+    console.warn(
+      "在庫データキャッシュ復元失敗",
+      error
+    );
+
+    return false;
+  }
+}
+
+/*
+ * 在庫データの最終更新時刻を画面へ表示する。
+ */
+function updateInventoryUpdatedAtDisplay(
+  updatedAt,
+  suffix
+) {
+  const el =
+    document.getElementById(
+      "inventoryUpdatedAt"
+    );
+
+  if (!el) {
+    return;
+  }
+
+  const date =
+    updatedAt
+      ? new Date(updatedAt)
+      : null;
+
+  if (
+    !date ||
+    Number.isNaN(date.getTime())
+  ) {
+    el.innerText =
+      "在庫データ：更新時刻不明";
+
+    return;
+  }
+
+  const formatted =
+    new Intl.DateTimeFormat(
+      "ja-JP",
+      {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false
+      }
+    ).format(date);
+
+  el.innerText =
+    "在庫データ：" +
+    formatted +
+    " 更新" +
+    (
+      suffix
+        ? " " + suffix
+        : ""
+    );
+}
+  
 
 /**
  * 現在保持している伝票情報を消去する。
