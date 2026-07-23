@@ -6220,11 +6220,16 @@ function getPhotoTitleCandidate(photoInfo) {
 
 
 /**
- * 保存タイトル候補がある場合だけ、
+ * 保存タイトル候補がある場合、
+ * または手入力が必要な場合に
  * タイトル確認画面を表示する。
  *
- * 候補がない場合はfalseを返し、
- * 従来どおりそのまま保存する。
+ * 伝票あり：
+ * AI解析結果を初期値として表示する。
+ *
+ * 伝票なし：
+ * 空欄の入力画面を表示し、
+ * 顧客名・現場名を手入力する。
  */
 function openPhotoTitleConfirmation(options) {
   const data =
@@ -6238,27 +6243,29 @@ function openPhotoTitleConfirmation(options) {
       photoInfo
     );
 
-  /*
-   * OCR・手入力・Data Matrixが未接続で
-   * タイトル候補がない場合は確認画面を出さない。
-   */
   const manualTitleRequired =
-  Boolean(
-    photoInfo.manualTitleRequired
-  );
+    Boolean(
+      photoInfo.manualTitleRequired
+    );
 
-if (
-  !titleCandidate &&
-  !manualTitleRequired
-) {
-  return false;
-}
+  /*
+   * 通常の出庫・返却などで
+   * タイトル候補がなく、
+   * 手入力も要求されていない場合は、
+   * 従来どおり確認画面を出さない。
+   */
+  if (
+    !titleCandidate &&
+    !manualTitleRequired
+  ) {
+    return false;
+  }
 
   pendingPhotoTitleSave = {
     photoType:
       String(
         data.photoType || ""
-      ),
+      ).trim(),
 
     files:
       Array.isArray(data.files)
@@ -6270,9 +6277,9 @@ if (
 
     photoRequestId:
       String(
-       data.photoRequestId || ""
+        data.photoRequestId || ""
       ).trim(),
-  
+
     button:
       data.button || null
   };
@@ -6282,57 +6289,101 @@ if (
     getCurrentSlipInfo() ||
     {};
 
-  document.getElementById(
-  "photoTitleCandidateDisplay"
-).innerText =
-  titleCandidate ||
-  "顧客名・現場名を入力してください";
+  const customerName =
+    String(
+      slipInfo.customerName || ""
+    ).trim();
 
+  const siteName =
+    String(
+      slipInfo.siteName || ""
+    ).trim();
+
+  /*
+   * AI解析済みの場合は解析結果を初期値にする。
+   * 伝票なしの場合は空欄のまま表示する。
+   */
   document.getElementById(
     "photoCustomerNameInput"
   ).value =
-    slipInfo.customerName || "";
+    customerName;
 
   document.getElementById(
     "photoSiteNameInput"
   ).value =
-    slipInfo.siteName || "";
+    siteName;
 
+  /*
+   * タイトル候補表示。
+   * 伝票なしの場合は入力案内を表示する。
+   */
   document.getElementById(
-  "photoSiteNameEditArea"
-).style.display =
-  manualTitleRequired
-    ? "block"
-    : "none";
+    "photoTitleCandidateDisplay"
+  ).innerText =
+    titleCandidate ||
+    "顧客名・現場名を入力してください";
 
+  /*
+   * P3-1では、AI解析あり・なしに関係なく
+   * 顧客名と現場名を確認・修正できるようにする。
+   */
+  document.getElementById(
+    "photoSiteNameEditArea"
+  ).style.display =
+    "block";
+
+  /*
+   * 入力欄を常時表示するため、
+   * 「現場名を修正」ボタンは不要。
+   */
   const editButton =
-  document.getElementById(
-    "editPhotoSiteNameBtn"
-  );
+    document.getElementById(
+      "editPhotoSiteNameBtn"
+    );
 
-if (editButton) {
-  editButton.style.display =
-    manualTitleRequired
-      ? "none"
-      : "block";
-}
+  if (editButton) {
+    editButton.style.display =
+      "none";
+  }
 
   document.getElementById(
     "photoTitleConfirmArea"
   ).style.display =
     "block";
 
-  log(
-    "保存タイトルを確認してください"
-  );
+  if (manualTitleRequired) {
+    log(
+      "顧客名・現場名を入力してください"
+    );
+  } else {
+    log(
+      "保存タイトルを確認してください"
+    );
+  }
 
   scrollToElement(
     "photoTitleConfirmArea"
   );
 
+  /*
+   * 伝票なしの場合は
+   * 最初の入力欄へ自動でカーソルを移す。
+   */
+  if (manualTitleRequired) {
+    setTimeout(function() {
+      const customerInput =
+        document.getElementById(
+          "photoCustomerNameInput"
+        );
+
+      if (customerInput) {
+        customerInput.focus();
+      }
+    }, 300);
+  }
+
   return true;
 }
-
 
 /**
  * 「現場名を修正」を押したとき、
@@ -6539,18 +6590,152 @@ async function confirmPhotoTitleAndSave() {
   const pending =
     pendingPhotoTitleSave;
 
-  const titleCandidate =
-    getPhotoTitleCandidate(
-      pending.photoInfo
+  const photoInfo =
+    pending.photoInfo || {};
+
+  const manualTitleRequired =
+    Boolean(
+      photoInfo.manualTitleRequired
     );
 
-  if (!titleCandidate) {
+  const customerInput =
+    document.getElementById(
+      "photoCustomerNameInput"
+    );
+
+  const siteInput =
+    document.getElementById(
+      "photoSiteNameInput"
+    );
+
+  const customerName =
+    String(
+      customerInput
+        ? customerInput.value
+        : ""
+    ).trim();
+
+  const siteName =
+    String(
+      siteInput
+        ? siteInput.value
+        : ""
+    ).trim();
+
+  /*
+   * 伝票なしのイレギュラーでは、
+   * 顧客名・現場名の両方を必須とする。
+   */
+  if (
+    manualTitleRequired &&
+    !customerName
+  ) {
+    alert(
+      "顧客名を入力してください"
+    );
+
+    if (customerInput) {
+      customerInput.focus();
+    }
+
+    return;
+  }
+
+  if (
+    manualTitleRequired &&
+    !siteName
+  ) {
+    alert(
+      "現場名を入力してください"
+    );
+
+    if (siteInput) {
+      siteInput.focus();
+    }
+
+    return;
+  }
+
+  /*
+   * AI解析結果または手入力結果を、
+   * 保存処理へ渡すslipInfoへ反映する。
+   */
+  const currentSlipInfo =
+    photoInfo.slipInfo ||
+    getCurrentSlipInfo() ||
+    {};
+
+  const updatedSlipInfo = {
+    ...currentSlipInfo,
+
+    customerName:
+      customerName ||
+      String(
+        currentSlipInfo.customerName || ""
+      ).trim(),
+
+    siteName:
+      siteName ||
+      String(
+        currentSlipInfo.siteName || ""
+      ).trim()
+  };
+
+  photoInfo.slipInfo =
+    updatedSlipInfo;
+
+  /*
+   * 入力された顧客名・現場名から
+   * 確定保存タイトルを作成する。
+   */
+  const enteredTitle =
+    [
+      updatedSlipInfo.customerName,
+      updatedSlipInfo.siteName
+    ]
+      .map(function(value) {
+        return String(
+          value || ""
+        ).trim();
+      })
+      .filter(function(value) {
+        return Boolean(value);
+      })
+      .join("_");
+
+  /*
+   * 入力内容からタイトルを作れた場合は、
+   * AI解析時の候補より優先する。
+   */
+  const confirmedTitle =
+    enteredTitle ||
+    getPhotoTitleCandidate(
+      photoInfo
+    );
+
+  if (!confirmedTitle) {
     alert(
       "保存タイトルがありません"
     );
 
     return;
   }
+
+  photoInfo.confirmedTitle =
+    confirmedTitle;
+
+  photoInfo.saveTitleCandidate =
+    confirmedTitle;
+
+  updatedSlipInfo.confirmedTitle =
+    confirmedTitle;
+
+  /*
+   * 保存実行前に、
+   * 最新のphotoInfoをpendingへ戻す。
+   */
+  pending.photoInfo =
+    photoInfo;
 
   document.getElementById(
     "photoTitleConfirmArea"
@@ -6562,21 +6747,22 @@ async function confirmPhotoTitleAndSave() {
   ).style.display =
     "none";
 
-  pendingPhotoTitleSave = null;
+  pendingPhotoTitleSave =
+    null;
 
   if (
-  pending.photoType ===
-  "shipment"
-) {
-  await executeShipmentPhotoSave(
-    pending.files,
-    pending.photoInfo,
-    pending.button,
-    pending.photoRequestId
-  );
+    pending.photoType ===
+    "shipment"
+  ) {
+    await executeShipmentPhotoSave(
+      pending.files,
+      pending.photoInfo,
+      pending.button,
+      pending.photoRequestId
+    );
 
-  return;
-}
+    return;
+  }
 
   if (
     pending.photoType ===
@@ -6591,8 +6777,8 @@ async function confirmPhotoTitleAndSave() {
 
     return;
   }
-  
-    if (
+
+  if (
     pending.photoType ===
     "irregular"
   ) {
@@ -8385,7 +8571,47 @@ if (hasSlip) {
       }
     );
 }
+    /*
+ * イレギュラー写真は、
+ * 伝票なしの場合またはAI解析でタイトル候補を
+ * 取得できなかった場合、手入力を必須にする。
+ */
+const irregularSlipStatus =
+  String(
+    (
+      pendingIrregularRecord &&
+      pendingIrregularRecord.slipStatus
+    ) ||
+    pendingIrregularSlipStatus ||
+    ""
+  ).trim();
 
+if (!lastReturnPhotoInfo) {
+  lastReturnPhotoInfo = {};
+}
+
+lastReturnPhotoInfo.slipStatus =
+  irregularSlipStatus;
+
+lastReturnPhotoInfo.manualTitleRequired =
+  (
+    irregularSlipStatus ===
+    "伝票なし"
+  ) ||
+  !getPhotoTitleCandidate(
+    lastReturnPhotoInfo
+  );
+    if (
+  !lastReturnPhotoInfo.slipInfo ||
+  typeof lastReturnPhotoInfo.slipInfo !==
+    "object"
+) {
+  lastReturnPhotoInfo.slipInfo = {
+    customerName: "",
+    siteName: "",
+    confirmedTitle: ""
+  };
+}
     const confirmationOpened =
       openPhotoTitleConfirmation({
         photoType:
@@ -8397,7 +8623,7 @@ if (hasSlip) {
         photoInfo:
           lastReturnPhotoInfo,
 
-　　　　　 photoRequestId:
+       photoRequestId:
           photoRequestId,
           
         button:
@@ -8932,7 +9158,7 @@ async function uploadReturnPhotos() {
       files,
       lastReturnPhotoInfo
     );
-
+  
   /*
    * タイトル候補を取得できた場合は、
    * 保存前の確認画面を表示する。
