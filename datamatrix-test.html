@@ -5846,6 +5846,11 @@ return;
 
   try {
     const records = pendingReturnItems.map(buildBatchRecordData);
+     /*
+   * 直前取消で返却前の状態へ戻せるよう、
+   * 送信前のローカル状態を保存する。
+   */
+  saveLocalStateSnapshot(records);
     const result = await sendBatchRecords(records, {
       batchMemo: memoForLog,
       memoUser: pendingReturnItems[0] ? pendingReturnItems[0].user : "",
