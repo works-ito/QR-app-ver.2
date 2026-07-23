@@ -2835,7 +2835,10 @@ function beginUnknownIrregularRegistration() {
 
     irregularNote:
       pendingIrregularNote,
-
+    
+    slipStatus:
+      pendingIrregularSlipStatus,
+    
     readMethod:
       "イレギュラーQR（番号不明）"
   };
@@ -3266,6 +3269,8 @@ function beginIrregularRegistration() {
     pendingIrregularRecord.user +
     "\n追記：" +
     pendingIrregularRecord.irregularNote +
+    "\n返却伝票：" +
+    pendingIrregularRecord.slipStatus +
     "\n読取方法：" +
     pendingIrregularRecord.readMethod
   );
@@ -7684,6 +7689,14 @@ function showIrregularPhotoArea() {
 
   selectedReturnPhotos = [];
 
+  const slipStatus =
+  String(
+    pendingIrregularRecord.slipStatus || ""
+  ).trim();
+
+const hasSlip =
+  slipStatus === "伝票あり";
+
   /*
  * イレギュラー受付情報を、
  * 共通の写真保存フローで扱える形式へ変換する。
@@ -7713,6 +7726,9 @@ lastReturnPhotoInfo = {
       {},
       pendingIrregularRecord
     ),
+
+  slipStatus:
+  pendingIrregularRecord.slipStatus || "",
 
   photoRequired:
     true,
@@ -7757,17 +7773,34 @@ lastReturnPhotoInfo = {
   }
 
   if (description) {
-    description.innerText =
-      "管理番号・伝票・QRラベルの状態が分かる写真を撮影してください。" +
-      "（1枚以上必須・最大6枚）";
-  }
+  description.innerText =
+    hasSlip
+      ? (
+          "1枚目は伝票写真を撮影してください。" +
+          "必要に応じて、管理番号・QRラベル・機械状態も撮影してください。" +
+          "（1枚以上必須・最大6枚）"
+        )
+      : (
+          "伝票がない場合は、" +
+          "機械全体・管理番号・QRラベル・機械状態が分かる写真を撮影してください。" +
+          "（1枚以上必須・最大6枚）"
+        );
+}
 
   if (preview) {
-    preview.innerText =
-      "管理番号・伝票・QRラベルの状態が分かる写真を撮影してください。\n" +
-      "写真は1枚以上必須です。\n" +
-      "カメラで1枚ずつ追加、またはライブラリから最大6枚選択できます。";
-  }
+  preview.innerText =
+    hasSlip
+      ? (
+          "1枚目は伝票写真を撮影してください。\n" +
+          "写真は1枚以上必須です。\n" +
+          "カメラで1枚ずつ追加、またはライブラリから最大6枚選択できます。"
+        )
+      : (
+          "1枚目は伝票写真でなくて構いません。\n" +
+          "機械全体・管理番号・QRラベル・状態が分かる写真を追加してください。\n" +
+          "写真は1枚以上必須です。"
+        );
+}
 
   document.getElementById(
     "returnPhotoArea"
@@ -7813,9 +7846,17 @@ lastReturnPhotoInfo = {
   }
 
   log(
-    "イレギュラー受付は写真必須です。\n" +
-    "管理番号・伝票・QRラベルの状態が分かる写真を追加してください"
-  );
+  hasSlip
+    ? (
+        "イレギュラー受付は写真必須です。\n" +
+        "1枚目に伝票写真を追加してください"
+      )
+    : (
+        "イレギュラー受付は写真必須です。\n" +
+        "伝票なしで受付します。\n" +
+        "機械・管理番号・QRラベルの状態が分かる写真を追加してください"
+      )
+);
 
   scrollToElement(
     "returnPhotoArea"
@@ -8259,15 +8300,71 @@ async function uploadIrregularPhotos() {
 
   try {
         /*
-     * 1枚目の写真から伝票情報を取得し、
-     * 共通のタイトル確認画面へ渡す。
-     */
-    lastReturnPhotoInfo =
-      await prepareSlipInfoBeforePhotoSave(
-        "irregular",
-        files,
-        lastReturnPhotoInfo
-      );
+ * 伝票ありの場合だけ、
+ * 1枚目を伝票写真としてAI・OCR解析する。
+ *
+ * 伝票なしの場合はAI解析を行わず、
+ * 作業区分と管理番号から仮タイトルを作成する。
+ */
+const hasSlip =
+  String(
+    pendingIrregularRecord.slipStatus || ""
+  ).trim() === "伝票あり";
+
+if (hasSlip) {
+  lastReturnPhotoInfo =
+    await prepareSlipInfoBeforePhotoSave(
+      "irregular",
+      files,
+      lastReturnPhotoInfo
+    );
+
+} else {
+  clearCurrentSlipInfo();
+
+  const safeMode =
+    sanitizePhotoTitlePart(
+      pendingIrregularRecord.mode ||
+      "イレギュラー"
+    );
+
+  const safeNumber =
+    sanitizePhotoTitlePart(
+      pendingIrregularRecord.qrText ||
+      "番号不明"
+    );
+
+  const temporaryTitle =
+    [
+      "伝票未登録",
+      safeMode,
+      safeNumber
+    ]
+      .filter(Boolean)
+      .join("_");
+
+  lastReturnPhotoInfo =
+    Object.assign(
+      {},
+      lastReturnPhotoInfo || {},
+      {
+        slipInfo:
+          null,
+
+        saveTitleCandidate:
+          temporaryTitle,
+
+        confirmedTitle:
+          temporaryTitle,
+
+        slipStatus:
+          "伝票なし",
+
+        acquisitionMethod:
+          "no_slip"
+      }
+    );
+}
 
     const confirmationOpened =
       openPhotoTitleConfirmation({
