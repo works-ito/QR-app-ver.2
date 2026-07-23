@@ -415,6 +415,18 @@ textarea {
   WORKS Co., Ltd.
 </div>
 
+<div
+  id="inventoryUpdatedAt"
+  style="
+    margin:-14px 0 18px;
+    color:#666;
+    font-size:14px;
+    line-height:1.4;
+  "
+>
+  在庫データ：確認中
+</div>
+  
 <div id="mainScanButtonArea">
   <button id="startBtn" onclick="startQr()">QRを読み取る</button>
 
@@ -1535,6 +1547,38 @@ async function loadAppInitialData(showLoading = true) {
 
     buildAppInitialDataMaps();
 
+    quantityItems = Array.isArray(result.quantityItems)
+  ? result.quantityItems
+  : [];
+
+buildAppInitialDataMaps();
+
+/*
+ * GASから取得した最新在庫データを、
+ * 次回起動用として端末内へ保存する。
+ */
+try {
+  await saveInventoryCache();
+
+  console.log(
+    "在庫データキャッシュ保存完了"
+  );
+
+} catch (cacheError) {
+  /*
+   * キャッシュ保存に失敗しても、
+   * 最新データ取得自体は成功しているため
+   * アプリ操作は止めない。
+   */
+  console.warn(
+    "在庫データキャッシュ保存失敗",
+    cacheError
+  );
+}
+
+appInitialDataLoaded = true;
+appInitialDataError = "";
+    
     appInitialDataLoaded = true;
     appInitialDataError = "";
 
@@ -2085,6 +2129,187 @@ function getCurrentSlipInfo() {
     {},
     currentSlipInfo
   );
+}
+/*
+ * =========================================================
+ * IndexedDB
+ * 在庫データキャッシュ
+ * =========================================================
+ */
+
+const INVENTORY_DB_NAME =
+  "qrInventoryCache";
+
+const INVENTORY_STORE_NAME =
+  "inventory";
+
+const INVENTORY_CACHE_KEY =
+  "latest";
+
+/*
+ * IndexedDBを開く。
+ */
+function openInventoryDb() {
+  return new Promise(function(resolve, reject) {
+
+    const request =
+      indexedDB.open(
+        INVENTORY_DB_NAME,
+        1
+      );
+
+    request.onupgradeneeded =
+      function(event) {
+
+      const db =
+        event.target.result;
+
+      if (
+        !db.objectStoreNames.contains(
+          INVENTORY_STORE_NAME
+        )
+      ) {
+        db.createObjectStore(
+          INVENTORY_STORE_NAME
+        );
+      }
+    };
+
+    request.onsuccess =
+      function(event) {
+
+      resolve(
+        event.target.result
+      );
+    };
+
+    request.onerror =
+      function(event) {
+
+      reject(
+        event.target.error
+      );
+    };
+
+  });
+}
+
+/*
+ * 現在の在庫データをIndexedDBへ保存する。
+ */
+async function saveInventoryCache() {
+  const db =
+    await openInventoryDb();
+
+  const cacheData = {
+    updatedAt:
+      new Date().toISOString(),
+
+    individualItems:
+      individualItems,
+
+    simpleItems:
+      simpleItems,
+
+    recItems:
+      recItems,
+
+    quantityItems:
+      quantityItems
+  };
+
+  return new Promise(function(resolve, reject) {
+    const transaction =
+      db.transaction(
+        INVENTORY_STORE_NAME,
+        "readwrite"
+      );
+
+    const store =
+      transaction.objectStore(
+        INVENTORY_STORE_NAME
+      );
+
+    const request =
+      store.put(
+        cacheData,
+        INVENTORY_CACHE_KEY
+      );
+
+    request.onsuccess =
+      function() {
+        resolve(
+          cacheData
+        );
+      };
+
+    request.onerror =
+      function(event) {
+        reject(
+          event.target.error
+        );
+      };
+
+    transaction.oncomplete =
+      function() {
+        db.close();
+      };
+  });
+}
+
+/*
+ * IndexedDBから在庫データを読み込む。
+ */
+async function loadInventoryCache() {
+  const db =
+    await openInventoryDb();
+
+  return new Promise(function(resolve, reject) {
+
+    const transaction =
+      db.transaction(
+        INVENTORY_STORE_NAME,
+        "readonly"
+      );
+
+    const store =
+      transaction.objectStore(
+        INVENTORY_STORE_NAME
+      );
+
+    const request =
+      store.get(
+        INVENTORY_CACHE_KEY
+      );
+
+    request.onsuccess =
+      function() {
+
+        const cache =
+          request.result;
+
+        if (!cache) {
+          resolve(null);
+          return;
+        }
+
+        resolve(cache);
+      };
+
+    request.onerror =
+      function(event) {
+
+        reject(
+          event.target.error
+        );
+      };
+
+    transaction.oncomplete =
+      function() {
+        db.close();
+      };
+
+  });
 }
 
 
