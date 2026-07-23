@@ -3876,11 +3876,20 @@ function confirmIrregularInput() {
     document.querySelector(
       'input[name="irregularNumberType"]:checked'
     );
+  const selectedSlip =
+  document.querySelector(
+    'input[name="irregularSlipStatus"]:checked'
+  );
 
   const numberType =
     selected
       ? selected.value
       : "";
+
+  const slipStatus =
+  selectedSlip
+    ? selectedSlip.value
+    : "";
 
   const enteredNumber =
     document.getElementById(
@@ -3898,6 +3907,13 @@ function confirmIrregularInput() {
     );
     return;
   }
+
+  if (!slipStatus) {
+  alert(
+    "返却伝票の有無を選択してください"
+  );
+  return;
+}
 
   if (
     numberType === "入力" &&
@@ -3937,7 +3953,10 @@ function confirmIrregularInput() {
 
   pendingIrregularNote =
     note;
-
+  
+  pendingIrregularSlipStatus =
+    slipStatus;
+  
   pendingIrregularManagementType = "";
   pendingIrregularManagedResult = null;
   pendingIrregularQuantityItem = null;
@@ -3951,6 +3970,9 @@ function confirmIrregularInput() {
   alert(
     "番号不明として受付します\n\n" +
     "管理番号・品目コード：番号不明\n" +
+    "返却伝票：" +
+    slipStatus +
+    "\n" +
     "在庫状態：更新しません\n" +
     "通常管理ログ：保存しません\n" +
     "追記：" +
@@ -4003,6 +4025,8 @@ alert(
   managementLabel +
   "\n現在状態：" +
   (currentState || "状態なし") +
+  "\n返却伝票：" +
+slipStatus +
   "\n追記：" +
   note +
   "\n\n作業設定へ進みます"
@@ -4072,6 +4096,8 @@ return;
   "\n管理区分：数量管理" +
   "\n品名：" +
   (displayName || "表示名なし") +
+  "\n返却伝票：" +
+  slipStatus +
   "\n追記：" +
   note +
   "\n\n作業設定へ進みます"
