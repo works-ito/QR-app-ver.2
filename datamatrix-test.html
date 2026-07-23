@@ -3898,6 +3898,102 @@ function isIrregularQr(text) {
 function startIrregularReturn() {
   startIrregularFlow();
 }
+
+/*
+ * イレギュラー受付専用画面を開始する。
+ */
+function startIrregularFlow() {
+  /*
+   * カメラが動作中でも安全に停止する。
+   */
+  stopQrForError();
+
+  irregularFlowActive = true;
+
+  scanWorkflowPhase =
+    SCAN_PHASE_SETUP;
+
+  scanBusy = true;
+
+  document.getElementById(
+    "startBtn"
+  ).style.display = "none";
+
+  document.getElementById(
+    "startNoQrReturnBtn"
+  ).style.display = "none";
+
+  document.getElementById(
+    "stopBtn"
+  ).style.display = "none";
+
+  document.getElementById(
+    "resetBtn"
+  ).style.display = "none";
+
+  document.getElementById(
+    "settingsPanel"
+  ).style.display = "none";
+
+  const numberInput =
+    document.getElementById(
+      "irregularNumberInput"
+    );
+
+  numberInput.value = "";
+  numberInput.disabled = false;
+  numberInput.placeholder =
+    "管理番号または品目コードを入力";
+
+  document.getElementById(
+    "irregularNote"
+  ).value = "";
+
+  document
+    .querySelectorAll(
+      'input[name="irregularNumberType"]'
+    )
+    .forEach(function(radio) {
+      radio.checked =
+        radio.value === "入力";
+    });
+
+  document
+    .querySelectorAll(
+      'input[name="irregularSlipStatus"]'
+    )
+    .forEach(function(radio) {
+      radio.checked =
+        radio.value === "伝票あり";
+    });
+
+  document.getElementById(
+    "irregularArea"
+  ).style.display = "block";
+
+  log(
+    "イレギュラー受付\n" +
+    "管理番号または品目コードを入力してください"
+  );
+
+  scrollToElement(
+    "irregularArea"
+  );
+
+  /*
+   * 関数が復元済みの場合だけ案内文を更新する。
+   */
+  if (
+    typeof updateIrregularSlipGuide ===
+    "function"
+  ) {
+    updateIrregularSlipGuide();
+  }
+
+  setTimeout(function() {
+    numberInput.focus();
+  }, 500);
+}
 /*
  * イレギュラーQR受付を取り消し、
  * 通常のホーム画面へ戻す。
