@@ -5868,7 +5868,19 @@ return;
 
 rememberSentLogIds(result);
 
+/*
+ * スプレッドシートの最新状態を取得する。
+ */
 await refreshInventoryAfterSend();
+
+/*
+ * 今回送信した返却分を、
+ * この端末内では直ちに最新状態へ反映する。
+ */
+applyLocalStateAfterSend(
+  result,
+  pendingReturnItems
+);
 
 stopBatchLoading();
 returnButton.disabled = false;
