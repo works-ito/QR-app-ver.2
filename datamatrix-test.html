@@ -1077,9 +1077,15 @@ let pendingPhotoTitleSave = null;
  *
  * 保存ボタンの連打による二重解析を防止する。
  */
-let slipAnalysisBusy = false;
 let lastSentLogIds = [];
 let lastPendingSendId = "";
+
+/*
+ * 直前送信を取消した際に、
+ * 端末内の状態を送信前へ戻すための記録。
+ */
+let lastSuccessfulSendStateSnapshot = [];
+
 let pendingQuantityItem = null;
 let lastQuantityCode = "";
 let lastQuantityCompletedAt = 0;
@@ -1757,7 +1763,78 @@ function applyLocalStateAfterSend(
   });
 }
 
-  
+/*
+ * 直前送信を取り消せるよう、
+ * 送信前のローカル状態を退避する。
+ */
+function saveLocalStateSnapshot(records) {
+  lastSuccessfulSendStateSnapshot = [];
+
+  const sourceRecords =
+    Array.isArray(records)
+      ? records
+      : [];
+
+  sourceRecords.forEach(function(record) {
+    if (!record) return;
+
+    const qrText =
+      String(
+        record.qrText ||
+        record.qr ||
+        ""
+      ).trim();
+
+    if (!qrText) {
+      return;
+    }
+
+    const managedResult =
+      findManagedItemLocal(qrText);
+
+    if (
+      !managedResult ||
+      !managedResult.item
+    ) {
+      return;
+    }
+
+    const item =
+      managedResult.item;
+
+    lastSuccessfulSendStateSnapshot.push({
+      qrText:
+        qrText,
+
+      currentState:
+        getFirstItemValue(
+          item,
+          [
+            "現在状態",
+            "状態",
+            "作業区分",
+            "status"
+          ]
+        ),
+
+      location:
+        getFirstItemValue(
+          item,
+          [
+            "拠点",
+            "現在拠点",
+            "location"
+          ]
+        )
+    });
+  });
+
+  console.log(
+    "直前送信用ローカル状態保存",
+    lastSuccessfulSendStateSnapshot
+  );
+}
+
 /**
  * 取得した配列から検索用Mapを作成する
  */
@@ -5037,7 +5114,8 @@ async function sendBatchToSheet() {
   
   try {
     const records = scannedRecords.map(buildBatchRecordData);
-    const result = await sendBatchRecords(records);
+    saveLocalStateSnapshot(records);
+　　　const result = await sendBatchRecords(records);
 
     if (!result.ok) {
   stopBatchLoading();
