@@ -6242,9 +6242,17 @@ function openPhotoTitleConfirmation(options) {
    * OCR・手入力・Data Matrixが未接続で
    * タイトル候補がない場合は確認画面を出さない。
    */
-  if (!titleCandidate) {
-    return false;
-  }
+  const manualTitleRequired =
+  Boolean(
+    photoInfo.manualTitleRequired
+  );
+
+if (
+  !titleCandidate &&
+  !manualTitleRequired
+) {
+  return false;
+}
 
   pendingPhotoTitleSave = {
     photoType:
@@ -6275,9 +6283,10 @@ function openPhotoTitleConfirmation(options) {
     {};
 
   document.getElementById(
-    "photoTitleCandidateDisplay"
-  ).innerText =
-    titleCandidate;
+  "photoTitleCandidateDisplay"
+).innerText =
+  titleCandidate ||
+  "顧客名・現場名を入力してください";
 
   document.getElementById(
     "photoCustomerNameInput"
@@ -6290,9 +6299,23 @@ function openPhotoTitleConfirmation(options) {
     slipInfo.siteName || "";
 
   document.getElementById(
-    "photoSiteNameEditArea"
-  ).style.display =
-    "none";
+  "photoSiteNameEditArea"
+).style.display =
+  manualTitleRequired
+    ? "block"
+    : "none";
+
+  const editButton =
+  document.getElementById(
+    "editPhotoSiteNameBtn"
+  );
+
+if (editButton) {
+  editButton.style.display =
+    manualTitleRequired
+      ? "none"
+      : "block";
+}
 
   document.getElementById(
     "photoTitleConfirmArea"
@@ -8322,26 +8345,20 @@ if (hasSlip) {
 } else {
   clearCurrentSlipInfo();
 
-  const safeMode =
-    sanitizePhotoTitlePart(
-      pendingIrregularRecord.mode ||
-      "イレギュラー"
-    );
+  const manualSlipInfo =
+    setCurrentSlipInfo({
+      customerName:
+        "",
 
-  const safeNumber =
-    sanitizePhotoTitlePart(
-      pendingIrregularRecord.qrText ||
-      "番号不明"
-    );
+      siteName:
+        "",
 
-  const temporaryTitle =
-    [
-      "伝票未登録",
-      safeMode,
-      safeNumber
-    ]
-      .filter(Boolean)
-      .join("_");
+      acquisitionMethod:
+        "manual_no_slip",
+
+      siteNameEdited:
+        true
+    });
 
   lastReturnPhotoInfo =
     Object.assign(
@@ -8349,19 +8366,22 @@ if (hasSlip) {
       lastReturnPhotoInfo || {},
       {
         slipInfo:
-          null,
+          manualSlipInfo,
 
         saveTitleCandidate:
-          temporaryTitle,
+          "",
 
         confirmedTitle:
-          temporaryTitle,
+          "",
 
         slipStatus:
           "伝票なし",
 
         acquisitionMethod:
-          "no_slip"
+          "manual_no_slip",
+
+        manualTitleRequired:
+          true
       }
     );
 }
