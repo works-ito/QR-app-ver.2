@@ -3994,6 +3994,367 @@ function startIrregularFlow() {
     numberInput.focus();
   }, 500);
 }
+
+/*
+ * 番号入力／番号不明の切替。
+ */
+function toggleIrregularNumberInput() {
+  const selected =
+    document.querySelector(
+      'input[name="irregularNumberType"]:checked'
+    );
+
+  const input =
+    document.getElementById(
+      "irregularNumberInput"
+    );
+
+  if (!input) {
+    return;
+  }
+
+  if (
+    selected &&
+    selected.value === "番号不明"
+  ) {
+    input.value = "";
+    input.disabled = true;
+    input.placeholder =
+      "番号不明として登録します";
+
+  } else {
+    input.disabled = false;
+    input.placeholder =
+      "管理番号または品目コードを入力";
+
+    setTimeout(function() {
+      input.focus();
+    }, 100);
+  }
+}
+
+/*
+ * 伝票あり／伝票なしに応じて、
+ * イレギュラー受付の案内文を切り替える。
+ */
+function updateIrregularSlipGuide() {
+  const selected =
+    document.querySelector(
+      'input[name="irregularSlipStatus"]:checked'
+    );
+
+  const guide =
+    document.getElementById(
+      "irregularSlipGuide"
+    );
+
+  if (
+    !selected ||
+    !guide
+  ) {
+    return;
+  }
+
+  if (
+    selected.value ===
+    "伝票あり"
+  ) {
+    guide.innerText =
+      "1枚目に伝票を撮影してください。\n" +
+      "必要に応じて機械・管理番号・QRラベルも撮影してください。";
+
+  } else {
+    guide.innerText =
+      "伝票がない場合は、機械全体・管理番号・QRラベル・機械状態が分かる写真を撮影してください。";
+  }
+}
+
+/*
+ * イレギュラー受付で入力された番号を確認し、
+ * ローカルデータから管理区分を判定する。
+ */
+function confirmIrregularInput() {
+  const selected =
+    document.querySelector(
+      'input[name="irregularNumberType"]:checked'
+    );
+
+  const selectedSlip =
+    document.querySelector(
+      'input[name="irregularSlipStatus"]:checked'
+    );
+
+  const numberType =
+    selected
+      ? selected.value
+      : "";
+
+  const slipStatus =
+    selectedSlip
+      ? selectedSlip.value
+      : "";
+
+  const enteredNumber =
+    document.getElementById(
+      "irregularNumberInput"
+    ).value.trim();
+
+  const note =
+    document.getElementById(
+      "irregularNote"
+    ).value.trim();
+
+  if (!numberType) {
+    alert(
+      "番号を入力する／番号が読めないを選択してください"
+    );
+    return;
+  }
+
+  if (!slipStatus) {
+    alert(
+      "伝票の有無を選択してください"
+    );
+    return;
+  }
+
+  if (
+    numberType === "入力" &&
+    !enteredNumber
+  ) {
+    alert(
+      "管理番号または品目コードを入力してください"
+    );
+
+    document.getElementById(
+      "irregularNumberInput"
+    ).focus();
+
+    return;
+  }
+
+  if (!note) {
+    alert(
+      "状況・理由・機械の特徴を入力してください"
+    );
+
+    document.getElementById(
+      "irregularNote"
+    ).focus();
+
+    return;
+  }
+
+  /*
+   * 入力内容を後続処理へ引き継ぐ。
+   */
+  pendingIrregularNumberType =
+    numberType;
+
+  pendingIrregularEnteredNumber =
+    enteredNumber;
+
+  pendingIrregularNote =
+    note;
+
+  pendingIrregularSlipStatus =
+    slipStatus;
+
+  pendingIrregularManagementType = "";
+  pendingIrregularManagedResult = null;
+  pendingIrregularQuantityItem = null;
+
+  /*
+   * 番号不明の場合は、
+   * 在庫状態・通常管理ログを更新しない。
+   */
+  if (numberType === "番号不明") {
+    alert(
+      "番号不明として受付します\n\n" +
+      "管理番号・品目コード：番号不明\n" +
+      "伝票：" +
+      slipStatus +
+      "\n在庫状態：更新しません\n" +
+      "通常管理ログ：保存しません\n" +
+      "追記：" +
+      note +
+      "\n\n作業設定へ進みます"
+    );
+
+    enterUnknownIrregularSetupPhase();
+    return;
+  }
+
+  /*
+   * 個体・簡易個体・RECを検索する。
+   */
+  const managedResult =
+    findManagedItemLocal(
+      enteredNumber
+    );
+
+  if (managedResult) {
+    pendingIrregularManagementType =
+      managedResult.managementType;
+
+    pendingIrregularManagedResult =
+      managedResult;
+
+    const managementLabel =
+      MANAGEMENT_TYPE_LABELS[
+        managedResult.managementType
+      ] ||
+      managedResult.managementType;
+
+    const currentState =
+      getFirstItemValue(
+        managedResult.item,
+        [
+          "現在状態",
+          "状態",
+          "作業区分",
+          "status"
+        ]
+      );
+
+    alert(
+      "管理区分を判定しました\n\n" +
+      "番号：" +
+      enteredNumber +
+      "\n管理区分：" +
+      managementLabel +
+      "\n現在状態：" +
+      (currentState || "状態なし") +
+      "\n伝票：" +
+      slipStatus +
+      "\n追記：" +
+      note +
+      "\n\n作業設定へ進みます"
+    );
+
+    document.getElementById(
+      "irregularArea"
+    ).style.display = "none";
+
+    enterSetupPhase({
+      managementType:
+        managedResult.managementType,
+
+      qrText:
+        enteredNumber,
+
+      managedResult:
+        managedResult,
+
+      quantityItem:
+        null,
+
+      currentState:
+        currentState
+    });
+
+    log(
+      "イレギュラー番号確認完了\n" +
+      "管理区分：" +
+      managementLabel +
+      "\n作業区分・拠点・担当者を確認してください"
+    );
+
+    return;
+  }
+
+  /*
+   * 数量管理品を検索する。
+   */
+  const quantityItem =
+    findQuantityItemLocal(
+      enteredNumber
+    );
+
+  if (quantityItem) {
+    pendingIrregularManagementType =
+      "quantity";
+
+    pendingIrregularQuantityItem =
+      quantityItem;
+
+    const displayName =
+      getFirstItemValue(
+        quantityItem,
+        [
+          "表示名",
+          "品名",
+          "商品名",
+          "displayName"
+        ]
+      );
+
+    alert(
+      "管理区分を判定しました\n\n" +
+      "番号：" +
+      enteredNumber +
+      "\n管理区分：数量管理" +
+      "\n品名：" +
+      (displayName || "表示名なし") +
+      "\n伝票：" +
+      slipStatus +
+      "\n追記：" +
+      note +
+      "\n\n作業設定へ進みます"
+    );
+
+    document.getElementById(
+      "irregularArea"
+    ).style.display = "none";
+
+    enterSetupPhase({
+      managementType:
+        "quantity",
+
+      qrText:
+        enteredNumber,
+
+      managedResult:
+        null,
+
+      quantityItem:
+        quantityItem,
+
+      currentState:
+        ""
+    });
+
+    log(
+      "イレギュラー番号確認完了\n" +
+      "管理区分：数量管理\n" +
+      "作業区分・拠点・担当者を確認してください"
+    );
+
+    return;
+  }
+
+  /*
+   * どのマスタにも存在しない番号は止める。
+   */
+  notifyScanError(
+    "入力した番号がマスタに登録されていません\n\n" +
+    "入力番号：" +
+    enteredNumber +
+    "\n\n番号を確認して再入力してください"
+  );
+
+  log(
+    "イレギュラー番号確認エラー\n" +
+    "マスタ未登録：" +
+    enteredNumber
+  );
+
+  document.getElementById(
+    "irregularNumberInput"
+  ).focus();
+}
+
+
 /*
  * イレギュラーQR受付を取り消し、
  * 通常のホーム画面へ戻す。
