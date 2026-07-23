@@ -1635,13 +1635,13 @@ async function refreshInventoryAfterSend() {
 }
 
 /**
- * 出庫送信に成功した管理品を、
- * この端末内では直ちに「出庫中」として扱う。
+ * 送信に成功した管理品の状態を、
+ * この端末内へ直ちに反映する。
  *
- * スプレッドシート側の状況シート更新が遅れた場合でも、
- * 同じ端末から同じ管理番号を再出庫できないようにする。
+ * スプレッドシート側の状況シート更新が遅れても、
+ * 同じ端末では送信直後の状態を使用する。
  */
-function applyLocalCheckoutStateAfterSend(
+function applyLocalStateAfterSend(
   result,
   sentRecords
 ) {
@@ -1657,7 +1657,7 @@ function applyLocalCheckoutStateAfterSend(
       : [];
 
   /*
-   * GAS側で送信成功した管理番号だけを集める。
+   * GAS側で送信に成功した管理番号だけを集める。
    */
   const successfulQrSet =
     new Set(
@@ -1678,16 +1678,6 @@ function applyLocalCheckoutStateAfterSend(
   records.forEach(function(record) {
     if (!record) return;
 
-    /*
-     * 今回は出庫だけを対象にする。
-     */
-    if (
-      String(record.mode || "").trim() !==
-      "出庫"
-    ) {
-      return;
-    }
-
     const qrText =
       String(
         record.qrText ||
@@ -1705,12 +1695,48 @@ function applyLocalCheckoutStateAfterSend(
       return;
     }
 
+    const mode =
+      String(
+        record.mode || ""
+      ).trim();
+
+    let nextState = "";
+
+    /*
+     * 送信成功後のローカル現在状態。
+     */
+    if (mode === "出庫") {
+      nextState = "出庫中";
+
+    } else if (mode === "返却") {
+      nextState = "未点検";
+
+    } else if (mode === "修理中") {
+      nextState = "修理中";
+
+    } else if (mode === "完成機") {
+      nextState = "完成機";
+
+    } else if (mode === "校正中") {
+      nextState = "校正中";
+
+    } else if (mode === "校正完了") {
+      nextState = "校正完了";
+    }
+
+    /*
+     * 拠点移動など、状態を変更しない処理は
+     * 現段階では対象外とする。
+     */
+    if (!nextState) {
+      return;
+    }
+
     const managedResult =
       findManagedItemLocal(qrText);
 
     /*
-     * 数量管理品は今回の対象外。
-     * 個体・簡易個体・RECだけ更新する。
+     * 今回は個体・簡易個体・RECを対象とする。
      */
     if (
       !managedResult ||
@@ -1719,17 +1745,14 @@ function applyLocalCheckoutStateAfterSend(
       return;
     }
 
-    /*
-     * getFirstItemValue()は「現在状態」を最優先で見るため、
-     * この項目を設定すれば次回読取時に二重出庫判定へ入る。
-     */
     managedResult.item["現在状態"] =
-      "出庫中";
+      nextState;
 
     console.log(
       "送信成功後ローカル状態更新",
       qrText,
-      "出庫中"
+      mode,
+      nextState
     );
   });
 }
@@ -5037,7 +5060,7 @@ await refreshInventoryAfterSend();
  * 状況シートの反映待ちに関係なく
  * この端末内で直ちに「出庫中」とする。
  */
-applyLocalCheckoutStateAfterSend(
+applyLocalStateAfterSend(
   result,
   scannedRecords
 );
