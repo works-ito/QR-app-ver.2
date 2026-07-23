@@ -9649,7 +9649,34 @@ async function cancelLastSend() {
     "✓ " + result.cancelCount + "件取消しました",
     "success"
    );
+  
     alert("取消しました\n" + result.cancelCount + "件");
+    /*
+ * 直前送信前のローカル状態へ戻す。
+ */
+lastSuccessfulSendStateSnapshot.forEach(function(snapshot) {
+
+  const managedResult =
+    findManagedItemLocal(snapshot.qrText);
+
+  if (
+    !managedResult ||
+    !managedResult.item
+  ) {
+    return;
+  }
+
+  managedResult.item["現在状態"] =
+    snapshot.currentState;
+
+  if (snapshot.location) {
+    managedResult.item["拠点"] =
+      snapshot.location;
+  }
+
+});
+
+lastSuccessfulSendStateSnapshot = [];
     lastSentLogIds = [];
     lastPendingSendId = "";
     btn.style.display = "none";
