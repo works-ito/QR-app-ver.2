@@ -2591,51 +2591,6 @@ function stopInventoryUpdateAnimation() {
 }
   
 
-let inventoryUpdateAnimationTimer = null;
-let inventoryUpdateFrame = 0;
-
-function startInventoryUpdateAnimation() {
-
-  stopInventoryUpdateAnimation();
-
-  const el =
-    document.getElementById(
-      "inventoryUpdatedAt"
-    );
-
-  if (!el) return;
-
-  inventoryUpdateAnimationTimer =
-    setInterval(function () {
-
-      inventoryUpdateFrame =
-        (inventoryUpdateFrame + 1) % 4;
-
-      const dots =
-        ".".repeat(inventoryUpdateFrame);
-
-      el.innerText =
-        "データを更新中" +
-        dots +
-        "\n" +
-        el.innerText.split("\n")[1];
-
-    }, 400);
-}
-
-function stopInventoryUpdateAnimation() {
-
-  if (inventoryUpdateAnimationTimer) {
-    clearInterval(
-      inventoryUpdateAnimationTimer
-    );
-
-    inventoryUpdateAnimationTimer =
-      null;
-  }
-
-  inventoryUpdateFrame = 0;
-}
 
 
 /**
