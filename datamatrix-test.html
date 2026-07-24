@@ -1564,6 +1564,11 @@ try {
     "在庫データキャッシュ保存完了"
   );
 
+  updateInventoryUpdatedAtDisplay(
+    new Date().toISOString(),
+    ""
+  );
+
 } catch (cacheError) {
   /*
    * キャッシュ保存に失敗しても、
@@ -10615,19 +10620,40 @@ document.querySelectorAll('input[name="recMemoType"]').forEach(function(radio) {
   });
 });
 
-loadSelections();
-toggleRecTarget();
-checkAppVersion();
+/*
+ * 起動処理。
+ *
+ * まず端末内キャッシュを復元し、
+ * キャッシュがない場合だけGASから最新データを取得する。
+ */
+async function initializeInventoryApp() {
+  loadSelections();
+  toggleRecTarget();
+  checkAppVersion();
+
+  const cache =
+    await restoreInventoryCache();
+
+  /*
+   * 初回起動やキャッシュ消失時だけ、
+   * 従来どおり最新データを取得する。
+   */
+  if (!cache) {
+    await loadAppInitialData(true);
+  } else {
+    log(
+      "在庫データ確認完了\n" +
+      "QRを読み取ってください"
+    );
+  }
+
+  startInventoryRefreshTimer();
+}
 
 /*
- * ver.2
- * ページ起動時に現在状態を一括取得する
- *
- * GAS側がまだ未実装でも、既存機能は止まらない。
+ * HTMLの読込み完了後に起動する。
  */
-loadAppInitialData(true).then(function() {
-  startInventoryRefreshTimer();
-});
+initializeInventoryApp();
 
 setInterval(checkAppVersion, 10000);
 
