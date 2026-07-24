@@ -9216,9 +9216,6 @@ async function uploadIrregularPhotos() {
 
   const files =
     selectedReturnPhotos.slice();
-    
-  const photoRequestId =
-    createPhotoRequestId();
 
   if (files.length === 0) {
     alert(
@@ -9238,7 +9235,7 @@ async function uploadIrregularPhotos() {
 
   /*
    * 数量管理品は数量入力が必要なため、
-   * この段階では誤送信を防止する。
+   * 数量入力フロー接続までは受付を停止する。
    */
   if (
     pendingIrregularRecord.managementType ===
@@ -9256,117 +9253,136 @@ async function uploadIrregularPhotos() {
       "uploadReturnPhotoBtn"
     );
 
-  btn.disabled = true;
+  if (btn) {
+    btn.disabled = true;
+  }
+
+  const photoRequestId =
+    createPhotoRequestId();
 
   startPhotoLoading(
-    "イレギュラー受付写真を合成しています"
+    "伝票情報を確認しています"
   );
 
   try {
-        /*
- * 伝票ありの場合だけ、
- * 1枚目を伝票写真としてAI・OCR解析する。
- *
- * 伝票なしの場合はAI解析を行わず、
- * 作業区分と管理番号から仮タイトルを作成する。
- */
-const hasSlip =
-  String(
-    pendingIrregularRecord.slipStatus || ""
-  ).trim() === "伝票あり";
+    /*
+     * 伝票ありの場合だけ、
+     * 1枚目の写真からAI・OCR解析を行う。
+     */
+    const hasSlip =
+      String(
+        pendingIrregularRecord.slipStatus || ""
+      ).trim() === "伝票あり";
 
-if (hasSlip) {
-  lastReturnPhotoInfo =
-    await prepareSlipInfoBeforePhotoSave(
-      "irregular",
-      files,
-      lastReturnPhotoInfo
-    );
+    if (hasSlip) {
+      lastReturnPhotoInfo =
+        await prepareSlipInfoBeforePhotoSave(
+          "irregular",
+          files,
+          lastReturnPhotoInfo
+        );
 
-} else {
-  clearCurrentSlipInfo();
+    } else {
+      /*
+       * 伝票なしはAI解析をせず、
+       * 顧客名・現場名の手入力を必須にする。
+       */
+      clearCurrentSlipInfo();
 
-  const manualSlipInfo =
-    setCurrentSlipInfo({
-      customerName:
-        "",
+      const manualSlipInfo =
+        setCurrentSlipInfo({
+          customerName:
+            "",
 
-      siteName:
-        "",
+          siteName:
+            "",
 
-      acquisitionMethod:
-        "manual_no_slip",
+          acquisitionMethod:
+            "manual_no_slip",
 
-      siteNameEdited:
-        true
-    });
+          siteNameEdited:
+            true
+        });
 
-  lastReturnPhotoInfo =
-    Object.assign(
-      {},
-      lastReturnPhotoInfo || {},
-      {
-        slipInfo:
-          manualSlipInfo,
+      lastReturnPhotoInfo =
+        Object.assign(
+          {},
+          lastReturnPhotoInfo || {},
+          {
+            slipInfo:
+              manualSlipInfo,
 
-        saveTitleCandidate:
+            saveTitleCandidate:
+              "",
+
+            confirmedTitle:
+              "",
+
+            slipStatus:
+              "伝票なし",
+
+            acquisitionMethod:
+              "manual_no_slip",
+
+            manualTitleRequired:
+              true
+          }
+        );
+    }
+
+    if (!lastReturnPhotoInfo) {
+      lastReturnPhotoInfo = {};
+    }
+
+    const irregularSlipStatus =
+      String(
+        pendingIrregularRecord.slipStatus ||
+        pendingIrregularSlipStatus ||
+        ""
+      ).trim();
+
+    lastReturnPhotoInfo.photoType =
+      "irregular";
+
+    lastReturnPhotoInfo.slipStatus =
+      irregularSlipStatus;
+
+    lastReturnPhotoInfo.irregularRecord =
+      Object.assign(
+        {},
+        pendingIrregularRecord
+      );
+
+    /*
+     * 伝票なし、またはAIでタイトル候補を
+     * 取得できなかった場合は手入力必須。
+     */
+    lastReturnPhotoInfo.manualTitleRequired =
+      (
+        irregularSlipStatus ===
+        "伝票なし"
+      ) ||
+      !getPhotoTitleCandidate(
+        lastReturnPhotoInfo
+      );
+
+    if (
+      !lastReturnPhotoInfo.slipInfo ||
+      typeof lastReturnPhotoInfo.slipInfo !==
+        "object"
+    ) {
+      lastReturnPhotoInfo.slipInfo = {
+        customerName:
+          "",
+
+        siteName:
           "",
 
         confirmedTitle:
-          "",
+          ""
+      };
+    }
 
-        slipStatus:
-          "伝票なし",
-
-        acquisitionMethod:
-          "manual_no_slip",
-
-        manualTitleRequired:
-          true
-      }
-    );
-}
-    /*
- * イレギュラー写真は、
- * 伝票なしの場合またはAI解析でタイトル候補を
- * 取得できなかった場合、手入力を必須にする。
- */
-const irregularSlipStatus =
-  String(
-    (
-      pendingIrregularRecord &&
-      pendingIrregularRecord.slipStatus
-    ) ||
-    pendingIrregularSlipStatus ||
-    ""
-  ).trim();
-
-if (!lastReturnPhotoInfo) {
-  lastReturnPhotoInfo = {};
-}
-
-lastReturnPhotoInfo.slipStatus =
-  irregularSlipStatus;
-
-lastReturnPhotoInfo.manualTitleRequired =
-  (
-    irregularSlipStatus ===
-    "伝票なし"
-  ) ||
-  !getPhotoTitleCandidate(
-    lastReturnPhotoInfo
-  );
-    if (
-  !lastReturnPhotoInfo.slipInfo ||
-  typeof lastReturnPhotoInfo.slipInfo !==
-    "object"
-) {
-  lastReturnPhotoInfo.slipInfo = {
-    customerName: "",
-    siteName: "",
-    confirmedTitle: ""
-  };
-}
     const confirmationOpened =
       openPhotoTitleConfirmation({
         photoType:
@@ -9378,253 +9394,32 @@ lastReturnPhotoInfo.manualTitleRequired =
         photoInfo:
           lastReturnPhotoInfo,
 
-       photoRequestId:
+        photoRequestId:
           photoRequestId,
-          
+
         button:
           btn
       });
 
-    if (confirmationOpened) {
-      stopPhotoLoading();
-      return;
-    }
-    /*
-     * 写真を1枚の受付画像へ合成する。
-     */
-    const collageBase64 =
-      await makeIrregularCollage(
-        files,
-        pendingIrregularRecord
-      );
-
-    startPhotoLoading(
-      "イレギュラー受付を保存中"
-    );
-
-    const irregularCaseId =
-      createIrregularCaseId();
-
-    const payload = {
-      action:
-        "saveIrregularRegistration",
-
-      irregularCaseId:
-        irregularCaseId,
-
-      photoBase64:
-        collageBase64,
-
-      record: {
-        qr:
-          pendingIrregularRecord.qrText,
-
-        mode:
-          pendingIrregularRecord.mode,
-
-        user:
-          pendingIrregularRecord.user,
-
-        location:
-          pendingIrregularRecord.location,
-
-        recTarget:
-          pendingIrregularRecord.recTarget || "",
-
-        recDate:
-          pendingIrregularRecord.recDate || "",
-
-        managementType:
-          pendingIrregularRecord.managementType,
-
-        displayName:
-          pendingIrregularRecord.displayName || "",
-
-        currentState:
-          pendingIrregularRecord.currentState || "",
-
-        irregularNote:
-          pendingIrregularRecord.irregularNote,
-
-        readMethod:
-        pendingIrregularRecord.readMethod,
-
-  numberType:
-        pendingIrregularRecord.numberType ||
-        pendingIrregularNumberType ||
-  "入力",
-
-photoCount:
-  files.length
-      }
-    };
-
-    const response =
-      await fetch(
-        GAS_URL,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "text/plain"
-          },
-          body:
-            JSON.stringify(payload)
-        }
-      );
-
-    const text =
-      await response.text();
-
-    let result;
-
-    try {
-      result =
-        JSON.parse(text);
-    } catch (parseError) {
-      throw new Error(
-        "保存結果の解析に失敗しました\n" +
-        text.slice(0, 200)
-      );
-    }
-
-    if (!result.ok) {
-      stopPhotoLoading();
-
-      alert(
-        "イレギュラー受付保存失敗\n" +
-        (
-          result.message ||
-          "保存できませんでした"
-        )
-      );
-
-      log(
-        "イレギュラー受付保存失敗"
-      );
-
-      btn.disabled = false;
-
-      return;
-    }
-
     stopPhotoLoading();
 
-    alert(
-      "イレギュラー受付を保存しました\n\n" +
-      "受付ID：" +
-      (
-        result.irregularCaseId ||
-        irregularCaseId
-      ) +
-      "\n番号：" +
-      pendingIrregularRecord.qrText +
-      "\n作業区分：" +
-      pendingIrregularRecord.mode +
-      "\n写真：" +
-      files.length +
-      "枚"
-    );
+    if (confirmationOpened) {
+      return;
+    }
 
     /*
-     * 写真画面を閉じる。
+     * イレギュラー受付では必ずタイトル確認を行うため、
+     * 通常ここへは到達しない。
      */
-    document.getElementById(
-      "returnPhotoArea"
-    ).style.display = "none";
-
-    document.getElementById(
-      "returnCameraInput"
-    ).value = "";
-
-    document.getElementById(
-      "returnLibraryInput"
-    ).value = "";
-
-    document.getElementById(
-      "returnPhotoPreview"
-    ).innerText = "";
-
-    btn.style.display = "none";
-    btn.disabled = false;
-
-    /*
-     * 在庫状態を最新化する。
-     */
-    await refreshInventoryAfterSend();
-
-    /*
-     * イレギュラー受付情報をクリアする。
-     */
-    selectedReturnPhotos = [];
-
-    pendingIrregularNumberType = "";
-    pendingIrregularEnteredNumber = "";
-    pendingIrregularNote = "";
-    pendingIrregularManagementType = "";
-    pendingIrregularManagedResult = null;
-    pendingIrregularQuantityItem = null;
-    pendingIrregularRecord = null;
-
-    irregularFlowActive = false;
-
-    /*
-     * 通常ホーム画面へ戻す。
-     */
-    scanWorkflowPhase =
-      SCAN_PHASE_DETECT;
-
-    detectedManagementType = "";
-    detectedManagementTypeLabel = "";
-    firstDetectedQrText = "";
-    firstDetectedManagedResult = null;
-    firstDetectedQuantityItem = null;
-    firstDetectedCurrentState = "";
-
-    activeManagementRestriction = "";
-
-    document.getElementById(
-      "mode"
-    ).innerHTML =
-      '<option value="">作業区分を選択</option>';
-
-    document.getElementById(
-      "mode"
-    ).value = "";
-
-    document.getElementById(
-      "settingsPanel"
-    ).open = false;
-
-    document.getElementById(
-      "settingsPanel"
-    ).style.display = "none";
-
-    document.getElementById(
-      "startBtn"
-    ).style.display = "block";
-
-    document.getElementById(
-      "startNoQrReturnBtn"
-    ).style.display = "block";
-
-    document.getElementById(
-      "stopBtn"
-    ).style.display = "none";
-
-    document.getElementById(
-      "resetBtn"
-    ).style.display = "none";
-
-    log(
-      "イレギュラー受付保存完了\n" +
-      "続けて作業する場合は、上のボタンを押してください"
+    throw new Error(
+      "保存タイトル確認画面を開けませんでした"
     );
 
   } catch (error) {
     stopPhotoLoading();
 
     alert(
-      "イレギュラー受付保存エラー\n" +
+      "イレギュラー受付写真の準備に失敗しました\n" +
       (
         error &&
         error.message
@@ -9634,13 +9429,15 @@ photoCount:
     );
 
     log(
-      "イレギュラー受付保存エラー"
+      "イレギュラー受付写真の準備に失敗しました"
     );
 
-    btn.disabled = false;
+    if (btn) {
+      btn.disabled = false;
+    }
   }
 }
-
+  
 /**
  * タイトル確認後に、
  * イレギュラー受付写真の合成・保存を実行する。
