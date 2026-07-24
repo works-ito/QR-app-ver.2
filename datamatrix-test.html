@@ -1098,7 +1098,16 @@ let lastPendingSendId = "";
  * 端末内の状態を送信前へ戻すための記録。
  */
 let lastSuccessfulSendStateSnapshot = [];
+/*
+ * 同じ端末からの直近二重送信を防止する。
+ */
+const RECENT_WORK_STORAGE_KEY =
+  "qrInventoryRecentSuccessfulWorks";
 
+const RECENT_WORK_BLOCK_MS =
+  5 * 60 * 1000;
+
+let lastSuccessfulWorkKeys = [];
 let pendingQuantityItem = null;
 let lastQuantityCode = "";
 let lastQuantityCompletedAt = 0;
@@ -1729,6 +1738,234 @@ async function refreshInventoryAfterSend() {
   }
 
   return success;
+}
+
+/*
+ * 直近の送信成功記録を端末から取得する。
+ */
+function getRecentSuccessfulWorks() {
+  try {
+    const raw =
+      localStorage.getItem(
+        RECENT_WORK_STORAGE_KEY
+      );
+
+    const parsed =
+      raw
+        ? JSON.parse(raw)
+        : [];
+
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    const now =
+      Date.now();
+
+    return parsed.filter(function(item) {
+      return (
+        item &&
+        now - Number(item.sentAt || 0) <
+          RECENT_WORK_BLOCK_MS
+      );
+    });
+
+  } catch (error) {
+    console.warn(
+      "直近送信記録の取得失敗",
+      error
+    );
+
+    return [];
+  }
+}
+
+
+/*
+ * 同一管理番号・品目コード・作業区分が
+ * 直近5分以内に送信済みか確認する。
+ */
+function isRecentSuccessfulWork(
+  qrText,
+  mode
+) {
+  const qrKey =
+    normalizeLookupKey(
+      qrText || ""
+    );
+
+  const modeKey =
+    String(
+      mode || ""
+    ).trim();
+
+  if (!qrKey || !modeKey) {
+    return false;
+  }
+
+  return getRecentSuccessfulWorks()
+    .some(function(item) {
+      return (
+        item.qrKey === qrKey &&
+        item.mode === modeKey
+      );
+    });
+}
+
+
+/*
+ * GAS側で成功した作業だけを、
+ * 端末内の直近送信記録へ保存する。
+ */
+function rememberRecentSuccessfulWorks(
+  result,
+  sentRecords
+) {
+  const results =
+    result &&
+    Array.isArray(result.results)
+      ? result.results
+      : [];
+
+  const records =
+    Array.isArray(sentRecords)
+      ? sentRecords
+      : [];
+
+  const successfulQrSet =
+    new Set(
+      results
+        .filter(function(item) {
+          return item && item.ok;
+        })
+        .map(function(item) {
+          return normalizeLookupKey(
+            item.qr || ""
+          );
+        })
+        .filter(Boolean)
+    );
+
+  const now =
+    Date.now();
+
+  let recent =
+    getRecentSuccessfulWorks();
+
+  lastSuccessfulWorkKeys = [];
+
+  records.forEach(function(record) {
+    if (!record) return;
+
+    const qrText =
+      String(
+        record.qrText ||
+        record.qr ||
+        ""
+      ).trim();
+
+    const qrKey =
+      normalizeLookupKey(qrText);
+
+    const mode =
+      String(
+        record.mode || ""
+      ).trim();
+
+    if (
+      !qrKey ||
+      !mode ||
+      !successfulQrSet.has(qrKey)
+    ) {
+      return;
+    }
+
+    const workKey =
+      qrKey + "||" + mode;
+
+    /*
+     * 同じ記録が残っていたら入れ替える。
+     */
+    recent =
+      recent.filter(function(item) {
+        return (
+          item.qrKey + "||" + item.mode
+        ) !== workKey;
+      });
+
+    recent.push({
+      qrKey:
+        qrKey,
+
+      mode:
+        mode,
+
+      sentAt:
+        now
+    });
+
+    lastSuccessfulWorkKeys.push(
+      workKey
+    );
+  });
+
+  try {
+    localStorage.setItem(
+      RECENT_WORK_STORAGE_KEY,
+      JSON.stringify(recent)
+    );
+
+  } catch (error) {
+    console.warn(
+      "直近送信記録の保存失敗",
+      error
+    );
+  }
+}
+
+
+/*
+ * 直前送信取消時に、
+ * その送信分の二重送信防止記録も解除する。
+ */
+function clearLastSuccessfulWorkRecords() {
+  if (
+    !Array.isArray(lastSuccessfulWorkKeys) ||
+    lastSuccessfulWorkKeys.length === 0
+  ) {
+    return;
+  }
+
+  const keySet =
+    new Set(
+      lastSuccessfulWorkKeys
+    );
+
+  const recent =
+    getRecentSuccessfulWorks()
+      .filter(function(item) {
+        const workKey =
+          item.qrKey +
+          "||" +
+          item.mode;
+
+        return !keySet.has(workKey);
+      });
+
+  try {
+    localStorage.setItem(
+      RECENT_WORK_STORAGE_KEY,
+      JSON.stringify(recent)
+    );
+
+  } catch (error) {
+    console.warn(
+      "直近送信記録の解除失敗",
+      error
+    );
+  }
+
+  lastSuccessfulWorkKeys = [];
 }
 
 /**
@@ -5443,6 +5680,41 @@ function handleDecoded(decodedText) {
       return;
     }
 
+    /*
+ * 数量管理品も、
+ * 同じ品目コード・同じ作業区分の
+ * 5分以内の二重登録を停止する。
+ */
+if (
+  isRecentSuccessfulWork(
+    decodedText,
+    selectedMode
+  )
+) {
+  stopQrForError();
+
+  notifyScanError(
+    "この作業は5分以内に登録済みです。\n\n" +
+    "二重登録の可能性があるため登録できません。\n\n" +
+    "品目コード：" +
+    decodedText +
+    "\n作業区分：" +
+    selectedMode
+  );
+
+  log(
+    "直近送信との重複を停止しました\n" +
+    decodedText +
+    "\n作業区分：" +
+    selectedMode
+  );
+
+  setTimeout(function() {
+    scanBusy = false;
+  }, 300);
+
+  return;
+}
 
     /*
      * 修理中は、個体・簡易個体・REC専用。
@@ -5720,7 +5992,40 @@ function handleDecoded(decodedText) {
     return;
   }
 
+/*
+ * 同じ端末から5分以内に、
+ * 同じ管理ID・同じ作業区分を送信済みなら停止する。
+ */
+if (
+  isRecentSuccessfulWork(
+    decodedText,
+    selectedMode
+  )
+) {
+  stopQrForError();
 
+  notifyScanError(
+    "この作業は5分以内に登録済みです。\n\n" +
+    "二重登録の可能性があるため登録できません。\n\n" +
+    "管理ID：" +
+    decodedText +
+    "\n作業区分：" +
+    selectedMode
+  );
+
+  log(
+    "直近送信との重複を停止しました\n" +
+    decodedText +
+    "\n作業区分：" +
+    selectedMode
+  );
+
+  setTimeout(function() {
+    scanBusy = false;
+  }, 300);
+
+  return;
+}
   const currentState =
     getFirstItemValue(
       managedResult.item,
@@ -6125,7 +6430,11 @@ async function sendBatchToSheet() {
 }
 
 rememberSentLogIds(result);
-
+    
+rememberRecentSuccessfulWorks(
+  result,
+  scannedRecords
+);
 /*
  * スプレッドシート反映後の最新状態を再取得する。
  */
@@ -6268,7 +6577,10 @@ async function sendRecBatchAfterMemo() {
 }
 
 rememberSentLogIds(result);
-
+rememberRecentSuccessfulWorks(
+  result,
+  pendingRecRecords
+);
 /*
  * REC送信後の最新状態を再取得する。
  */
@@ -6380,7 +6692,10 @@ return;
 }
 
 rememberSentLogIds(result);
-
+rememberRecentSuccessfulWorks(
+  result,
+  pendingReturnItems
+);
 /*
  * スプレッドシートの最新状態を取得する。
  */
@@ -10487,7 +10802,7 @@ lastSuccessfulSendStateSnapshot.forEach(function(snapshot) {
   }
 
 });
-
+clearLastSuccessfulWorkRecords();
 lastSuccessfulSendStateSnapshot = [];
     lastSentLogIds = [];
     lastPendingSendId = "";
