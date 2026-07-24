@@ -6022,10 +6022,12 @@ function resetScan() {
   });
   toggleRecTarget();
   log("読取履歴をリセットしました");
-　if (pendingAutoReload) {
+/*
+if (pendingAutoReload) {
   pendingAutoReload = false;
   location.href = location.pathname + "?v=" + Date.now();
-　}
+}
+*/
 }
 
 function undoLastScan() {
