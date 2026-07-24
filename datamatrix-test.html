@@ -400,19 +400,6 @@ textarea {
   font-size: 16px;
   line-height: 1.5;
 }
-.rotateIcon {
-  display: inline-block;
-  animation: rotateIcon 1s linear infinite;
-}
-
-@keyframes rotateIcon {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
 </style>
 </head>
 
@@ -2514,9 +2501,9 @@ function updateInventoryUpdatedAtDisplay(
 
   if (status === "最新データへ更新中...") {
    el.innerHTML =
-'<span id="inventoryUpdateIcon" class="rotateIcon">🔄</span> 更新中（操作できます）<br>' +
-'前回更新：' +
-formatted;
+  '◜ 更新中（操作できます）<br>' +
+  '前回更新：' +
+  formatted;
 
     el.style.color =
       "#1677ff";
@@ -2557,7 +2544,7 @@ let inventoryUpdateAnimationTimer = null;
 let inventoryUpdateFrame = 0;
 
 function startInventoryUpdateAnimation() {
-
+const spinner = ["◜", "◝", "◞", "◟"];
   stopInventoryUpdateAnimation();
 
   const el =
@@ -2582,7 +2569,8 @@ function startInventoryUpdateAnimation() {
         lines[1] || "";
 
      el.innerHTML =
-'<span id="inventoryUpdateIcon" class="rotateIcon">🔄</span> 更新中（操作できます）' +
+spinner[inventoryUpdateFrame % 4] +
+' 更新中（操作できます）' +
 '.'.repeat(inventoryUpdateFrame) +
 '<br>' +
 secondLine;
