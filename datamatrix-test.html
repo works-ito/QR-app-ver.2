@@ -2501,7 +2501,8 @@ function updateInventoryUpdatedAtDisplay(
 
   if (status === "最新データへ更新中...") {
    el.innerHTML =
-  '◜ 更新中（操作できます）<br>' +
+  '<span style="font-size:1.2em; display:inline-block;">◜</span>' +
+  ' 更新中（操作できます）<br>' +
   '前回更新：' +
   formatted;
 
@@ -2569,11 +2570,13 @@ const spinner = ["◜", "◝", "◞", "◟"];
         lines[1] || "";
 
      el.innerHTML =
-spinner[inventoryUpdateFrame % 4] +
-' 更新中（操作できます）' +
-'.'.repeat(inventoryUpdateFrame) +
-'<br>' +
-secondLine;
+  '<span style="font-size:1.2em; display:inline-block;">' +
+  spinner[inventoryUpdateFrame % 4] +
+  '</span>' +
+  ' 更新中（操作できます）' +
+  '.'.repeat(inventoryUpdateFrame) +
+  '<br>' +
+  secondLine;
 
     }, 300);
 }
