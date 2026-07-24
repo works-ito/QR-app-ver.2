@@ -1597,8 +1597,7 @@ if (showLoading) {
   stopInitialDataLoading();
 
   log(
-    "在庫データ確認完了\n" +
-    "QRを読み取ってください"
+       "QR作業を開始してください"
   );
 }
 
@@ -2508,7 +2507,10 @@ function updateInventoryUpdatedAtDisplay(
 
     el.style.color =
       "#1677ff";
-
+    log(
+  "前回データで操作できます\n" +
+  "最新データを確認中です"
+);
     startInventoryUpdateAnimation();
     return;
   }
