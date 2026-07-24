@@ -2500,17 +2500,16 @@ function updateInventoryUpdatedAtDisplay(
   }
 
   if (status === "最新データへ更新中...") {
-    el.innerText =
-  "🔄 データを更新中\n" +
+   el.innerText =
+  "🔄 更新中（操作できます）\n" +
   "前回更新：" +
   formatted;
 
     el.style.color =
       "#1677ff";
     log(
-  "前回データで操作できます\n" +
-  "最新データを確認中です"
-);
+  "QR読取作業を開始してください"
+  );
     startInventoryUpdateAnimation();
     return;
   }
