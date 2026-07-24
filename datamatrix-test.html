@@ -2480,59 +2480,163 @@ function updateInventoryUpdatedAtDisplay(
       ? new Date(updatedAt)
       : null;
 
-  if (
-    !date ||
-    Number.isNaN(date.getTime())
-  ) {
-    el.innerText =
-      "最終データ更新\n" +
-      "更新時刻不明";
+  let formatted =
+    "更新時刻不明";
 
+  if (
+    date &&
+    !Number.isNaN(date.getTime())
+  ) {
+    formatted =
+      new Intl.DateTimeFormat(
+        "ja-JP",
+        {
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false
+        }
+      ).format(date);
+  }
+
+  if (status === "最新データへ更新中...") {
+    el.innerText =
+  "🔄 データを更新中\n" +
+  "前回更新：" +
+  formatted;
+
+    el.style.color =
+      "#1677ff";
+
+    startInventoryUpdateAnimation();
     return;
   }
 
-  const formatted =
-    new Intl.DateTimeFormat(
-      "ja-JP",
-      {
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false
-      }
-    ).format(date);
+  stopInventoryUpdateAnimation();
 
-  el.innerText =
-    "最終データ更新\n" +
-    formatted +
-    (
-      status
-        ? "\n" + status
-        : ""
-    );
-
-  /*
-   * 状態に応じて文字色を切り替える。
-   */
   if (
     status === "更新失敗" ||
     status === "最新データ取得失敗"
   ) {
+    el.innerText =
+  "⚠️ 更新失敗\n" +
+  "前回更新：" +
+  formatted;
+
     el.style.color =
       "#c62828";
 
-  } else if (
-    status === "最新データへ更新中..."
-  ) {
-    el.style.color =
-      "#1677ff";
-
-  } else {
-    el.style.color =
-      "#666";
+    return;
   }
-}  
+
+  el.innerText =
+  "✅ 最新データ\n" +
+  "更新：" +
+  formatted;
+
+  el.style.color =
+    "#666";
+}
+
+let inventoryUpdateAnimationTimer = null;
+let inventoryUpdateFrame = 0;
+
+function startInventoryUpdateAnimation() {
+
+  stopInventoryUpdateAnimation();
+
+  const el =
+    document.getElementById(
+      "inventoryUpdatedAt"
+    );
+
+  if (!el) return;
+
+  inventoryUpdateFrame = 0;
+
+  inventoryUpdateAnimationTimer =
+    setInterval(function() {
+
+      inventoryUpdateFrame =
+        (inventoryUpdateFrame + 1) % 4;
+
+      const lines =
+        el.innerText.split("\n");
+
+      const secondLine =
+        lines[1] || "";
+
+      el.innerText =
+        "🔄 データを更新中" +
+        ".".repeat(inventoryUpdateFrame) +
+        "\n" +
+        secondLine;
+
+    }, 400);
+}
+
+function stopInventoryUpdateAnimation() {
+
+  if (inventoryUpdateAnimationTimer) {
+    clearInterval(
+      inventoryUpdateAnimationTimer
+    );
+
+    inventoryUpdateAnimationTimer =
+      null;
+  }
+
+  inventoryUpdateFrame = 0;
+}
+  
+
+let inventoryUpdateAnimationTimer = null;
+let inventoryUpdateFrame = 0;
+
+function startInventoryUpdateAnimation() {
+
+  stopInventoryUpdateAnimation();
+
+  const el =
+    document.getElementById(
+      "inventoryUpdatedAt"
+    );
+
+  if (!el) return;
+
+  inventoryUpdateAnimationTimer =
+    setInterval(function () {
+
+      inventoryUpdateFrame =
+        (inventoryUpdateFrame + 1) % 4;
+
+      const dots =
+        ".".repeat(inventoryUpdateFrame);
+
+      el.innerText =
+        "データを更新中" +
+        dots +
+        "\n" +
+        el.innerText.split("\n")[1];
+
+    }, 400);
+}
+
+function stopInventoryUpdateAnimation() {
+
+  if (inventoryUpdateAnimationTimer) {
+    clearInterval(
+      inventoryUpdateAnimationTimer
+    );
+
+    inventoryUpdateAnimationTimer =
+      null;
+  }
+
+  inventoryUpdateFrame = 0;
+}
+
 
 /**
  * 現在保持している伝票情報を消去する。
