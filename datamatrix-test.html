@@ -1334,7 +1334,7 @@ let firstDetectedCurrentState = "";
 let activeManagementRestriction = "";
 
 const AUTO_RELOAD_MINUTES = 30;
-const DATA_REFRESH_MINUTES = 15;
+const DATA_REFRESH_MINUTES = 5;
 
 let lastHiddenTime = null;
 let inventoryRefreshTimer = null;
@@ -1640,6 +1640,41 @@ if (showLoading) {
     appInitialDataLoading = false;
   }
 }
+  /*
+ * バックグラウンド更新を実行してよいか判定する。
+ *
+ * 読取中・送信中・写真登録中は更新しない。
+ */
+function canRefreshInventoryNow() {
+
+  /*
+   * 初期データ取得中。
+   */
+  if (appInitialDataLoading) {
+    return false;
+  }
+
+  /*
+   * 一括送信中。
+   */
+  if (batchLoading) {
+    return false;
+  }
+
+  /*
+   * QR読取一覧が残っている間は、
+   * 現在状態が変わる可能性があるため更新しない。
+   */
+  if (
+    Array.isArray(scannedRecords) &&
+    scannedRecords.length > 0
+  ) {
+    return false;
+  }
+
+  return true;
+}
+  
 
   function startInventoryRefreshTimer() {
   if (inventoryRefreshTimer) {
@@ -1647,6 +1682,13 @@ if (showLoading) {
   }
 
   inventoryRefreshTimer = setInterval(async function() {
+    
+    if (!canRefreshInventoryNow()) {
+  console.log(
+    "在庫データ更新保留"
+  );
+  return;
+}
     console.log("在庫データ定期更新開始");
 
     const success = await loadAppInitialData(false);
@@ -2411,9 +2453,18 @@ async function restoreInventoryCache() {
 /*
  * 在庫データの最終更新時刻を画面へ表示する。
  */
+/*
+ * 在庫データの最終更新時刻を画面へ表示する。
+ *
+ * 通常時：
+ * 最終更新
+ * 07/24 10:18
+ *
+ * 更新中・失敗時だけ3行目を表示する。
+ */
 function updateInventoryUpdatedAtDisplay(
   updatedAt,
-  suffix
+  status
 ) {
   const el =
     document.getElementById(
@@ -2434,7 +2485,8 @@ function updateInventoryUpdatedAtDisplay(
     Number.isNaN(date.getTime())
   ) {
     el.innerText =
-      "在庫データ：更新時刻不明";
+      "最終データ更新\n" +
+      "更新時刻不明";
 
     return;
   }
@@ -2443,7 +2495,6 @@ function updateInventoryUpdatedAtDisplay(
     new Intl.DateTimeFormat(
       "ja-JP",
       {
-        year: "numeric",
         month: "2-digit",
         day: "2-digit",
         hour: "2-digit",
@@ -2453,16 +2504,35 @@ function updateInventoryUpdatedAtDisplay(
     ).format(date);
 
   el.innerText =
-    "在庫データ：" +
+    "最終データ更新\n" +
     formatted +
-    " 更新" +
     (
-      suffix
-        ? " " + suffix
+      status
+        ? "\n" + status
         : ""
     );
-}
-  
+
+  /*
+   * 状態に応じて文字色を切り替える。
+   */
+  if (
+    status === "更新失敗" ||
+    status === "最新データ取得失敗"
+  ) {
+    el.style.color =
+      "#c62828";
+
+  } else if (
+    status === "最新データへ更新中..."
+  ) {
+    el.style.color =
+      "#1677ff";
+
+  } else {
+    el.style.color =
+      "#666";
+  }
+}  
 
 /**
  * 現在保持している伝票情報を消去する。
@@ -10657,7 +10727,7 @@ async function initializeInventoryApp() {
 
   updateInventoryUpdatedAtDisplay(
     cache.updatedAt || "",
-    "最新確認中..."
+    "最新データへ更新中..."
   );
 
   /*
