@@ -10638,14 +10638,57 @@ async function initializeInventoryApp() {
    * 初回起動やキャッシュ消失時だけ、
    * 従来どおり最新データを取得する。
    */
-  if (!cache) {
-    await loadAppInitialData(true);
-  } else {
-    log(
-      "在庫データ確認完了\n" +
-      "QRを読み取ってください"
-    );
-  }
+ if (!cache) {
+  /*
+   * 初回起動だけはキャッシュがないため、
+   * 従来どおり最新データ取得を待つ。
+   */
+  await loadAppInitialData(true);
+
+} else {
+  /*
+   * キャッシュがある場合は、
+   * 待たずにすぐ操作可能にする。
+   */
+  log(
+    "在庫データ確認完了\n" +
+    "QRを読み取ってください"
+  );
+
+  updateInventoryUpdatedAtDisplay(
+    cache.updatedAt || "",
+    "最新確認中..."
+  );
+
+  /*
+   * 最新データ取得は裏で実行する。
+   * awaitしないため、起動操作を待たせない。
+   */
+  loadAppInitialData(false)
+    .then(function(success) {
+      if (success) {
+        console.log(
+          "起動後バックグラウンド更新完了"
+        );
+      } else {
+        updateInventoryUpdatedAtDisplay(
+          cache.updatedAt || "",
+          "更新失敗"
+        );
+      }
+    })
+    .catch(function(error) {
+      console.warn(
+        "起動後バックグラウンド更新エラー",
+        error
+      );
+
+      updateInventoryUpdatedAtDisplay(
+        cache.updatedAt || "",
+        "更新失敗"
+      );
+    });
+}
 
   startInventoryRefreshTimer();
 }
