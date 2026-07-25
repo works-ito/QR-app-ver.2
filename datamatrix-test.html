@@ -3060,19 +3060,6 @@ function updateScanDisplay(lastMessage) {
   }
 }
 
-function refreshScanDisplay(decodedText) {
-  document.getElementById("lastRead").innerText =
-    "読取成功 ✔ " + formatScanItemForDisplay(lastScanned || decodedText);
-
-  document.getElementById("count").innerText =
-    "読取件数：" + scannedSet.size + "件";
-
-  document.getElementById("scanList").innerHTML =
-    Array.from(scannedSet).reverse().map(function(item) {
-      return '<div class="readItem">' + formatScanItemForDisplay(item) + '</div>';
-    }).join("");
-}
-
 function flashScanFrame() {
   const frame = document.getElementById("scanFrame");
   if (!frame) return;
