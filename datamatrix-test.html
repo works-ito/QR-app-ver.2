@@ -3748,6 +3748,9 @@ function beginUnknownIrregularRegistration() {
   }
 
   pendingIrregularRecord = {
+    irregularCaseId:
+      createIrregularCaseId(),
+
     qrText:
       "番号不明",
 
@@ -4173,6 +4176,9 @@ function beginIrregularRegistration() {
   }
 
   pendingIrregularRecord = {
+    irregularCaseId:
+      createIrregularCaseId(),
+
     qrText:
       pendingIrregularEnteredNumber,
 
@@ -8968,7 +8974,7 @@ lastReturnPhotoInfo = {
   ],
 
   irregularCaseId:
-    "",
+    pendingIrregularRecord.irregularCaseId || "",
 
   irregularRecord:
     Object.assign(
