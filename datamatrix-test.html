@@ -387,6 +387,16 @@ textarea {
   white-space:pre-wrap;
   margin:8px 0;
 }
+
+.buttonDescription{
+  margin-top:6px;
+  margin-bottom:18px;
+  text-align:center;
+  font-size:15px;
+  color:#666;
+  line-height:1.4;
+}
+
 </style>
 </head>
 
@@ -416,7 +426,10 @@ textarea {
   
 <div id="mainScanButtonArea">
   <button id="startBtn" onclick="startQr()">QRを読み取る</button>
-
+  <p class="buttonDescription">
+  QRラベルありはこちら
+  </p>
+  
   <button
     id="startNoQrReturnBtn"
     type="button"
@@ -434,6 +447,9 @@ textarea {
   >
     イレギュラー受付
   </button>
+  <p class="buttonDescription">
+QRラベルなし・読取不可等はこちら
+</p>
 </div>
 
 <details id="settingsPanel" style="display:none;">
