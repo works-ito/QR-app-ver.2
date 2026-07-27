@@ -389,12 +389,12 @@ textarea {
 }
 
 .buttonDescription{
-  margin-top:6px;
-  margin-bottom:18px;
+  margin:0 0 6px;
   text-align:center;
   font-size:15px;
   color:#666;
   line-height:1.4;
+  font-weight:bold;
 }
 
 </style>
@@ -425,17 +425,31 @@ textarea {
 </div>
   
 <div id="mainScanButtonArea">
-  <button id="startBtn" onclick="startQr()">QRを読み取る</button>
+
   <p class="buttonDescription">
-  QRラベルありはこちら
+    QRラベルありはこちら
   </p>
-  
+
+  <button
+    id="startBtn"
+    onclick="startQr()"
+  >
+    QRを読み取る
+  </button>
+
+  <p
+    class="buttonDescription"
+    style="margin-top:12px;"
+  >
+    QRラベルなし・読取不可等はこちら
+  </p>
+
   <button
     id="startNoQrReturnBtn"
     type="button"
     onclick="startIrregularReturn()"
     style="
-      margin-top:4px;
+      margin-top:0;
       background:#fff3cd;
       color:#333;
       border:2px solid #d39e00;
@@ -447,9 +461,7 @@ textarea {
   >
     イレギュラー受付
   </button>
-  <p class="buttonDescription">
-QRラベルなし・読取不可等はこちら
-</p>
+
 </div>
 
 <details id="settingsPanel" style="display:none;">
