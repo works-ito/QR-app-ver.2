@@ -569,7 +569,7 @@ textarea {
         min-height:64px;
       "
     >
-      この設定でまとめ読取開始
+      1件目を登録して読取開始
     </button>
 
     <button
@@ -3420,7 +3420,7 @@ function enterSetupPhase(options) {
 ).innerText =
   irregularFlowActive
     ? "手入力番号：" + firstDetectedQrText
-    : "読取QR：" + firstDetectedQrText;
+    : "1件目のQR：" + firstDetectedQrText;
 
   populateModeOptions(detectedManagementType);
   /*
@@ -3443,7 +3443,7 @@ if (irregularFlowActive) {
     "#d39e00";
 } else {
   beginButton.innerText =
-    "この設定でまとめ読取開始";
+    "1件目を登録して読取開始";
 
   beginButton.onclick =
     beginBatchScan;
@@ -3572,7 +3572,7 @@ async function beginBatchScan() {
     "設定完了\n" +
     "作業区分：" +
     mode +
-    "\n最初のQRを登録しています"
+    "\n1件目を登録しています"
   );
 
   /*
