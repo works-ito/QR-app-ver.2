@@ -1821,20 +1821,6 @@ function rememberRecentSuccessfulWorks(
       ? sentRecords
       : [];
 
-  const successfulQrSet =
-    new Set(
-      results
-        .filter(function(item) {
-          return item && item.ok;
-        })
-        .map(function(item) {
-          return normalizeLookupKey(
-            item.qr || ""
-          );
-        })
-        .filter(Boolean)
-    );
-
   const now =
     Date.now();
 
@@ -1843,8 +1829,22 @@ function rememberRecentSuccessfulWorks(
 
   lastSuccessfulWorkKeys = [];
 
-  records.forEach(function(record) {
+  records.forEach(function(record, index) {
     if (!record) return;
+
+    /*
+     * GASのresultsは送信recordsと同じ順番で返るため、
+     * 同じ位置の結果が成功したものだけ記録する。
+     *
+     * result.results内にqrが含まれない成功レスポンスでも、
+     * 送信元recordから管理番号・品目コードを取得できる。
+     */
+    const resultItem =
+      results[index] || null;
+
+    if (!resultItem || !resultItem.ok) {
+      return;
+    }
 
     const qrText =
       String(
@@ -1861,11 +1861,7 @@ function rememberRecentSuccessfulWorks(
         record.mode || ""
       ).trim();
 
-    if (
-      !qrKey ||
-      !mode ||
-      !successfulQrSet.has(qrKey)
-    ) {
+    if (!qrKey || !mode) {
       return;
     }
 
@@ -1873,7 +1869,8 @@ function rememberRecentSuccessfulWorks(
       qrKey + "||" + mode;
 
     /*
-     * 同じ記録が残っていたら入れ替える。
+     * 同じ記録がすでにある場合は、
+     * 最新の送信時刻へ入れ替える。
      */
     recent =
       recent.filter(function(item) {
@@ -1883,14 +1880,9 @@ function rememberRecentSuccessfulWorks(
       });
 
     recent.push({
-      qrKey:
-        qrKey,
-
-      mode:
-        mode,
-
-      sentAt:
-        now
+      qrKey: qrKey,
+      mode: mode,
+      sentAt: now
     });
 
     lastSuccessfulWorkKeys.push(
@@ -1904,6 +1896,11 @@ function rememberRecentSuccessfulWorks(
       JSON.stringify(recent)
     );
 
+    console.log(
+      "直近送信記録を保存しました",
+      recent
+    );
+
   } catch (error) {
     console.warn(
       "直近送信記録の保存失敗",
@@ -1911,7 +1908,6 @@ function rememberRecentSuccessfulWorks(
     );
   }
 }
-
 
 /*
  * 直前送信取消時に、
