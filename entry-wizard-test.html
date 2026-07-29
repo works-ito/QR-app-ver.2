@@ -2,10 +2,12 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
+
   <meta
     name="viewport"
     content="width=device-width, initial-scale=1, viewport-fit=cover"
   >
+
   <title>QR在庫管理｜入口ウィザード試作</title>
 
   <style>
@@ -36,6 +38,7 @@
       min-height:100%;
       background:var(--background);
       color:var(--ink);
+
       font-family:
         -apple-system,
         BlinkMacSystemFont,
@@ -56,10 +59,12 @@
       max-width:430px;
       min-height:100dvh;
       margin:0 auto;
+
       padding:
         max(12px, env(safe-area-inset-top))
         12px
         max(16px, env(safe-area-inset-bottom));
+
       background:var(--background);
     }
 
@@ -93,10 +98,13 @@
       min-width:68px;
       min-height:40px;
       padding:8px 12px;
+
       border:1px solid var(--line);
       border-radius:10px;
+
       background:#fff;
       color:#475467;
+
       font-size:14px;
       font-weight:700;
     }
@@ -124,6 +132,7 @@
       gap:6px;
       min-height:31px;
       margin-bottom:10px;
+
       overflow-x:auto;
       scrollbar-width:none;
     }
@@ -138,28 +147,28 @@
 
     .summaryChip {
       flex:0 0 auto;
+
       padding:6px 9px;
+
       border:1px solid #c8ddfa;
       border-radius:999px;
+
       background:var(--blue-pale);
       color:#145aa8;
+
       font-size:13px;
       font-weight:800;
       white-space:nowrap;
     }
 
-    .summaryPlaceholder {
-      padding:6px 2px;
-      color:#8a94a6;
-      font-size:13px;
-      font-weight:700;
-    }
-
     .panel {
       display:none;
+
       padding:16px 14px 14px;
+
       border:1px solid #e1e6ee;
       border-radius:16px;
+
       background:var(--surface);
       box-shadow:var(--shadow);
     }
@@ -181,15 +190,64 @@
       }
     }
 
-    .stepLabel {
+    .stepHeader {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
       margin-bottom:4px;
+    }
+
+    .stepLabel {
+      margin:0;
       color:var(--blue);
       font-size:13px;
       font-weight:800;
     }
 
+    .receptionStatus {
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      flex:0 0 auto;
+
+      padding:5px 9px;
+
+      border:1px solid #c8ddfa;
+      border-radius:999px;
+
+      background:var(--blue-pale);
+      color:#145aa8;
+
+      font-size:12px;
+      line-height:1;
+      font-weight:800;
+      white-space:nowrap;
+    }
+
+    .receptionStatus::before {
+      content:"";
+
+      width:7px;
+      height:7px;
+
+      border-radius:50%;
+      background:var(--blue);
+    }
+
+    .receptionStatus.isIrregular {
+      border-color:#ead29e;
+      background:var(--amber-pale);
+      color:#865700;
+    }
+
+    .receptionStatus.isIrregular::before {
+      background:var(--amber);
+    }
+
     .question {
       margin:0;
+
       font-size:23px;
       line-height:1.3;
       font-weight:900;
@@ -198,7 +256,9 @@
 
     .questionHint {
       margin:6px 0 14px;
+
       color:var(--muted);
+
       font-size:14px;
       line-height:1.45;
       font-weight:600;
@@ -213,14 +273,18 @@
     .choiceButton {
       min-width:0;
       min-height:52px;
-      padding:6px 6px;
+      padding:6px;
+
       border:2px solid #bdd4f2;
       border-radius:12px;
+
       background:#f8fbff;
       color:#153c68;
+
       font-size:20px;
       line-height:1.2;
       font-weight:900;
+
       box-shadow:0 2px 0 rgba(30, 87, 148, 0.08);
     }
 
@@ -250,14 +314,31 @@
       font-size:22px;
     }
 
+    .choiceSubText {
+      display:block;
+      margin-top:4px;
+
+      color:#5f7188;
+
+      font-size:13px;
+      font-weight:700;
+    }
+
+    .choiceButton[data-kind="special"] .choiceSubText {
+      color:#8a650e;
+    }
+
     .backButton {
       width:100%;
       min-height:48px;
       margin-top:12px;
+
       border:1px solid var(--line);
       border-radius:11px;
+
       background:#f5f6f8;
       color:#4c5668;
+
       font-size:17px;
       font-weight:800;
     }
@@ -265,14 +346,17 @@
     .dateBox {
       margin-top:12px;
       padding:12px;
+
       border:1px solid var(--line);
       border-radius:12px;
+
       background:#f8fafc;
     }
 
     .dateLabel {
       display:block;
       margin-bottom:6px;
+
       font-size:15px;
       font-weight:800;
     }
@@ -281,10 +365,13 @@
       width:100%;
       min-height:54px;
       padding:8px 10px;
+
       border:2px solid #b8c4d4;
       border-radius:10px;
+
       background:#fff;
       color:var(--ink);
+
       font-size:20px;
       font-weight:700;
     }
@@ -293,12 +380,16 @@
       width:100%;
       min-height:60px;
       margin-top:12px;
+
       border:0;
       border-radius:12px;
+
       background:var(--blue);
       color:#fff;
+
       font-size:21px;
       font-weight:900;
+
       box-shadow:0 4px 10px rgba(22, 119, 255, 0.24);
     }
 
@@ -308,14 +399,18 @@
 
     .completeCard {
       padding:14px;
+
       border:2px solid #b9e2c7;
       border-radius:14px;
+
       background:var(--green-pale);
     }
 
     .completeTitle {
       margin:0 0 10px;
+
       color:var(--green);
+
       font-size:24px;
       font-weight:900;
       text-align:center;
@@ -325,7 +420,9 @@
       display:grid;
       grid-template-columns:92px 1fr;
       gap:8px 10px;
+
       margin:0;
+
       font-size:17px;
       line-height:1.4;
     }
@@ -345,13 +442,17 @@
       display:flex;
       align-items:center;
       justify-content:center;
+
       min-height:150px;
       margin-top:12px;
       padding:16px;
+
       border:3px dashed #9fb8d8;
       border-radius:14px;
+
       background:#eef4fb;
       color:#436184;
+
       text-align:center;
       font-size:18px;
       line-height:1.5;
@@ -360,7 +461,9 @@
 
     .connectionNote {
       margin:10px 2px 0;
+
       color:var(--muted);
+
       font-size:13px;
       line-height:1.5;
       font-weight:600;
@@ -370,11 +473,15 @@
     .debugOutput {
       margin-top:12px;
       padding:10px;
+
       border-radius:10px;
+
       background:#182230;
       color:#d7f7df;
+
       font-size:12px;
       line-height:1.45;
+
       white-space:pre-wrap;
       word-break:break-word;
     }
@@ -398,20 +505,21 @@
       }
 
       .choiceButton {
-        min-height:57px;
+        min-height:50px;
         font-size:18px;
+      }
+
+      .receptionStatus {
+        padding:4px 8px;
+        font-size:11px;
       }
     }
 
-    /*
-     * iPhone SE（375 × 667px）向けの縦方向調整。
-     * 2列配置と十分なタップ領域を維持しながら、
-     * 作業区分11個を見渡しやすくする。
-     */
     @media (max-width:390px) and (max-height:700px) {
       .app {
         padding-top:
           max(7px, env(safe-area-inset-top));
+
         padding-left:9px;
         padding-right:9px;
       }
@@ -446,9 +554,22 @@
         border-radius:14px;
       }
 
-      .stepLabel {
+      .stepHeader {
         margin-bottom:2px;
+      }
+
+      .stepLabel {
         font-size:12px;
+      }
+
+      .receptionStatus {
+        padding:4px 8px;
+        font-size:11px;
+      }
+
+      .receptionStatus::before {
+        width:6px;
+        height:6px;
       }
 
       .question {
@@ -490,8 +611,13 @@
   <main class="app">
     <header class="appHeader">
       <div class="brand">
-        <div class="brandTitle">QR在庫管理</div>
-        <div class="brandSub">WORKS Co., Ltd.</div>
+        <div class="brandTitle">
+          QR在庫管理
+        </div>
+
+        <div class="brandSub">
+          WORKS Co., Ltd.
+        </div>
       </div>
 
       <button
@@ -517,7 +643,7 @@
 
     <div
       id="selectionSummary"
-      class="selectionSummary"
+      class="selectionSummary isEmpty"
       aria-live="polite"
     ></div>
 
@@ -526,13 +652,17 @@
       class="panel"
       aria-labelledby="receptionQuestion"
     >
-      <div class="stepLabel">START</div>
+      <div class="stepLabel">
+        START
+      </div>
+
       <h1
         id="receptionQuestion"
         class="question"
       >
         受付方法を選んでください
       </h1>
+
       <p class="questionHint">
         管理QRの状態に合わせて選択します
       </p>
@@ -544,13 +674,8 @@
           data-reception-type="normal"
         >
           通常受付
-          <span style="
-            display:block;
-            margin-top:4px;
-            font-size:13px;
-            font-weight:700;
-            color:#5f7188;
-          ">
+
+          <span class="choiceSubText">
             管理QRをカメラで読み取る
           </span>
         </button>
@@ -562,13 +687,8 @@
           data-kind="special"
         >
           イレギュラー受付
-          <span style="
-            display:block;
-            margin-top:4px;
-            font-size:13px;
-            font-weight:700;
-            color:#8a650e;
-          ">
+
+          <span class="choiceSubText">
             管理QRなし・破損・読取不可
           </span>
         </button>
@@ -580,13 +700,26 @@
       class="panel"
       aria-labelledby="modeQuestion"
     >
-      <div class="stepLabel">STEP 1</div>
+      <div class="stepHeader">
+        <div class="stepLabel">
+          STEP 1
+        </div>
+
+        <div
+          class="receptionStatus"
+          data-reception-status
+        >
+          通常受付
+        </div>
+      </div>
+
       <h1
         id="modeQuestion"
         class="question"
       >
         作業区分を選んでください
       </h1>
+
       <p class="questionHint">
         今から行う作業を1つ選択します
       </p>
@@ -610,13 +743,26 @@
       class="panel"
       aria-labelledby="locationQuestion"
     >
-      <div class="stepLabel">STEP 2</div>
+      <div class="stepHeader">
+        <div class="stepLabel">
+          STEP 2
+        </div>
+
+        <div
+          class="receptionStatus"
+          data-reception-status
+        >
+          通常受付
+        </div>
+      </div>
+
       <h1
         id="locationQuestion"
         class="question"
       >
         実施拠点を選んでください
       </h1>
+
       <p class="questionHint">
         作業を実施している拠点を選択します
       </p>
@@ -640,13 +786,26 @@
       class="panel"
       aria-labelledby="userQuestion"
     >
-      <div class="stepLabel">STEP 3</div>
+      <div class="stepHeader">
+        <div class="stepLabel">
+          STEP 3
+        </div>
+
+        <div
+          class="receptionStatus"
+          data-reception-status
+        >
+          通常受付
+        </div>
+      </div>
+
       <h1
         id="userQuestion"
         class="question"
       >
         担当者を選んでください
       </h1>
+
       <p class="questionHint">
         今回の作業者を選択します
       </p>
@@ -670,13 +829,26 @@
       class="panel"
       aria-labelledby="recQuestion"
     >
-      <div class="stepLabel">追加設定</div>
+      <div class="stepHeader">
+        <div class="stepLabel">
+          追加設定
+        </div>
+
+        <div
+          class="receptionStatus"
+          data-reception-status
+        >
+          通常受付
+        </div>
+      </div>
+
       <h1
         id="recQuestion"
         class="question"
       >
         REC対象を選んでください
       </h1>
+
       <p class="questionHint">
         対象を選び、必要な場合は実施日を入力します
       </p>
@@ -772,17 +944,54 @@
 
   <script>
     const MODE_OPTIONS = [
-      { value:"出庫", label:"出庫" },
-      { value:"返却", label:"返却" },
-      { value:"完成機", label:"完成機" },
-      { value:"修理中", label:"修理" },
-      { value:"拠点移動", label:"拠点移動" },
-      { value:"出庫取消", label:"出庫取消" },
-      { value:"校正中", label:"校正中", kind:"special" },
-      { value:"校正完了", label:"校正完了", kind:"special" },
-      { value:"交換完了", label:"交換完了", kind:"special" },
-      { value:"入庫", label:"入庫" },
-      { value:"廃棄", label:"廃棄", kind:"danger" }
+      {
+        value:"出庫",
+        label:"出庫"
+      },
+      {
+        value:"返却",
+        label:"返却"
+      },
+      {
+        value:"完成機",
+        label:"完成機"
+      },
+      {
+        value:"修理中",
+        label:"修理"
+      },
+      {
+        value:"拠点移動",
+        label:"拠点移動"
+      },
+      {
+        value:"出庫取消",
+        label:"出庫取消"
+      },
+      {
+        value:"校正中",
+        label:"校正中",
+        kind:"special"
+      },
+      {
+        value:"校正完了",
+        label:"校正完了",
+        kind:"special"
+      },
+      {
+        value:"交換完了",
+        label:"交換完了",
+        kind:"special"
+      },
+      {
+        value:"入庫",
+        label:"入庫"
+      },
+      {
+        value:"廃棄",
+        label:"廃棄",
+        kind:"danger"
+      }
     ];
 
     const LOCATION_OPTIONS = [
@@ -840,102 +1049,146 @@
     };
 
     function createChoiceButton(options) {
-      const data = options || {};
-      const button = document.createElement("button");
+      const data =
+        options || {};
 
-      button.type = "button";
-      button.className = "choiceButton";
-      button.innerText = data.label || data.value || "";
+      const button =
+        document.createElement("button");
+
+      button.type =
+        "button";
+
+      button.className =
+        "choiceButton";
+
+      button.innerText =
+        data.label ||
+        data.value ||
+        "";
 
       if (data.kind) {
-        button.dataset.kind = data.kind;
+        button.dataset.kind =
+          data.kind;
       }
 
-      button.addEventListener("click", function() {
-        if (typeof data.onClick === "function") {
-          data.onClick();
+      button.addEventListener(
+        "click",
+        function() {
+          if (
+            typeof data.onClick ===
+            "function"
+          ) {
+            data.onClick();
+          }
         }
-      });
+      );
 
       return button;
     }
 
     function renderButtons() {
       const modeButtons =
-        document.getElementById("modeButtons");
-
-      MODE_OPTIONS.forEach(function(item) {
-        modeButtons.appendChild(
-          createChoiceButton({
-            label:item.label,
-            value:item.value,
-            kind:item.kind,
-            onClick:function() {
-              selectMode(item);
-            }
-          })
+        document.getElementById(
+          "modeButtons"
         );
-      });
+
+      MODE_OPTIONS.forEach(
+        function(item) {
+          modeButtons.appendChild(
+            createChoiceButton({
+              label:item.label,
+              value:item.value,
+              kind:item.kind,
+
+              onClick:function() {
+                selectMode(item);
+              }
+            })
+          );
+        }
+      );
 
       const locationButtons =
-        document.getElementById("locationButtons");
-
-      LOCATION_OPTIONS.forEach(function(location) {
-        locationButtons.appendChild(
-          createChoiceButton({
-            label:location,
-            value:location,
-            onClick:function() {
-              selectLocation(location);
-            }
-          })
+        document.getElementById(
+          "locationButtons"
         );
-      });
+
+      LOCATION_OPTIONS.forEach(
+        function(location) {
+          locationButtons.appendChild(
+            createChoiceButton({
+              label:location,
+              value:location,
+
+              onClick:function() {
+                selectLocation(location);
+              }
+            })
+          );
+        }
+      );
 
       const userButtons =
-        document.getElementById("userButtons");
-
-      USER_OPTIONS.forEach(function(user) {
-        userButtons.appendChild(
-          createChoiceButton({
-            label:user,
-            value:user,
-            onClick:function() {
-              selectUser(user);
-            }
-          })
+        document.getElementById(
+          "userButtons"
         );
-      });
+
+      USER_OPTIONS.forEach(
+        function(user) {
+          userButtons.appendChild(
+            createChoiceButton({
+              label:user,
+              value:user,
+
+              onClick:function() {
+                selectUser(user);
+              }
+            })
+          );
+        }
+      );
 
       const recTargetButtons =
-        document.getElementById("recTargetButtons");
-
-      REC_TARGET_OPTIONS.forEach(function(target) {
-        recTargetButtons.appendChild(
-          createChoiceButton({
-            label:target,
-            value:target,
-            kind:"special",
-            onClick:function() {
-              selectRecTarget(target);
-            }
-          })
+        document.getElementById(
+          "recTargetButtons"
         );
-      });
+
+      REC_TARGET_OPTIONS.forEach(
+        function(target) {
+          recTargetButtons.appendChild(
+            createChoiceButton({
+              label:target,
+              value:target,
+              kind:"special",
+
+              onClick:function() {
+                selectRecTarget(target);
+              }
+            })
+          );
+        }
+      );
     }
 
     function showStep(stepName) {
-      Object.keys(STEP_IDS).forEach(function(name) {
-        const panel =
-          document.getElementById(STEP_IDS[name]);
+      Object.keys(
+        STEP_IDS
+      ).forEach(
+        function(name) {
+          const panel =
+            document.getElementById(
+              STEP_IDS[name]
+            );
 
-        panel.classList.toggle(
-          "isActive",
-          name === stepName
-        );
-      });
+          panel.classList.toggle(
+            "isActive",
+            name === stepName
+          );
+        }
+      );
 
       updateProgress(stepName);
+      updateReceptionStatus();
       updateSummary();
 
       window.scrollTo({
@@ -955,37 +1208,66 @@
       }[stepName] || 0;
 
       document
-        .querySelectorAll(".progressStep")
-        .forEach(function(step, index) {
-          step.classList.toggle(
-            "isDone",
-            index < progressIndex
-          );
-        });
+        .querySelectorAll(
+          ".progressStep"
+        )
+        .forEach(
+          function(step, index) {
+            step.classList.toggle(
+              "isDone",
+              index < progressIndex
+            );
+          }
+        );
+    }
+
+    function updateReceptionStatus() {
+      const isIrregular =
+        wizardState.receptionType ===
+        "irregular";
+
+      document
+        .querySelectorAll(
+          "[data-reception-status]"
+        )
+        .forEach(
+          function(status) {
+            status.innerText =
+              wizardState.receptionLabel ||
+              "通常受付";
+
+            status.classList.toggle(
+              "isIrregular",
+              isIrregular
+            );
+          }
+        );
     }
 
     function updateSummary() {
       const summary =
-        document.getElementById("selectionSummary");
+        document.getElementById(
+          "selectionSummary"
+        );
 
       const values = [];
 
-      if (wizardState.receptionLabel) {
+      if (wizardState.modeLabel) {
         values.push(
-          wizardState.receptionLabel
+          wizardState.modeLabel
         );
       }
 
-      if (wizardState.modeLabel) {
-        values.push(wizardState.modeLabel);
-      }
-
       if (wizardState.location) {
-        values.push(wizardState.location);
+        values.push(
+          wizardState.location
+        );
       }
 
       if (wizardState.user) {
-        values.push(wizardState.user);
+        values.push(
+          wizardState.user
+        );
       }
 
       summary.classList.toggle(
@@ -995,28 +1277,24 @@
 
       summary.innerHTML = "";
 
-      if (values.length === 0) {
-        const placeholder =
-          document.createElement("div");
+      values.forEach(
+        function(value) {
+          const chip =
+            document.createElement(
+              "div"
+            );
 
-        placeholder.className =
-          "summaryPlaceholder";
+          chip.className =
+            "summaryChip";
 
-        placeholder.innerText =
-          "設定内容がここに表示されます";
+          chip.innerText =
+            value;
 
-        summary.appendChild(placeholder);
-        return;
-      }
-
-      values.forEach(function(value) {
-        const chip =
-          document.createElement("div");
-
-        chip.className = "summaryChip";
-        chip.innerText = value;
-        summary.appendChild(chip);
-      });
+          summary.appendChild(
+            chip
+          );
+        }
+      );
     }
 
     function selectReceptionType(type) {
@@ -1039,8 +1317,11 @@
     }
 
     function selectMode(item) {
-      wizardState.mode = item.value;
-      wizardState.modeLabel = item.label;
+      wizardState.mode =
+        item.value;
+
+      wizardState.modeLabel =
+        item.label;
 
       wizardState.location = "";
       wizardState.user = "";
@@ -1051,7 +1332,9 @@
     }
 
     function selectLocation(location) {
-      wizardState.location = location;
+      wizardState.location =
+        location;
+
       wizardState.user = "";
       wizardState.recTarget = "";
       wizardState.recDate = "";
@@ -1060,16 +1343,25 @@
     }
 
     function selectUser(user) {
-      wizardState.user = user;
+      wizardState.user =
+        user;
 
-      if (REC_MODES.includes(wizardState.mode)) {
-        wizardState.lastInputStep = "rec";
+      if (
+        REC_MODES.includes(
+          wizardState.mode
+        )
+      ) {
+        wizardState.lastInputStep =
+          "rec";
+
         prepareRecStep();
         showStep("rec");
         return;
       }
 
-      wizardState.lastInputStep = "user";
+      wizardState.lastInputStep =
+        "user";
+
       finishWizard();
     }
 
@@ -1083,11 +1375,14 @@
 
       document.getElementById(
         "recDateBox"
-      ).classList.add("hidden");
+      ).classList.add(
+        "hidden"
+      );
     }
 
     function selectRecTarget(target) {
-      wizardState.recTarget = target;
+      wizardState.recTarget =
+        target;
 
       if (
         REC_DATE_REQUIRED_MODES.includes(
@@ -1095,17 +1390,24 @@
         )
       ) {
         const dateBox =
-          document.getElementById("recDateBox");
+          document.getElementById(
+            "recDateBox"
+          );
 
         const dateLabel =
-          document.getElementById("recDateLabel");
+          document.getElementById(
+            "recDateLabel"
+          );
 
         dateLabel.innerText =
-          wizardState.mode === "交換完了"
+          wizardState.mode ===
+          "交換完了"
             ? "交換実施日"
             : "校正実施日";
 
-        dateBox.classList.remove("hidden");
+        dateBox.classList.remove(
+          "hidden"
+        );
 
         document.getElementById(
           "recDate"
@@ -1115,15 +1417,20 @@
       }
 
       wizardState.recDate = "";
+
       finishWizard();
     }
 
     function confirmRecSettings() {
       const dateValue =
-        document.getElementById("recDate").value;
+        document.getElementById(
+          "recDate"
+        ).value;
 
       if (!wizardState.recTarget) {
-        alert("REC対象を選んでください");
+        alert(
+          "REC対象を選んでください"
+        );
         return;
       }
 
@@ -1133,11 +1440,15 @@
         ) &&
         !dateValue
       ) {
-        alert("実施日を入力してください");
+        alert(
+          "実施日を入力してください"
+        );
         return;
       }
 
-      wizardState.recDate = dateValue;
+      wizardState.recDate =
+        dateValue;
+
       finishWizard();
     }
 
@@ -1145,11 +1456,19 @@
       return {
         receptionType:
           wizardState.receptionType,
-        mode:wizardState.mode,
-        location:wizardState.location,
-        user:wizardState.user,
+
+        mode:
+          wizardState.mode,
+
+        location:
+          wizardState.location,
+
+        user:
+          wizardState.user,
+
         recTarget:
           wizardState.recTarget,
+
         recDate:
           wizardState.recDate
       };
@@ -1159,23 +1478,45 @@
       const settings =
         buildWizardSettings();
 
-      renderCompleteSettings(settings);
-      showStep("complete");
-      completeEntryWizard(settings);
+      renderCompleteSettings(
+        settings
+      );
+
+      showStep(
+        "complete"
+      );
+
+      completeEntryWizard(
+        settings
+      );
     }
 
     function renderCompleteSettings(settings) {
       const list =
-        document.getElementById("completeList");
+        document.getElementById(
+          "completeList"
+        );
 
       const rows = [
         [
           "受付方法",
           wizardState.receptionLabel
         ],
-        ["作業区分", wizardState.modeLabel],
-        ["実施拠点", settings.location],
-        ["担当者", settings.user]
+
+        [
+          "作業区分",
+          wizardState.modeLabel
+        ],
+
+        [
+          "実施拠点",
+          settings.location
+        ],
+
+        [
+          "担当者",
+          settings.user
+        ]
       ];
 
       if (settings.recTarget) {
@@ -1194,33 +1535,53 @@
 
       list.innerHTML = "";
 
-      rows.forEach(function(row) {
-        const term =
-          document.createElement("dt");
+      rows.forEach(
+        function(row) {
+          const term =
+            document.createElement(
+              "dt"
+            );
 
-        const description =
-          document.createElement("dd");
+          const description =
+            document.createElement(
+              "dd"
+            );
 
-        term.innerText = row[0];
-        description.innerText = row[1];
+          term.innerText =
+            row[0];
 
-        list.appendChild(term);
-        list.appendChild(description);
-      });
+          description.innerText =
+            row[1];
+
+          list.appendChild(
+            term
+          );
+
+          list.appendChild(
+            description
+          );
+        }
+      );
 
       const cameraPreview =
-        document.getElementById("cameraPreview");
+        document.getElementById(
+          "cameraPreview"
+        );
 
       const connectionNote =
-        document.getElementById("connectionNote");
+        document.getElementById(
+          "connectionNote"
+        );
 
-      if (settings.receptionType === "irregular") {
+      if (
+        settings.receptionType ===
+        "irregular"
+      ) {
         cameraPreview.innerText =
           "イレギュラー受付画面への接続位置\n管理番号・品目コードを入力";
 
         connectionNote.innerText =
           "本番接続時はカメラを起動せず、番号入力／番号不明・追記・写真の画面へ進みます。";
-
       } else {
         cameraPreview.innerText =
           "カメラ自動起動の接続位置\nQRを読み取ってください";
@@ -1232,25 +1593,13 @@
       document.getElementById(
         "debugOutput"
       ).innerText =
-        JSON.stringify(settings, null, 2);
+        JSON.stringify(
+          settings,
+          null,
+          2
+        );
     }
 
-    /*
-     * =====================================================
-     * 既存QR在庫管理アプリとの接続口
-     * =====================================================
-     *
-     * この試作では既存アプリへ接続しない。
-     *
-     * 本番移植時に、この関数内で次を行う。
-     *
-     * ・既存のmode / location / userへ値を渡す
-     * ・recTarget / recDateへ値を渡す
-     * ・管理区分制限を設定する
-     * ・設定を端末へ保存する
-     * ・通常ルートならカメラを自動起動する
-     * ・イレギュラーなら番号入力画面へ進む
-     */
     function completeEntryWizard(settings) {
       console.log(
         "入口ウィザード設定完了",
@@ -1259,27 +1608,50 @@
     }
 
     function goBack(target) {
-      if (target === "reception") {
-        showStep("reception");
+      if (
+        target ===
+        "reception"
+      ) {
+        showStep(
+          "reception"
+        );
         return;
       }
 
-      if (target === "mode") {
-        showStep("mode");
+      if (
+        target ===
+        "mode"
+      ) {
+        showStep(
+          "mode"
+        );
         return;
       }
 
-      if (target === "location") {
-        showStep("location");
+      if (
+        target ===
+        "location"
+      ) {
+        showStep(
+          "location"
+        );
         return;
       }
 
-      if (target === "user") {
-        showStep("user");
+      if (
+        target ===
+        "user"
+      ) {
+        showStep(
+          "user"
+        );
         return;
       }
 
-      if (target === "last") {
+      if (
+        target ===
+        "last"
+      ) {
         showStep(
           wizardState.lastInputStep ||
           "user"
@@ -1304,44 +1676,63 @@
 
       document.getElementById(
         "recDateBox"
-      ).classList.add("hidden");
+      ).classList.add(
+        "hidden"
+      );
 
-      showStep("reception");
+      showStep(
+        "reception"
+      );
     }
 
     document
-      .querySelectorAll("[data-reception-type]")
-      .forEach(function(button) {
-        button.addEventListener(
-          "click",
-          function() {
-            selectReceptionType(
-              button.dataset.receptionType
-            );
-          }
-        );
-      });
+      .querySelectorAll(
+        "[data-reception-type]"
+      )
+      .forEach(
+        function(button) {
+          button.addEventListener(
+            "click",
+            function() {
+              selectReceptionType(
+                button.dataset
+                  .receptionType
+              );
+            }
+          );
+        }
+      );
 
     document
-      .querySelectorAll("[data-back]")
-      .forEach(function(button) {
-        button.addEventListener(
-          "click",
-          function() {
-            goBack(button.dataset.back);
-          }
-        );
-      });
+      .querySelectorAll(
+        "[data-back]"
+      )
+      .forEach(
+        function(button) {
+          button.addEventListener(
+            "click",
+            function() {
+              goBack(
+                button.dataset.back
+              );
+            }
+          );
+        }
+      );
 
     document
-      .getElementById("confirmRecButton")
+      .getElementById(
+        "confirmRecButton"
+      )
       .addEventListener(
         "click",
         confirmRecSettings
       );
 
     document
-      .getElementById("restartButton")
+      .getElementById(
+        "restartButton"
+      )
       .addEventListener(
         "click",
         resetWizard
