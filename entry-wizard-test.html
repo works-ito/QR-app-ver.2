@@ -72,11 +72,13 @@
       display:flex;
       align-items:center;
       justify-content:space-between;
+      gap:8px;
       min-height:44px;
       margin-bottom:8px;
     }
 
     .brand {
+      min-width:0;
       line-height:1.1;
     }
 
@@ -84,6 +86,7 @@
       font-size:20px;
       font-weight:800;
       letter-spacing:0.02em;
+      white-space:nowrap;
     }
 
     .brandSub {
@@ -92,6 +95,35 @@
       font-size:11px;
       font-weight:700;
       letter-spacing:0.12em;
+      white-space:nowrap;
+    }
+
+    .headerActions {
+      display:flex;
+      align-items:center;
+      justify-content:flex-end;
+      gap:6px;
+      flex:0 0 auto;
+    }
+
+    .headerBackButton {
+      min-width:58px;
+      min-height:40px;
+      padding:8px 10px;
+
+      border:1px solid var(--line);
+      border-radius:10px;
+
+      background:#f5f6f8;
+      color:#4c5668;
+
+      font-size:14px;
+      font-weight:800;
+    }
+
+    .headerBackButton:active {
+      transform:translateY(1px);
+      background:#e9edf2;
     }
 
     .restartButton {
@@ -107,6 +139,11 @@
 
       font-size:14px;
       font-weight:700;
+    }
+
+    .restartButton:active {
+      transform:translateY(1px);
+      background:#f4f6f8;
     }
 
     .progress {
@@ -147,7 +184,6 @@
 
     .summaryChip {
       flex:0 0 auto;
-
       padding:6px 9px;
 
       border:1px solid #c8ddfa;
@@ -163,7 +199,6 @@
 
     .panel {
       display:none;
-
       padding:16px 14px 14px;
 
       border:1px solid #e1e6ee;
@@ -227,10 +262,8 @@
 
     .receptionStatus::before {
       content:"";
-
       width:7px;
       height:7px;
-
       border-radius:50%;
       background:var(--blue);
     }
@@ -247,7 +280,6 @@
 
     .question {
       margin:0;
-
       font-size:23px;
       line-height:1.3;
       font-weight:900;
@@ -256,9 +288,7 @@
 
     .questionHint {
       margin:6px 0 14px;
-
       color:var(--muted);
-
       font-size:14px;
       line-height:1.45;
       font-weight:600;
@@ -317,30 +347,13 @@
     .choiceSubText {
       display:block;
       margin-top:4px;
-
       color:#5f7188;
-
       font-size:13px;
       font-weight:700;
     }
 
     .choiceButton[data-kind="special"] .choiceSubText {
       color:#8a650e;
-    }
-
-    .backButton {
-      width:100%;
-      min-height:48px;
-      margin-top:12px;
-
-      border:1px solid var(--line);
-      border-radius:11px;
-
-      background:#f5f6f8;
-      color:#4c5668;
-
-      font-size:17px;
-      font-weight:800;
     }
 
     .dateBox {
@@ -356,7 +369,6 @@
     .dateLabel {
       display:block;
       margin-bottom:6px;
-
       font-size:15px;
       font-weight:800;
     }
@@ -408,9 +420,7 @@
 
     .completeTitle {
       margin:0 0 10px;
-
       color:var(--green);
-
       font-size:24px;
       font-weight:900;
       text-align:center;
@@ -461,9 +471,7 @@
 
     .connectionNote {
       margin:10px 2px 0;
-
       color:var(--muted);
-
       font-size:13px;
       line-height:1.5;
       font-weight:600;
@@ -513,6 +521,18 @@
         padding:4px 8px;
         font-size:11px;
       }
+
+      .headerBackButton {
+        min-width:52px;
+        padding:7px 8px;
+        font-size:13px;
+      }
+
+      .restartButton {
+        min-width:62px;
+        padding:7px 9px;
+        font-size:13px;
+      }
     }
 
     @media (max-width:390px) and (max-height:700px) {
@@ -538,10 +558,21 @@
         font-size:9px;
       }
 
-      .restartButton {
-        min-width:64px;
+      .headerActions {
+        gap:5px;
+      }
+
+      .headerBackButton {
+        min-width:52px;
         min-height:38px;
-        padding:6px 10px;
+        padding:6px 8px;
+        font-size:13px;
+      }
+
+      .restartButton {
+        min-width:62px;
+        min-height:38px;
+        padding:6px 9px;
         font-size:13px;
       }
 
@@ -620,13 +651,23 @@
         </div>
       </div>
 
-      <button
-        id="restartButton"
-        class="restartButton"
-        type="button"
-      >
-        最初から
-      </button>
+      <div class="headerActions">
+        <button
+          id="headerBackButton"
+          class="headerBackButton hidden"
+          type="button"
+        >
+          戻る
+        </button>
+
+        <button
+          id="restartButton"
+          class="restartButton"
+          type="button"
+        >
+          最初から
+        </button>
+      </div>
     </header>
 
     <div
@@ -728,14 +769,6 @@
         id="modeButtons"
         class="buttonGrid"
       ></div>
-
-      <button
-        class="backButton"
-        type="button"
-        data-back="reception"
-      >
-        戻る
-      </button>
     </section>
 
     <section
@@ -771,14 +804,6 @@
         id="locationButtons"
         class="buttonGrid singleColumn"
       ></div>
-
-      <button
-        class="backButton"
-        type="button"
-        data-back="mode"
-      >
-        戻る
-      </button>
     </section>
 
     <section
@@ -814,14 +839,6 @@
         id="userButtons"
         class="buttonGrid"
       ></div>
-
-      <button
-        class="backButton"
-        type="button"
-        data-back="location"
-      >
-        戻る
-      </button>
     </section>
 
     <section
@@ -884,14 +901,6 @@
           この内容で次へ
         </button>
       </div>
-
-      <button
-        class="backButton"
-        type="button"
-        data-back="user"
-      >
-        戻る
-      </button>
     </section>
 
     <section
@@ -931,14 +940,6 @@
         id="debugOutput"
         class="debugOutput"
       ></pre>
-
-      <button
-        class="backButton"
-        type="button"
-        data-back="last"
-      >
-        設定を修正する
-      </button>
     </section>
   </main>
 
@@ -1045,7 +1046,8 @@
       user:"",
       recTarget:"",
       recDate:"",
-      lastInputStep:"user"
+      lastInputStep:"user",
+      currentStep:"reception"
     };
 
     function createChoiceButton(options) {
@@ -1171,6 +1173,9 @@
     }
 
     function showStep(stepName) {
+      wizardState.currentStep =
+        stepName;
+
       Object.keys(
         STEP_IDS
       ).forEach(
@@ -1190,11 +1195,24 @@
       updateProgress(stepName);
       updateReceptionStatus();
       updateSummary();
+      updateHeaderBackButton(stepName);
 
       window.scrollTo({
         top:0,
         behavior:"smooth"
       });
+    }
+
+    function updateHeaderBackButton(stepName) {
+      const backButton =
+        document.getElementById(
+          "headerBackButton"
+        );
+
+      backButton.classList.toggle(
+        "hidden",
+        stepName === "reception"
+      );
     }
 
     function updateProgress(stepName) {
@@ -1607,51 +1625,31 @@
       );
     }
 
-    function goBack(target) {
-      if (
-        target ===
-        "reception"
-      ) {
-        showStep(
-          "reception"
-        );
+    function goBackFromCurrentStep() {
+      const currentStep =
+        wizardState.currentStep;
+
+      if (currentStep === "mode") {
+        showStep("reception");
         return;
       }
 
-      if (
-        target ===
-        "mode"
-      ) {
-        showStep(
-          "mode"
-        );
+      if (currentStep === "location") {
+        showStep("mode");
         return;
       }
 
-      if (
-        target ===
-        "location"
-      ) {
-        showStep(
-          "location"
-        );
+      if (currentStep === "user") {
+        showStep("location");
         return;
       }
 
-      if (
-        target ===
-        "user"
-      ) {
-        showStep(
-          "user"
-        );
+      if (currentStep === "rec") {
+        showStep("user");
         return;
       }
 
-      if (
-        target ===
-        "last"
-      ) {
+      if (currentStep === "complete") {
         showStep(
           wizardState.lastInputStep ||
           "user"
@@ -1669,6 +1667,7 @@
       wizardState.recTarget = "";
       wizardState.recDate = "";
       wizardState.lastInputStep = "user";
+      wizardState.currentStep = "reception";
 
       document.getElementById(
         "recDate"
@@ -1704,23 +1703,6 @@
       );
 
     document
-      .querySelectorAll(
-        "[data-back]"
-      )
-      .forEach(
-        function(button) {
-          button.addEventListener(
-            "click",
-            function() {
-              goBack(
-                button.dataset.back
-              );
-            }
-          );
-        }
-      );
-
-    document
       .getElementById(
         "confirmRecButton"
       )
@@ -1731,11 +1713,39 @@
 
     document
       .getElementById(
+        "headerBackButton"
+      )
+      .addEventListener(
+        "click",
+        goBackFromCurrentStep
+      );
+
+    document
+      .getElementById(
         "restartButton"
       )
       .addEventListener(
         "click",
-        resetWizard
+        function() {
+          if (
+            wizardState.currentStep ===
+            "reception"
+          ) {
+            resetWizard();
+            return;
+          }
+
+          const confirmed =
+            confirm(
+              "設定を最初からやり直しますか？"
+            );
+
+          if (!confirmed) {
+            return;
+          }
+
+          resetWizard();
+        }
       );
 
     renderButtons();
