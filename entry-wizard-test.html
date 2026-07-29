@@ -103,7 +103,7 @@
 
     .progress {
       display:grid;
-      grid-template-columns:repeat(4, 1fr);
+      grid-template-columns:repeat(5, 1fr);
       gap:6px;
       margin:0 0 10px;
     }
@@ -512,6 +512,7 @@
       <div class="progressStep"></div>
       <div class="progressStep"></div>
       <div class="progressStep"></div>
+      <div class="progressStep"></div>
     </div>
 
     <div
@@ -519,6 +520,60 @@
       class="selectionSummary"
       aria-live="polite"
     ></div>
+
+    <section
+      id="receptionStep"
+      class="panel"
+      aria-labelledby="receptionQuestion"
+    >
+      <div class="stepLabel">START</div>
+      <h1
+        id="receptionQuestion"
+        class="question"
+      >
+        受付方法を選んでください
+      </h1>
+      <p class="questionHint">
+        管理QRの状態に合わせて選択します
+      </p>
+
+      <div class="buttonGrid singleColumn">
+        <button
+          class="choiceButton"
+          type="button"
+          data-reception-type="normal"
+        >
+          通常受付
+          <span style="
+            display:block;
+            margin-top:4px;
+            font-size:13px;
+            font-weight:700;
+            color:#5f7188;
+          ">
+            管理QRをカメラで読み取る
+          </span>
+        </button>
+
+        <button
+          class="choiceButton"
+          type="button"
+          data-reception-type="irregular"
+          data-kind="special"
+        >
+          イレギュラー受付
+          <span style="
+            display:block;
+            margin-top:4px;
+            font-size:13px;
+            font-weight:700;
+            color:#8a650e;
+          ">
+            管理QRなし・破損・読取不可
+          </span>
+        </button>
+      </div>
+    </section>
 
     <section
       id="modeStep"
@@ -540,6 +595,14 @@
         id="modeButtons"
         class="buttonGrid"
       ></div>
+
+      <button
+        class="backButton"
+        type="button"
+        data-back="reception"
+      >
+        戻る
+      </button>
     </section>
 
     <section
@@ -597,50 +660,6 @@
         class="backButton"
         type="button"
         data-back="location"
-      >
-        戻る
-      </button>
-    </section>
-
-    <section
-      id="returnMethodStep"
-      class="panel"
-      aria-labelledby="returnMethodQuestion"
-    >
-      <div class="stepLabel">追加設定</div>
-      <h1
-        id="returnMethodQuestion"
-        class="question"
-      >
-        返却方法を選んでください
-      </h1>
-      <p class="questionHint">
-        QRを読み取れるかどうかを選択します
-      </p>
-
-      <div class="buttonGrid singleColumn">
-        <button
-          class="choiceButton"
-          type="button"
-          data-return-method="QRあり"
-        >
-          QRあり返却
-        </button>
-
-        <button
-          class="choiceButton"
-          type="button"
-          data-return-method="QRなし"
-          data-kind="special"
-        >
-          QRなし返却
-        </button>
-      </div>
-
-      <button
-        class="backButton"
-        type="button"
-        data-back="user"
       >
         戻る
       </button>
@@ -800,20 +819,21 @@
     ];
 
     const STEP_IDS = {
+      reception:"receptionStep",
       mode:"modeStep",
       location:"locationStep",
       user:"userStep",
-      returnMethod:"returnMethodStep",
       rec:"recStep",
       complete:"completeStep"
     };
 
     const wizardState = {
+      receptionType:"",
+      receptionLabel:"",
       mode:"",
       modeLabel:"",
       location:"",
       user:"",
-      returnQrMode:"",
       recTarget:"",
       recDate:"",
       lastInputStep:"user"
@@ -926,12 +946,12 @@
 
     function updateProgress(stepName) {
       const progressIndex = {
-        mode:0,
-        location:1,
-        user:2,
-        returnMethod:3,
-        rec:3,
-        complete:4
+        reception:0,
+        mode:1,
+        location:2,
+        user:3,
+        rec:4,
+        complete:5
       }[stepName] || 0;
 
       document
@@ -949,6 +969,12 @@
         document.getElementById("selectionSummary");
 
       const values = [];
+
+      if (wizardState.receptionLabel) {
+        values.push(
+          wizardState.receptionLabel
+        );
+      }
 
       if (wizardState.modeLabel) {
         values.push(wizardState.modeLabel);
@@ -993,13 +1019,31 @@
       });
     }
 
+    function selectReceptionType(type) {
+      wizardState.receptionType =
+        type;
+
+      wizardState.receptionLabel =
+        type === "irregular"
+          ? "イレギュラー受付"
+          : "通常受付";
+
+      wizardState.mode = "";
+      wizardState.modeLabel = "";
+      wizardState.location = "";
+      wizardState.user = "";
+      wizardState.recTarget = "";
+      wizardState.recDate = "";
+
+      showStep("mode");
+    }
+
     function selectMode(item) {
       wizardState.mode = item.value;
       wizardState.modeLabel = item.label;
 
       wizardState.location = "";
       wizardState.user = "";
-      wizardState.returnQrMode = "";
       wizardState.recTarget = "";
       wizardState.recDate = "";
 
@@ -1009,7 +1053,6 @@
     function selectLocation(location) {
       wizardState.location = location;
       wizardState.user = "";
-      wizardState.returnQrMode = "";
       wizardState.recTarget = "";
       wizardState.recDate = "";
 
@@ -1018,14 +1061,6 @@
 
     function selectUser(user) {
       wizardState.user = user;
-
-      if (wizardState.mode === "返却") {
-        wizardState.lastInputStep =
-          "returnMethod";
-
-        showStep("returnMethod");
-        return;
-      }
 
       if (REC_MODES.includes(wizardState.mode)) {
         wizardState.lastInputStep = "rec";
@@ -1106,18 +1141,13 @@
       finishWizard();
     }
 
-    function selectReturnMethod(method) {
-      wizardState.returnQrMode = method;
-      finishWizard();
-    }
-
     function buildWizardSettings() {
       return {
+        receptionType:
+          wizardState.receptionType,
         mode:wizardState.mode,
         location:wizardState.location,
         user:wizardState.user,
-        returnQrMode:
-          wizardState.returnQrMode,
         recTarget:
           wizardState.recTarget,
         recDate:
@@ -1139,17 +1169,14 @@
         document.getElementById("completeList");
 
       const rows = [
+        [
+          "受付方法",
+          wizardState.receptionLabel
+        ],
         ["作業区分", wizardState.modeLabel],
         ["実施拠点", settings.location],
         ["担当者", settings.user]
       ];
-
-      if (settings.returnQrMode) {
-        rows.push([
-          "返却方法",
-          settings.returnQrMode
-        ]);
-      }
 
       if (settings.recTarget) {
         rows.push([
@@ -1187,15 +1214,12 @@
       const connectionNote =
         document.getElementById("connectionNote");
 
-      if (
-        settings.mode === "返却" &&
-        settings.returnQrMode === "QRなし"
-      ) {
+      if (settings.receptionType === "irregular") {
         cameraPreview.innerText =
-          "QRなし返却フローへの接続位置";
+          "イレギュラー受付画面への接続位置\n管理番号・品目コードを入力";
 
         connectionNote.innerText =
-          "本番接続時はカメラを起動せず、QRなし返却の写真・追記画面へ進みます。";
+          "本番接続時はカメラを起動せず、番号入力／番号不明・追記・写真の画面へ進みます。";
 
       } else {
         cameraPreview.innerText =
@@ -1221,11 +1245,11 @@
      * 本番移植時に、この関数内で次を行う。
      *
      * ・既存のmode / location / userへ値を渡す
-     * ・returnQrMode / recTarget / recDateへ値を渡す
+     * ・recTarget / recDateへ値を渡す
      * ・管理区分制限を設定する
      * ・設定を端末へ保存する
      * ・通常ルートならカメラを自動起動する
-     * ・QRなし返却なら専用フローへ進む
+     * ・イレギュラーなら番号入力画面へ進む
      */
     function completeEntryWizard(settings) {
       console.log(
@@ -1235,6 +1259,11 @@
     }
 
     function goBack(target) {
+      if (target === "reception") {
+        showStep("reception");
+        return;
+      }
+
       if (target === "mode") {
         showStep("mode");
         return;
@@ -1259,11 +1288,12 @@
     }
 
     function resetWizard() {
+      wizardState.receptionType = "";
+      wizardState.receptionLabel = "";
       wizardState.mode = "";
       wizardState.modeLabel = "";
       wizardState.location = "";
       wizardState.user = "";
-      wizardState.returnQrMode = "";
       wizardState.recTarget = "";
       wizardState.recDate = "";
       wizardState.lastInputStep = "user";
@@ -1276,17 +1306,17 @@
         "recDateBox"
       ).classList.add("hidden");
 
-      showStep("mode");
+      showStep("reception");
     }
 
     document
-      .querySelectorAll("[data-return-method]")
+      .querySelectorAll("[data-reception-type]")
       .forEach(function(button) {
         button.addEventListener(
           "click",
           function() {
-            selectReturnMethod(
-              button.dataset.returnMethod
+            selectReceptionType(
+              button.dataset.receptionType
             );
           }
         );
