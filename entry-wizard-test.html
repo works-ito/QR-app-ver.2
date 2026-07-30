@@ -2149,6 +2149,91 @@ function changePreviousSettings() {
     "reception"
   );
 }
+  document
+  .querySelectorAll(
+    "[data-reception-type]"
+  )
+  .forEach(
+    function(button) {
+      button.addEventListener(
+        "click",
+        function() {
+          selectReceptionType(
+            button.dataset
+              .receptionType
+          );
+        }
+      );
+    }
+  );
+
+document
+  .getElementById(
+    "usePreviousSettingsButton"
+  )
+  .addEventListener(
+    "click",
+    usePreviousSettings
+  );
+
+document
+  .getElementById(
+    "changePreviousSettingsButton"
+  )
+  .addEventListener(
+    "click",
+    changePreviousSettings
+  );
+
+document
+  .getElementById(
+    "confirmRecButton"
+  )
+  .addEventListener(
+    "click",
+    confirmRecSettings
+  );
+
+document
+  .getElementById(
+    "headerBackButton"
+  )
+  .addEventListener(
+    "click",
+    goBackFromCurrentStep
+  );
+
+document
+  .getElementById(
+    "restartButton"
+  )
+  .addEventListener(
+    "click",
+    function() {
+      if (
+        wizardState.currentStep ===
+        "reception"
+      ) {
+        resetWizard();
+        return;
+      }
+
+      const confirmed =
+        confirm(
+          "設定を最初からやり直しますか？"
+        );
+
+      if (!confirmed) {
+        return;
+      }
+
+      resetWizard();
+    }
+  );
+
+renderButtons();
+resetWizard();
+    
   </script>
 </body>
 </html>
