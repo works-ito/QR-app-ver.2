@@ -675,6 +675,62 @@
         border-right:1px solid #e1e6ee;
       }
     }
+
+    .previousCard {
+  margin:4px 0 14px;
+  padding:14px;
+  border:2px solid #c8ddfa;
+  border-radius:14px;
+  background:#f8fbff;
+}
+
+.previousLead {
+  margin:0 0 12px;
+  color:#526073;
+  font-size:15px;
+  line-height:1.5;
+  font-weight:700;
+}
+
+.previousSettings {
+  display:grid;
+  grid-template-columns:78px 1fr;
+  gap:10px;
+  margin:0;
+  font-size:20px;
+  line-height:1.35;
+}
+
+.previousSettings dt {
+  color:#526073;
+  font-weight:700;
+}
+
+.previousSettings dd {
+  margin:0;
+  font-weight:900;
+  word-break:break-word;
+}
+
+.previousQuestion {
+  margin:14px 0 0;
+  text-align:center;
+  font-size:17px;
+  line-height:1.45;
+  font-weight:900;
+}
+
+#changePreviousSettingsButton {
+  width:100%;
+  min-height:58px;
+  margin-top:0;
+  border:2px solid #b8c4d4;
+  border-radius:12px;
+  background:#fff;
+  color:#475467;
+  font-size:20px;
+  font-weight:900;
+}
   </style>
 </head>
 
@@ -1054,7 +1110,9 @@
   </main>
 
   <script>
-    const MODE_OPTIONS = [
+       const PREVIOUS_SETTINGS_STORAGE_KEY =
+      "qrInventoryWizardPreviousSettingsV1";
+       const MODE_OPTIONS = [
       {
         value:"出庫",
         label:"出庫"
@@ -1139,26 +1197,33 @@
     ];
 
     const STEP_IDS = {
-      reception:"receptionStep",
-      mode:"modeStep",
-      location:"locationStep",
-      user:"userStep",
-      rec:"recStep",
-      complete:"completeStep"
+     reception:"receptionStep",
+     previous:"previousStep",
+     mode:"modeStep",
+     location:"locationStep",
+     user:"userStep",
+     rec:"recStep",
+     complete:"completeStep"
     };
 
     const wizardState = {
-      receptionType:"",
-      receptionLabel:"",
-      mode:"",
-      modeLabel:"",
-      location:"",
-      user:"",
-      recTarget:"",
-      recDate:"",
-      lastInputStep:"user",
-      currentStep:"reception"
-    };
+     receptionType:"",
+     receptionLabel:"",
+     mode:"",
+     modeLabel:"",
+     location:"",
+     user:"",
+     recTarget:"",
+     recDate:"",
+
+     previousLocation:"",
+     previousUser:"",
+     hasPreviousSettings:false,
+     usePreviousSettings:false,
+
+     lastInputStep:"user",
+     currentStep:"reception"
+   };
 
     function createChoiceButton(options) {
       const data =
@@ -1425,24 +1490,161 @@
       );
     }
 
-    function selectReceptionType(type) {
-      wizardState.receptionType =
-        type;
+    function getPreviousSettings() {
+  try {
+    const raw =
+      localStorage.getItem(
+        PREVIOUS_SETTINGS_STORAGE_KEY
+      );
 
-      wizardState.receptionLabel =
-        type === "irregular"
-          ? "イレギュラー受付"
-          : "通常受付";
-
-      wizardState.mode = "";
-      wizardState.modeLabel = "";
-      wizardState.location = "";
-      wizardState.user = "";
-      wizardState.recTarget = "";
-      wizardState.recDate = "";
-
-      showStep("mode");
+    if (!raw) {
+      return null;
     }
+
+    const parsed =
+      JSON.parse(raw);
+
+    const location =
+      String(
+        parsed.location || ""
+      ).trim();
+
+    const user =
+      String(
+        parsed.user || ""
+      ).trim();
+
+    if (
+      !LOCATION_OPTIONS.includes(location) ||
+      !USER_OPTIONS.includes(user)
+    ) {
+      return null;
+    }
+
+    return {
+      location:location,
+      user:user
+    };
+
+  } catch (error) {
+    console.warn(
+      "前回設定の読込に失敗しました",
+      error
+    );
+
+    return null;
+  }
+}
+
+    function savePreviousSettings() {
+  if (
+    !LOCATION_OPTIONS.includes(
+      wizardState.location
+    ) ||
+    !USER_OPTIONS.includes(
+      wizardState.user
+    )
+  ) {
+    return;
+  }
+
+  try {
+    localStorage.setItem(
+      PREVIOUS_SETTINGS_STORAGE_KEY,
+      JSON.stringify({
+        location:
+          wizardState.location,
+
+        user:
+          wizardState.user
+      })
+    );
+
+  } catch (error) {
+    console.warn(
+      "前回設定の保存に失敗しました",
+      error
+    );
+  }
+}
+
+    function preparePreviousSettingsStep() {
+  const previous =
+    getPreviousSettings();
+
+  wizardState.hasPreviousSettings =
+    Boolean(previous);
+
+  if (!previous) {
+    wizardState.previousLocation = "";
+    wizardState.previousUser = "";
+    wizardState.usePreviousSettings =
+      false;
+
+    return false;
+  }
+
+  wizardState.previousLocation =
+    previous.location;
+
+  wizardState.previousUser =
+    previous.user;
+
+  document.getElementById(
+    "previousLocationDisplay"
+  ).innerText =
+    previous.location;
+
+  document.getElementById(
+    "previousUserDisplay"
+  ).innerText =
+    previous.user;
+
+  const receptionStatus =
+    document.getElementById(
+      "previousReceptionStatus"
+    );
+
+  receptionStatus.innerText =
+    wizardState.receptionLabel;
+
+  receptionStatus.classList.toggle(
+    "isIrregular",
+    wizardState.receptionType ===
+      "irregular"
+  );
+
+  return true;
+}
+    
+    function selectReceptionType(type) {
+  wizardState.receptionType =
+    type;
+
+  wizardState.receptionLabel =
+    type === "irregular"
+      ? "イレギュラー受付"
+      : "通常受付";
+
+  wizardState.mode = "";
+  wizardState.modeLabel = "";
+  wizardState.location = "";
+  wizardState.user = "";
+  wizardState.recTarget = "";
+  wizardState.recDate = "";
+
+  wizardState.usePreviousSettings =
+    false;
+
+  if (
+    preparePreviousSettingsStep()
+  ) {
+    showStep("previous");
+    return;
+  }
+
+  showStep("mode");
+}
 
     function selectMode(item) {
       wizardState.mode =
