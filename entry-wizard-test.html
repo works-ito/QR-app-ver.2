@@ -1646,21 +1646,76 @@
   showStep("mode");
 }
 
-    function selectMode(item) {
-      wizardState.mode =
-        item.value;
+    function usePreviousSettings() {
+  wizardState.location =
+    wizardState.previousLocation;
 
-      wizardState.modeLabel =
-        item.label;
+  wizardState.user =
+    wizardState.previousUser;
 
-      wizardState.location = "";
-      wizardState.user = "";
-      wizardState.recTarget = "";
-      wizardState.recDate = "";
+  wizardState.usePreviousSettings =
+    true;
 
-      showStep("location");
+  showStep("mode");
+}
+
+function changePreviousSettings() {
+  wizardState.location = "";
+  wizardState.user = "";
+
+  wizardState.usePreviousSettings =
+    false;
+
+  showStep("mode");
+}
+    
+   function selectMode(item) {
+  wizardState.mode =
+    item.value;
+
+  wizardState.modeLabel =
+    item.label;
+
+  wizardState.recTarget = "";
+  wizardState.recDate = "";
+
+  /*
+   * 前回の拠点・担当者を使う場合は、
+   * STEP2・STEP3を飛ばす。
+   */
+  if (
+    wizardState.usePreviousSettings
+  ) {
+    if (
+      REC_MODES.includes(
+        wizardState.mode
+      )
+    ) {
+      wizardState.lastInputStep =
+        "rec";
+
+      prepareRecStep();
+      showStep("rec");
+      return;
     }
 
+    wizardState.lastInputStep =
+      "mode";
+
+    finishWizard();
+    return;
+  }
+
+  /*
+   * 前回設定を変更する場合は、
+   * 通常どおり拠点→担当者へ進む。
+   */
+  wizardState.location = "";
+  wizardState.user = "";
+
+  showStep("location");
+}
+    
     function selectLocation(location) {
       wizardState.location =
         location;
@@ -1805,21 +1860,16 @@
     }
 
     function finishWizard() {
-      const settings =
-        buildWizardSettings();
+     const settings =
+       buildWizardSettings();
 
-      renderCompleteSettings(
-        settings
-      );
+       savePreviousSettings();
 
-      showStep(
-        "complete"
-      );
-
-      completeEntryWizard(
-        settings
-      );
+       renderCompleteSettings(settings);
+       showStep("complete");
+       completeEntryWizard(settings);
     }
+    
 
     function renderCompleteSettings(settings) {
       const list =
@@ -2014,6 +2064,24 @@
         }
       );
 
+    document
+  .getElementById(
+    "usePreviousSettingsButton"
+  )
+  .addEventListener(
+    "click",
+    usePreviousSettings
+  );
+
+document
+  .getElementById(
+    "changePreviousSettingsButton"
+  )
+  .addEventListener(
+    "click",
+    changePreviousSettings
+  );
+    
     document
       .getElementById(
         "confirmRecButton"
