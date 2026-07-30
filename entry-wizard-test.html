@@ -593,6 +593,46 @@
         font-size:12px;
       }
 
+      .stepHeader {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:4px;
+}
+
+.receptionStatus {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:5px 9px;
+  border:1px solid #c8ddfa;
+  border-radius:999px;
+  background:var(--blue-pale);
+  color:#145aa8;
+  font-size:12px;
+  font-weight:800;
+  white-space:nowrap;
+}
+
+.receptionStatus::before {
+  content:"";
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:var(--blue);
+}
+
+.receptionStatus.isIrregular {
+  border-color:#ead29e;
+  background:var(--amber-pale);
+  color:#865700;
+}
+
+.receptionStatus.isIrregular::before {
+  background:var(--amber);
+}
+
       .receptionStatus {
         padding:4px 8px;
         font-size:11px;
@@ -735,7 +775,77 @@
         </button>
       </div>
     </section>
+    <section
+  id="previousStep"
+  class="panel"
+>
 
+  <div class="stepHeader">
+
+    <div class="stepLabel">
+      前回設定
+    </div>
+
+    <div
+      id="previousReceptionStatus"
+      class="receptionStatus"
+    >
+      通常受付
+    </div>
+
+  </div>
+
+  <h1 class="question">
+    前回の設定を確認してください
+  </h1>
+
+  <p class="questionHint">
+    拠点と担当者だけ前回の設定を使用できます
+  </p>
+
+  <div class="previousCard">
+
+    <p class="previousLead">
+      前回は次の設定でした。
+    </p>
+
+    <dl class="previousSettings">
+
+      <dt>拠点</dt>
+      <dd id="previousLocationDisplay"></dd>
+
+      <dt>担当者</dt>
+      <dd id="previousUserDisplay"></dd>
+
+    </dl>
+
+    <p class="previousQuestion">
+      今回もこの設定で進めますか？
+    </p>
+
+  </div>
+
+  <div class="buttonGrid singleColumn">
+
+    <button
+      id="usePreviousSettingsButton"
+      class="nextButton"
+      type="button"
+    >
+      このまま進む
+    </button>
+
+    <button
+      id="changePreviousSettingsButton"
+      class="backButton"
+      type="button"
+    >
+      変更する
+    </button>
+
+  </div>
+
+</section>
     <section
       id="modeStep"
       class="panel"
