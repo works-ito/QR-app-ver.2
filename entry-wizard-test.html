@@ -1392,12 +1392,13 @@
 
     function updateProgress(stepName) {
       const progressIndex = {
-        reception:0,
-        mode:1,
-        location:2,
-        user:3,
-        rec:4,
-        complete:5
+       reception:0,
+       previous:0,
+       mode:1,
+       location:2,
+       user:3,
+       rec:4,
+       complete:5
       }[stepName] || 0;
 
       document
@@ -1987,149 +1988,167 @@ function changePreviousSettings() {
       );
     }
 
-    function goBackFromCurrentStep() {
-      const currentStep =
-        wizardState.currentStep;
+   function goBackFromCurrentStep() {
+  const currentStep =
+    wizardState.currentStep;
 
-      if (currentStep === "mode") {
-        showStep("reception");
-        return;
-      }
+  /*
+   * 前回設定確認
+   * ↓
+   * 受付方法
+   */
+  if (
+    currentStep ===
+    "previous"
+  ) {
+    showStep(
+      "reception"
+    );
+    return;
+  }
 
-      if (currentStep === "location") {
-        showStep("mode");
-        return;
-      }
-
-      if (currentStep === "user") {
-        showStep("location");
-        return;
-      }
-
-      if (currentStep === "rec") {
-        showStep("user");
-        return;
-      }
-
-      if (currentStep === "complete") {
-        showStep(
-          wizardState.lastInputStep ||
-          "user"
-        );
-      }
+  /*
+   * 作業区分
+   *
+   * 前回設定がある場合は
+   * 前回設定確認へ戻る。
+   *
+   * 前回設定がない場合は
+   * 受付方法へ戻る。
+   */
+  if (
+    currentStep ===
+    "mode"
+  ) {
+    if (
+      wizardState.hasPreviousSettings
+    ) {
+      showStep(
+        "previous"
+      );
+      return;
     }
+
+    showStep(
+      "reception"
+    );
+    return;
+  }
+
+  /*
+   * 拠点
+   * ↓
+   * 作業区分
+   */
+  if (
+    currentStep ===
+    "location"
+  ) {
+    showStep(
+      "mode"
+    );
+    return;
+  }
+
+  /*
+   * 担当者
+   * ↓
+   * 拠点
+   */
+  if (
+    currentStep ===
+    "user"
+  ) {
+    showStep(
+      "location"
+    );
+    return;
+  }
+
+  /*
+   * REC追加設定
+   *
+   * 前回設定を使用した場合は
+   * 作業区分へ戻る。
+   *
+   * 前回設定を変更した場合は
+   * 担当者へ戻る。
+   */
+  if (
+    currentStep ===
+    "rec"
+  ) {
+    if (
+      wizardState.usePreviousSettings
+    ) {
+      showStep(
+        "mode"
+      );
+      return;
+    }
+
+    showStep(
+      "user"
+    );
+    return;
+  }
+
+  /*
+   * 設定完了画面から戻る。
+   */
+  if (
+    currentStep ===
+    "complete"
+  ) {
+    showStep(
+      wizardState.lastInputStep ||
+      "user"
+    );
+  }
+}
 
     function resetWizard() {
-      wizardState.receptionType = "";
-      wizardState.receptionLabel = "";
-      wizardState.mode = "";
-      wizardState.modeLabel = "";
-      wizardState.location = "";
-      wizardState.user = "";
-      wizardState.recTarget = "";
-      wizardState.recDate = "";
-      wizardState.lastInputStep = "user";
-      wizardState.currentStep = "reception";
+  wizardState.receptionType = "";
+  wizardState.receptionLabel = "";
 
-      document.getElementById(
-        "recDate"
-      ).value = "";
+  wizardState.mode = "";
+  wizardState.modeLabel = "";
 
-      document.getElementById(
-        "recDateBox"
-      ).classList.add(
-        "hidden"
-      );
+  wizardState.location = "";
+  wizardState.user = "";
 
-      showStep(
-        "reception"
-      );
-    }
+  wizardState.recTarget = "";
+  wizardState.recDate = "";
 
-    document
-      .querySelectorAll(
-        "[data-reception-type]"
-      )
-      .forEach(
-        function(button) {
-          button.addEventListener(
-            "click",
-            function() {
-              selectReceptionType(
-                button.dataset
-                  .receptionType
-              );
-            }
-          );
-        }
-      );
+  wizardState.previousLocation = "";
+  wizardState.previousUser = "";
 
-    document
-  .getElementById(
-    "usePreviousSettingsButton"
-  )
-  .addEventListener(
-    "click",
-    usePreviousSettings
+  wizardState.hasPreviousSettings =
+    false;
+
+  wizardState.usePreviousSettings =
+    false;
+
+  wizardState.lastInputStep =
+    "user";
+
+  wizardState.currentStep =
+    "reception";
+
+  document.getElementById(
+    "recDate"
+  ).value = "";
+
+  document.getElementById(
+    "recDateBox"
+  ).classList.add(
+    "hidden"
   );
 
-document
-  .getElementById(
-    "changePreviousSettingsButton"
-  )
-  .addEventListener(
-    "click",
-    changePreviousSettings
+  showStep(
+    "reception"
   );
-    
-    document
-      .getElementById(
-        "confirmRecButton"
-      )
-      .addEventListener(
-        "click",
-        confirmRecSettings
-      );
-
-    document
-      .getElementById(
-        "headerBackButton"
-      )
-      .addEventListener(
-        "click",
-        goBackFromCurrentStep
-      );
-
-    document
-      .getElementById(
-        "restartButton"
-      )
-      .addEventListener(
-        "click",
-        function() {
-          if (
-            wizardState.currentStep ===
-            "reception"
-          ) {
-            resetWizard();
-            return;
-          }
-
-          const confirmed =
-            confirm(
-              "設定を最初からやり直しますか？"
-            );
-
-          if (!confirmed) {
-            return;
-          }
-
-          resetWizard();
-        }
-      );
-
-    renderButtons();
-    resetWizard();
+}
   </script>
 </body>
 </html>
