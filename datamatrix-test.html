@@ -1504,34 +1504,65 @@ async function loadAppInitialData(showLoading = true) {
   }
 
   try {
-    const gasRequestUrl =
-  GAS_URL +
-  "?t=" +
-  Date.now();
+    let response = null;
+let text = "";
 
-const response =
-  await fetch(
-    gasRequestUrl,
-    {
-      method: "POST",
+for (let attempt = 1; attempt <= 2; attempt++) {
+  const gasRequestUrl =
+    GAS_URL +
+    "?t=" +
+    Date.now() +
+    "&attempt=" +
+    attempt;
 
-      headers: {
-        "Content-Type":
-          "text/plain"
-      },
+  response =
+    await fetch(
+      gasRequestUrl,
+      {
+        method: "POST",
 
-      cache:
-        "no-store",
+        headers: {
+          "Content-Type":
+            "text/plain"
+        },
 
-      body:
-        JSON.stringify({
-          action:
-            "getAppInitialData"
-        })
-    }
-  );
+        cache:
+          "no-store",
 
-    const text = await response.text();
+        body:
+          JSON.stringify({
+            action:
+              "getAppInitialData"
+          })
+      }
+    );
+
+  text =
+    await response.text();
+
+  /*
+   * 正常応答なら再試行せず終了する。
+   */
+  if (response.ok) {
+    break;
+  }
+
+  /*
+   * 1回目の404などは、
+   * 少し待って新しいURLで再試行する。
+   */
+  if (attempt === 1) {
+    console.warn(
+      "在庫データ取得失敗。再試行します",
+      response.status,
+      response.url
+    );
+
+    await new Promise(function(resolve) {
+      setTimeout(resolve, 1000);
+    });
+  }
+}
 
     let result;
 
