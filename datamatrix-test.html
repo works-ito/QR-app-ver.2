@@ -1518,11 +1518,17 @@ async function loadAppInitialData(showLoading = true) {
 
     let result;
 
-    try {
+        try {
       result = JSON.parse(text);
+
     } catch (parseError) {
       throw new Error(
         "初期データの解析に失敗しました\n" +
+        "HTTP：" +
+        response.status +
+        "\n転送先：" +
+        response.url +
+        "\n返答：" +
         text.slice(0, 200)
       );
     }
