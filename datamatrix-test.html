@@ -1488,7 +1488,12 @@ function showSendStatus(message, type = "") {
  * 現段階では、取得失敗しても既存アプリの動作を止めない。
  */
 async function loadAppInitialData(showLoading = true) {
-  if (appInitialDataLoading) return false;
+  if (appInitialDataLoading) {
+    appInitialDataError =
+      "別の在庫データ更新がすでに実行中です";
+
+    return false;
+  }
 
   appInitialDataLoading = true;
   appInitialDataError = "";
@@ -2686,7 +2691,8 @@ async function restoreInventoryCache() {
  */
 function updateInventoryUpdatedAtDisplay(
   updatedAt,
-  status
+  status,
+  detail
 ) {
   const el =
     document.getElementById(
@@ -2740,14 +2746,22 @@ function updateInventoryUpdatedAtDisplay(
 
   stopInventoryUpdateAnimation();
 
-  if (
+    if (
     status === "更新失敗" ||
     status === "最新データ取得失敗"
   ) {
+    const errorDetail =
+      String(detail || "").trim();
+
     el.innerText =
-  "⚠️ 更新失敗\n" +
-  "前回更新：" +
-  formatted;
+      "⚠️ 更新失敗\n" +
+      "前回更新：" +
+      formatted +
+      (
+        errorDetail
+          ? "\n原因：" + errorDetail.slice(0, 180)
+          : "\n原因：詳細を取得できませんでした"
+      );
 
     el.style.color =
       "#c62828";
@@ -10856,29 +10870,34 @@ async function initializeInventoryApp() {
    * awaitしないため、起動操作を待たせない。
    */
   loadAppInitialData(false)
-    .then(function(success) {
-      if (success) {
-        console.log(
-          "起動後バックグラウンド更新完了"
-        );
-      } else {
-        updateInventoryUpdatedAtDisplay(
-          cache.updatedAt || "",
-          "更新失敗"
-        );
-      }
-    })
-    .catch(function(error) {
-      console.warn(
-        "起動後バックグラウンド更新エラー",
-        error
+  .then(function(success) {
+    if (success) {
+      console.log(
+        "起動後バックグラウンド更新完了"
       );
 
+    } else {
       updateInventoryUpdatedAtDisplay(
         cache.updatedAt || "",
-        "更新失敗"
+        "更新失敗",
+        appInitialDataError
       );
-    });
+    }
+  })
+  .catch(function(error) {
+    console.warn(
+      "起動後バックグラウンド更新エラー",
+      error
+    );
+
+    updateInventoryUpdatedAtDisplay(
+      cache.updatedAt || "",
+      "更新失敗",
+      error && error.message
+        ? error.message
+        : String(error)
+    );
+  });
 }
 
   startInventoryRefreshTimer();
