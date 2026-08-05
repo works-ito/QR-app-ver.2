@@ -6446,26 +6446,43 @@ rememberRecentSuccessfulWorks(
   scannedRecords
 );
 /*
- * スプレッドシート反映後の最新状態を再取得する。
- */
-await refreshInventoryAfterSend();
-
-/*
- * 今回出庫に成功した管理品は、
- * 状況シートの反映待ちに関係なく
- * この端末内で直ちに「出庫中」とする。
+ * GASのログ保存成功後、
+ * 今回の送信状態を端末内へ即時反映する。
  */
 applyLocalStateAfterSend(
   result,
-  scannedRecords
+  records
 );
 
 /*
- * スプレッドシート反映と最新状態の再取得が完了したため、
- * 送信中の点滅表示を停止する。
+ * 全件更新を待たずに、
+ * 送信中表示を終了する。
  */
 stopBatchLoading();
-document.getElementById("sendBatchBtn").disabled = false;
+
+document.getElementById(
+  "sendBatchBtn"
+).disabled = false;
+
+/*
+ * 最新在庫データの全件取得は裏で行う。
+ *
+ * 状況シートの数式反映が遅れていても、
+ * 更新終了後に今回の送信状態を再反映する。
+ */
+refreshInventoryAfterSend()
+  .then(function() {
+    applyLocalStateAfterSend(
+      result,
+      records
+    );
+  })
+  .catch(function(error) {
+    console.warn(
+      "送信後の在庫データ裏更新失敗",
+      error
+    );
+  });
 
 showSendStatus(
   "✓ " + result.successCount + "件送信しました",
@@ -6592,12 +6609,33 @@ rememberRecentSuccessfulWorks(
   pendingRecRecords
 );
 /*
- * REC送信後の最新状態を再取得する。
+ * REC送信結果を端末内へ即時反映する。
  */
-await refreshInventoryAfterSend();
+applyLocalStateAfterSend(
+  result,
+  records
+);
 
 stopBatchLoading();
 btn.disabled = false;
+
+/*
+ * 全件更新は裏で行い、
+ * 終了後に今回の状態を再反映する。
+ */
+refreshInventoryAfterSend()
+  .then(function() {
+    applyLocalStateAfterSend(
+      result,
+      records
+    );
+  })
+  .catch(function(error) {
+    console.warn(
+      "REC送信後の在庫データ裏更新失敗",
+      error
+    );
+  });
 
 alert(
   "REC送信完了\n" +
@@ -6707,21 +6745,33 @@ rememberRecentSuccessfulWorks(
   pendingReturnItems
 );
 /*
- * スプレッドシートの最新状態を取得する。
- */
-await refreshInventoryAfterSend();
-
-/*
- * 今回送信した返却分を、
- * この端末内では直ちに最新状態へ反映する。
+ * 今回の返却状態を端末内へ即時反映する。
  */
 applyLocalStateAfterSend(
   result,
-  pendingReturnItems
+  records
 );
 
 stopBatchLoading();
 returnButton.disabled = false;
+
+/*
+ * 全件更新は裏で行い、
+ * 終了後に今回の返却状態を再反映する。
+ */
+refreshInventoryAfterSend()
+  .then(function() {
+    applyLocalStateAfterSend(
+      result,
+      records
+    );
+  })
+  .catch(function(error) {
+    console.warn(
+      "返却送信後の在庫データ裏更新失敗",
+      error
+    );
+  });
     
     const sentReturnPhotoInfo = {
       mode: "返却",
