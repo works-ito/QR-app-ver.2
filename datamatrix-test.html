@@ -2034,26 +2034,19 @@ function applyLocalStateAfterSend(
       ? sentRecords
       : [];
 
-  /*
-   * GAS側で送信に成功した管理番号だけを集める。
-   */
-  const successfulQrSet =
-    new Set(
-      results
-        .filter(function(item) {
-          return item && item.ok;
-        })
-        .map(function(item) {
-          return normalizeLookupKey(
-            item.qr || ""
-          );
-        })
-        .filter(function(key) {
-          return Boolean(key);
-        })
-    );
+  records.forEach(function(record, index) {
+  if (!record) return;
 
-  records.forEach(function(record) {
+  /*
+   * GASのresultsは送信recordsと同じ順番で返る。
+   * result内にqrがなくても、同じ位置の送信元recordを使う。
+   */
+  const resultItem =
+    results[index] || null;
+
+  if (!resultItem || !resultItem.ok) {
+    return;
+  }
     if (!record) return;
 
     const qrText =
@@ -2066,13 +2059,7 @@ function applyLocalStateAfterSend(
     const key =
       normalizeLookupKey(qrText);
 
-    if (
-      !key ||
-      !successfulQrSet.has(key)
-    ) {
-      return;
-    }
-
+   
     const mode =
       String(
         record.mode || ""
