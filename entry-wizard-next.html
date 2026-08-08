@@ -2295,29 +2295,51 @@ function changePreviousSettings() {
         ["校正中", "校正完了", "交換完了"]
           .includes(wizardState.mode);
 
+      const baseManaged =
+        findManagedItemLocal(qrText);
+
+      const recLogItem =
+        recItemMap.get(lookupKey) ||
+        recItemMap.get(managedLookupKey) ||
+        null;
+
+      const isRecManagedId =
+        /^rec[a-z0-9]*-\d+$/i.test(
+          normalizeLookupKey(qrText)
+        );
+
       /*
        * REC機器は通常作業では個体管理機として扱う。
        * REC専用作業を選択した場合だけRECデータ側を参照する。
        */
-      const managed =
+      let managed = baseManaged;
+
+      if (isRecWork && recLogItem) {
+        managed = {
+          managementType:"rec",
+          item:recLogItem
+        };
+
+      } else if (
         isRecWork &&
-        (
-          recItemMap.has(lookupKey) ||
-          recItemMap.has(managedLookupKey)
-        )
-          ? {
-              managementType:"rec",
-              item:
-                recItemMap.get(lookupKey) ||
-                recItemMap.get(managedLookupKey)
-            }
-          : findManagedItemLocal(qrText);
+        baseManaged &&
+        isRecManagedId
+      ) {
+        /*
+         * RECログがまだ1件もない機械も、
+         * 個体マスタに存在するREC管理IDなら初回登録を許可する。
+         */
+        managed = {
+          managementType:"rec",
+          item:baseManaged.item
+        };
+      }
 
       if (managed) {
         const typeLabels = {
           individual:"個体",
           simple:"簡易個体",
-          rec:"REC"
+          rec:"個体（REC対象）"
         };
 
         return {
