@@ -869,6 +869,24 @@
   font-size:19px;
   font-weight:900;
 }
+
+.scannerDiagnostic {
+  display:none;
+  margin-top:10px;
+  padding:10px;
+  border:1px solid #f0c36d;
+  border-radius:10px;
+  background:#fff8e6;
+  color:#6b4b00;
+  font-size:12px;
+  line-height:1.45;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+}
+
+.scannerDiagnostic.isVisible {
+  display:block;
+}
   </style>
 </head>
 
@@ -1266,6 +1284,11 @@
         >
           もう一度読み取る
         </button>
+
+        <pre
+          id="scannerDiagnostic"
+          class="scannerDiagnostic"
+        ></pre>
       </div>
 
       <p
@@ -2381,6 +2404,47 @@ function changePreviousSettings() {
       return true;
     }
 
+    function showRecLookupDiagnostic(qrText) {
+      const diagnostic =
+        document.getElementById(
+          "scannerDiagnostic"
+        );
+
+      if (!diagnostic) return;
+
+      const sample =
+        recItems.length > 0
+          ? recItems[0]
+          : null;
+
+      const keys =
+        sample && typeof sample === "object"
+          ? Object.keys(sample)
+          : [];
+
+      const values =
+        sample && typeof sample === "object"
+          ? Object.values(sample)
+              .slice(0, 12)
+              .map(function(value) {
+                return String(value || "");
+              })
+          : [];
+
+      diagnostic.innerText =
+        "REC照合診断\n" +
+        "読取値：" + qrText + "\n" +
+        "REC件数：" + recItems.length + "\n" +
+        "先頭データの項目名：\n" +
+        keys.join(" / ") + "\n" +
+        "先頭データの値：\n" +
+        values.join(" / ");
+
+      diagnostic.classList.add(
+        "isVisible"
+      );
+    }
+
     function renderScannerResult(details) {
       const rows = [
         ["読取番号", details.qrText],
@@ -2461,6 +2525,14 @@ function changePreviousSettings() {
           "」を使用できません";
 
         renderScannerResult(details);
+
+        if (
+          ["校正中", "校正完了", "交換完了"]
+            .includes(wizardState.mode)
+        ) {
+          showRecLookupDiagnostic(qrText);
+        }
+
         return;
       }
 
@@ -2555,6 +2627,14 @@ function changePreviousSettings() {
       document.getElementById(
         "scannerResult"
       ).classList.remove("isVisible");
+
+      document.getElementById(
+        "scannerDiagnostic"
+      ).classList.remove("isVisible");
+
+      document.getElementById(
+        "scannerDiagnostic"
+      ).innerText = "";
 
       document.getElementById(
         "scannerViewport"
@@ -2838,6 +2918,46 @@ function changePreviousSettings() {
             "id"
           ]
         );
+
+        /*
+         * RECデータなどで、機種コードと管理番号が
+         * 別項目になっている場合は管理IDを組み立てる。
+         */
+        const machineCode = getFirstItemValue(
+          item,
+          [
+            "機種コード",
+            "機種CD",
+            "機種ＣＤ",
+            "modelCode",
+            "機種"
+          ]
+        );
+
+        const managementNumber =
+          getFirstItemValue(
+            item,
+            [
+              "管理番号",
+              "管理No",
+              "管理NO",
+              "管理Ｎｏ",
+              "番号",
+              "No",
+              "no"
+            ]
+          );
+
+        if (
+          machineCode &&
+          managementNumber &&
+          !String(managedId || "").includes("-")
+        ) {
+          managedId =
+            machineCode +
+            "-" +
+            managementNumber;
+        }
 
         if (!managedId) {
           const values = Object.values(item);
