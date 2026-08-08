@@ -971,9 +971,12 @@ textarea {
   （タイトルの自動作成に使用します）
 </p>
 
-  <button onclick="skipReturnPhotos()">
-    写真なしで完了
-  </button>
+  <button
+  id="skipReturnPhotosBtn"
+  onclick="skipReturnPhotos()"
+>
+  写真なしで完了
+</button>
 
   <input
     type="file"
@@ -8800,7 +8803,15 @@ function showIrregularPhotoArea() {
 
     return;
   }
+  const skipReturnPhotosBtn =
+  document.getElementById(
+    "skipReturnPhotosBtn"
+  );
 
+if (skipReturnPhotosBtn) {
+  skipReturnPhotosBtn.style.display =
+    "none";
+}
   selectedReturnPhotos = [];
 
   const slipStatus =
@@ -8978,6 +8989,17 @@ lastReturnPhotoInfo = {
 }
 
 function showReturnPhotoArea(info, photoRequired = false) {
+  const skipReturnPhotosBtn =
+  document.getElementById(
+    "skipReturnPhotosBtn"
+  );
+
+if (skipReturnPhotosBtn) {
+  skipReturnPhotosBtn.style.display =
+    photoRequired
+      ? "none"
+      : "block";
+}
   /*
    * 通常の返却写真画面として表示するため、
    * イレギュラー用に変更した表示と保存処理を元へ戻す。
