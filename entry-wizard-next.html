@@ -2810,7 +2810,10 @@ function changePreviousSettings() {
           applyReadOnlyCameraSettings,
           1200
         );
-
+        setTimeout(
+          applyReadOnlyCameraSettings,
+          2000
+        );
       } catch (error) {
         scannerRunning = false;
         scannerBusy = false;
