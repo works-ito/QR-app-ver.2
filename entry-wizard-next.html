@@ -988,6 +988,41 @@
 .wizardSendButton.isVisible {
   display:block;
 }
+
+.wizardSendStatus {
+  display:none;
+  margin-top:10px;
+  padding:11px 12px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#fff;
+  font-size:14px;
+  font-weight:900;
+  line-height:1.5;
+  white-space:pre-wrap;
+}
+
+.wizardSendStatus.isVisible {
+  display:block;
+}
+
+.wizardSendStatus.isSending {
+  border-color:#b8d6ff;
+  background:var(--blue-pale);
+  color:#145aa8;
+}
+
+.wizardSendStatus.isSuccess {
+  border-color:#bfe4ca;
+  background:var(--green-pale);
+  color:#18733a;
+}
+
+.wizardSendStatus.isError {
+  border-color:#efbcbc;
+  background:#fff1f1;
+  color:#b42318;
+}
   </style>
 </head>
 
@@ -1451,6 +1486,13 @@
           読取分をまとめて送信
         </button>
 
+        <div
+          id="wizardSendStatus"
+          class="wizardSendStatus"
+          role="status"
+          aria-live="polite"
+        ></div>
+
       </div>
 
       <p
@@ -1542,6 +1584,8 @@
     let pendingWizardQuantityRecord = null;
     let resetAllArmed = false;
     let resetAllArmTimer = null;
+    let wizardSendBusy = false;
+    let lastPendingSendId = "";
     const animatedDotsTimers = new Map();
 
     function stopAnimatedDots(elementId) {
@@ -2441,7 +2485,7 @@ function changePreviousSettings() {
         );
 
         connectionNote.innerText =
-          "確認版のため、読み取った内容は送信されません。";
+          "読み取った内容は、確認後にまとめて送信されます。";
       }
 
     }
@@ -3053,7 +3097,129 @@ function changePreviousSettings() {
       }, 500);
     }
 
-    function previewWizardBatchSend() {
+    function createBatchId() {
+      return "BATCH-" + new Date()
+        .toISOString()
+        .replace(/[-:.TZ]/g, "")
+        .slice(0, 14) + "-" +
+        Math.floor(Math.random() * 1000);
+    }
+
+    function buildBatchRecordData(record) {
+      const data = {
+        mode:record.mode,
+        qr:record.qr,
+        user:record.user,
+        location:record.location,
+        recTarget:record.recTarget || "",
+        recDate:record.recDate || "",
+        recordType:record.recordType || "",
+        managementType:record.managementType || "",
+        displayName:record.displayName || ""
+      };
+
+      if (record.recordType === "quantity") {
+        data.itemCode = record.itemCode;
+        data.quantity = record.quantity;
+        data.unit = record.unit;
+        data.category = record.category;
+      }
+
+      return data;
+    }
+
+    function sendBatchRecords(records) {
+      const batchId = createBatchId();
+      lastPendingSendId = batchId;
+
+      const recordsWithIds = records.map(
+        function(record) {
+          return Object.assign({}, record, {
+            batchId:batchId,
+            sendId:batchId
+          });
+        }
+      );
+
+      return fetch(GAS_URL, {
+        method:"POST",
+        headers:{
+          "Content-Type":"text/plain"
+        },
+        body:JSON.stringify({
+          action:"batchWrite",
+          batchId:batchId,
+          sendId:batchId,
+          records:recordsWithIds
+        })
+      }).then(async function(response) {
+        const text = await response.text();
+
+        try {
+          const result = JSON.parse(text);
+
+          if (!result.sendId) {
+            result.sendId = batchId;
+          }
+
+          return result;
+        } catch (error) {
+          const unknownError = new Error(
+            "送信結果を確認できませんでした"
+          );
+
+          unknownError.sendId = batchId;
+          throw unknownError;
+        }
+      });
+    }
+
+    function setWizardSendStatus(message, state) {
+      const status = document.getElementById(
+        "wizardSendStatus"
+      );
+
+      stopAnimatedDots("wizardSendStatus");
+      status.innerText = message || "";
+      status.className = "wizardSendStatus";
+
+      if (!message) return;
+
+      status.classList.add("isVisible");
+
+      if (state) {
+        status.classList.add(state);
+      }
+    }
+
+    function startWizardSendLoading() {
+      const status = document.getElementById(
+        "wizardSendStatus"
+      );
+
+      status.className =
+        "wizardSendStatus isVisible isSending";
+
+      startAnimatedDots(
+        "wizardSendStatus",
+        "送信中"
+      );
+    }
+
+    function getWizardBatchFailures(result) {
+      const results =
+        result && Array.isArray(result.results)
+          ? result.results
+          : [];
+
+      return results.filter(function(item) {
+        return !item.ok;
+      });
+    }
+
+    async function sendWizardBatch() {
+      if (wizardSendBusy) return;
+
       const records =
         getWizardPreparedBatchRecords();
 
@@ -3079,11 +3245,106 @@ function changePreviousSettings() {
         return;
       }
 
-      alert(
-        "送信準備OK\n" +
+      if (!confirm(
+        wizardState.modeLabel + "を " +
         records.length +
-        "件\n\nGAS送信は次の工程で接続します"
+        "件まとめて送信します。よろしいですか？"
+      )) {
+        return;
+      }
+
+      wizardSendBusy = true;
+      scannerBusy = true;
+
+      const button = document.getElementById(
+        "wizardSendBatchButton"
       );
+
+      button.disabled = true;
+      startWizardSendLoading();
+
+      try {
+        const sendRecords = records.map(
+          buildBatchRecordData
+        );
+
+        const result = await sendBatchRecords(
+          sendRecords
+        );
+
+        const failures = getWizardBatchFailures(
+          result
+        );
+
+        const successCount = Number(
+          result.successCount || 0
+        );
+
+        const failedCount = Number(
+          result.failedCount || failures.length || 0
+        );
+
+        if (!result.ok || failedCount > 0) {
+          const failureText = failures.map(
+            function(item) {
+              return (
+                (item.qr || "不明") + "：" +
+                (item.message || "送信失敗")
+              );
+            }
+          ).join("\n");
+
+          setWizardSendStatus(
+            "一部送信失敗\n" +
+            "成功：" + successCount + "件\n" +
+            "失敗：" + failedCount + "件" +
+            (failureText ? "\n\n" + failureText : "") +
+            "\n\n送信ID：" +
+            (result.sendId || lastPendingSendId),
+            "isError"
+          );
+
+          scannerBusy = false;
+          return;
+        }
+
+        setWizardSendStatus(
+          "送信完了 ✔\n" +
+          successCount + "件\n" +
+          "送信ID：" +
+          (result.sendId || lastPendingSendId),
+          "isSuccess"
+        );
+
+        scannedEntries = [];
+        renderScannerResults();
+
+        setTemporaryScannerStatus(
+          "送信完了 ✔\n続けてQRを読み取れます",
+          1400
+        );
+
+        scannerBusy = false;
+      } catch (error) {
+        const sendId =
+          error.sendId ||
+          lastPendingSendId ||
+          "不明";
+
+        setWizardSendStatus(
+          "送信結果不明\n" +
+          "スプレッドシートを確認してください。" +
+          "同じ内容をすぐに再送信しないでください。\n\n" +
+          "送信ID：" + sendId,
+          "isError"
+        );
+
+        scannerBusy = false;
+      } finally {
+        stopAnimatedDots("wizardSendStatus");
+        wizardSendBusy = false;
+        button.disabled = false;
+      }
     }
 
     async function handleReadOnlyDecoded(text) {
@@ -4399,7 +4660,7 @@ document
   )
   .addEventListener(
     "click",
-    previewWizardBatchSend
+    sendWizardBatch
   );
 
 renderButtons();
