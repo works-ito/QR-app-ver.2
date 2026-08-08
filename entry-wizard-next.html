@@ -1525,6 +1525,46 @@
     let scannedEntries = [];
     let scannerStatusTimer = null;
     let pendingWizardQuantityRecord = null;
+    const animatedDotsTimers = new Map();
+
+    function stopAnimatedDots(elementId) {
+      const timer = animatedDotsTimers.get(
+        elementId
+      );
+
+      if (timer) {
+        clearInterval(timer);
+        animatedDotsTimers.delete(elementId);
+      }
+    }
+
+    function startAnimatedDots(
+      elementId,
+      baseMessage
+    ) {
+      stopAnimatedDots(elementId);
+
+      const element =
+        document.getElementById(elementId);
+
+      if (!element) return;
+
+      let dots = 0;
+
+      const update = function() {
+        element.innerText =
+          baseMessage + ".".repeat(dots);
+
+        dots = (dots + 1) % 4;
+      };
+
+      update();
+
+      animatedDotsTimers.set(
+        elementId,
+        setInterval(update, 400)
+      );
+    }
 
        const MODE_OPTIONS = [
       {
@@ -2747,6 +2787,8 @@ function changePreviousSettings() {
     }
 
     function setTemporaryScannerStatus(message, duration) {
+      stopAnimatedDots("scannerStatus");
+
       const status = document.getElementById("scannerStatus");
 
       if (scannerStatusTimer) {
@@ -3097,9 +3139,10 @@ function changePreviousSettings() {
         "scannerFrame"
       ).classList.remove("isSuccess");
 
-      document.getElementById(
-        "scannerStatus"
-      ).innerText = "カメラ起動中…";
+      startAnimatedDots(
+        "scannerStatus",
+        "カメラ起動中"
+      );
 
       try {
         const hints = new Map();
@@ -3160,11 +3203,26 @@ function changePreviousSettings() {
 
         scannerRunning = true;
 
+        stopAnimatedDots("scannerStatus");
+
         document.getElementById(
           "scannerStatus"
         ).innerText =
           "QRを読み取ってください\n読取件数：" +
           scannedEntries.length + "件";
+
+        /*
+         * 現行HTMLと同じく、カメラ起動後に
+         * 読取画面まで滑らかに自動スクロールする。
+         */
+        setTimeout(function() {
+          document.getElementById(
+            "scannerViewport"
+          ).scrollIntoView({
+            behavior:"smooth",
+            block:"start"
+          });
+        }, 300);
 
         setTimeout(
           applyReadOnlyCameraSettings,
@@ -3180,6 +3238,7 @@ function changePreviousSettings() {
           2000
         );
       } catch (error) {
+        stopAnimatedDots("scannerStatus");
         scannerRunning = false;
         scannerBusy = false;
 
@@ -3194,6 +3253,8 @@ function changePreviousSettings() {
     }
 
     async function stopReadOnlyScanner() {
+      stopAnimatedDots("scannerStatus");
+
       if (scannerCodeReader) {
         try {
           scannerCodeReader.reset();
@@ -3219,6 +3280,8 @@ function changePreviousSettings() {
       message,
       state
     ) {
+      stopAnimatedDots("inventoryDataStatus");
+
       const status =
         document.getElementById(
           "inventoryDataStatus"
@@ -3230,6 +3293,52 @@ function changePreviousSettings() {
       status.className =
         "inventoryDataStatus" +
         (state ? " " + state : "");
+    }
+
+    function startInventoryDataStatusAnimation(
+      message
+    ) {
+      const status =
+        document.getElementById(
+          "inventoryDataStatus"
+        );
+
+      if (!status) return;
+
+      status.className =
+        "inventoryDataStatus isLoading";
+
+      startAnimatedDots(
+        "inventoryDataStatus",
+        message
+      );
+    }
+
+    /*
+     * 次工程のGAS送信接続でも同じ点アニメーションを使う。
+     */
+    function startWizardSendLoading(message) {
+      const button = document.getElementById(
+        "wizardSendBatchButton"
+      );
+
+      button.disabled = true;
+
+      startAnimatedDots(
+        "wizardSendBatchButton",
+        message || "送信中"
+      );
+    }
+
+    function stopWizardSendLoading() {
+      stopAnimatedDots("wizardSendBatchButton");
+
+      const button = document.getElementById(
+        "wizardSendBatchButton"
+      );
+
+      button.disabled = false;
+      renderScannerResults();
     }
 
     function formatInventoryUpdatedAt(value) {
@@ -3684,9 +3793,8 @@ function changePreviousSettings() {
       appInitialDataError = "";
 
       if (showLoading) {
-        setInventoryDataStatus(
-          "在庫データ：最新データ取得中…",
-          "isLoading"
+        startInventoryDataStatusAnimation(
+          "在庫データ：最新データ取得中"
         );
       }
 
@@ -3811,13 +3919,12 @@ function changePreviousSettings() {
         await restoreInventoryCache();
 
       if (cache) {
-        setInventoryDataStatus(
+        startInventoryDataStatusAnimation(
           "在庫データ：前回データ確認済み " +
             formatInventoryUpdatedAt(
               cache.updatedAt
             ) +
-            "／最新データへ更新中…",
-          "isLoading"
+            "／最新データへ更新中"
         );
 
         const success =
