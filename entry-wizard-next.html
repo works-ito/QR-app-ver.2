@@ -480,22 +480,6 @@
       text-align:center;
     }
 
-    .debugOutput {
-      margin-top:12px;
-      padding:10px;
-
-      border-radius:10px;
-
-      background:#182230;
-      color:#d7f7df;
-
-      font-size:12px;
-      line-height:1.45;
-
-      white-space:pre-wrap;
-      word-break:break-word;
-    }
-
     .hidden {
       display:none !important;
     }
@@ -831,43 +815,74 @@
 }
 
 .scannerResultTitle {
-  margin:0 0 8px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin:0 0 10px;
   color:#18733a;
-  font-size:20px;
+  font-size:18px;
   font-weight:900;
 }
 
 .scannerResultList {
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin:0;
+  padding:0;
+  list-style:none;
+}
+
+.scannerResultItem {
   display:grid;
-  grid-template-columns:auto 1fr;
-  gap:5px 10px;
-  margin:0;
-  font-size:15px;
-  line-height:1.45;
+  grid-template-columns:34px 1fr;
+  gap:8px;
+  padding:9px 10px;
+  border:1px solid #cde8d5;
+  border-radius:10px;
+  background:#fff;
 }
 
-.scannerResultList dt {
-  color:var(--muted);
-  font-weight:800;
+.scannerResultNumber {
+  color:var(--green);
+  font-size:18px;
+  font-weight:900;
+  text-align:center;
 }
 
-.scannerResultList dd {
-  margin:0;
+.scannerResultName {
   color:var(--ink);
+  font-size:15px;
   font-weight:900;
   overflow-wrap:anywhere;
 }
 
-.scannerActionButton {
+.scannerResultMeta {
+  margin-top:2px;
+  color:var(--muted);
+  font-size:12px;
+  font-weight:700;
+  line-height:1.4;
+  overflow-wrap:anywhere;
+}
+
+.scannerCancelButton {
   width:100%;
-  min-height:56px;
+  min-height:48px;
   margin-top:8px;
-  border:0;
+  border:1px solid #efbcbc;
   border-radius:12px;
-  background:var(--blue);
-  color:#fff;
-  font-size:19px;
+  background:#fff;
+  color:var(--red);
+  font-size:16px;
   font-weight:900;
+}
+
+.scannerCancelButton:disabled {
+  border-color:var(--line);
+  color:#98a2b3;
+  background:#f5f6f8;
 }
 
 .scannerDiagnostic {
@@ -1270,19 +1285,20 @@
 
         <div id="scannerResult" class="scannerResult">
           <div class="scannerResultTitle">
-            読取確認
+            <span>読取済み</span>
+            <span id="scannerResultCount">0件</span>
           </div>
 
-          <dl id="scannerResultList" class="scannerResultList"></dl>
+          <ol id="scannerResultList" class="scannerResultList"></ol>
         </div>
 
         <button
-          id="scanAgainButton"
-          class="scannerActionButton"
+          id="cancelLastScanButton"
+          class="scannerCancelButton"
           type="button"
-          hidden
+          disabled
         >
-          もう一度読み取る
+          最後の読取を取り消す
         </button>
 
         <pre
@@ -1298,10 +1314,6 @@
         本番接続時は、この画面に到達した直後にカメラを自動起動します。
       </p>
 
-      <pre
-        id="debugOutput"
-        class="debugOutput"
-      ></pre>
     </section>
   </main>
 
@@ -1379,6 +1391,8 @@
     let scannerStream = null;
     let scannerRunning = false;
     let scannerBusy = false;
+    let scannedEntries = [];
+    let scannerStatusTimer = null;
 
        const MODE_OPTIONS = [
       {
@@ -2241,20 +2255,15 @@ function changePreviousSettings() {
           "確認版のため、読み取った内容は送信されません。";
       }
 
-      document.getElementById(
-        "debugOutput"
-      ).innerText =
-        JSON.stringify(
-          settings,
-          null,
-          2
-        );
     }
 
     function completeEntryWizard(settings) {
       syncWizardSettingsToLegacyFields(
         settings
       );
+
+      scannedEntries = [];
+      renderScannerResults();
 
       window.dispatchEvent(
         new CustomEvent(
@@ -2467,15 +2476,7 @@ function changePreviousSettings() {
       );
     }
 
-    function renderScannerResult(details) {
-      const rows = [
-        ["読取番号", details.qrText],
-        ["管理区分", details.managementLabel],
-        ["機械・品名", details.displayName],
-        ["現在状態", details.currentState],
-        ["選択作業", wizardState.modeLabel]
-      ];
-
+    function renderScannerResults() {
       const list =
         document.getElementById(
           "scannerResultList"
@@ -2483,30 +2484,71 @@ function changePreviousSettings() {
 
       list.innerHTML = "";
 
-      rows.forEach(function(row) {
-        const term =
-          document.createElement("dt");
+      scannedEntries.forEach(function(details, index) {
+        const item = document.createElement("li");
+        const number = document.createElement("div");
+        const body = document.createElement("div");
+        const name = document.createElement("div");
+        const meta = document.createElement("div");
 
-        const description =
-          document.createElement("dd");
+        item.className = "scannerResultItem";
+        number.className = "scannerResultNumber";
+        name.className = "scannerResultName";
+        meta.className = "scannerResultMeta";
 
-        term.innerText = row[0];
-        description.innerText = row[1];
-        list.appendChild(term);
-        list.appendChild(description);
+        number.innerText = String(index + 1);
+        name.innerText = details.displayName;
+        meta.innerText =
+          details.qrText + " ／ " +
+          details.managementLabel + " ／ " +
+          details.currentState;
+
+        body.appendChild(name);
+        body.appendChild(meta);
+        item.appendChild(number);
+        item.appendChild(body);
+        list.appendChild(item);
       });
 
-      document.getElementById(
-        "scannerResult"
-      ).classList.add("isVisible");
+      const count = scannedEntries.length;
 
-      document.getElementById(
-        "scannerViewport"
-      ).hidden = true;
+      document.getElementById("scannerResultCount")
+        .innerText = count + "件";
 
-      document.getElementById(
-        "scanAgainButton"
-      ).hidden = false;
+      document.getElementById("scannerResult")
+        .classList.toggle("isVisible", count > 0);
+
+      document.getElementById("cancelLastScanButton")
+        .disabled = count === 0;
+    }
+
+    function setTemporaryScannerStatus(message, duration) {
+      const status = document.getElementById("scannerStatus");
+
+      if (scannerStatusTimer) {
+        clearTimeout(scannerStatusTimer);
+      }
+
+      status.innerText = message;
+
+      scannerStatusTimer = setTimeout(function() {
+        if (!scannerRunning) return;
+
+        status.innerText =
+          "続けてQRを読み取ってください\n読取件数：" +
+          scannedEntries.length + "件";
+      }, duration || 900);
+    }
+
+    function cancelLastScan() {
+      if (!scannedEntries.length) return;
+
+      const removed = scannedEntries.pop();
+      renderScannerResults();
+      setTemporaryScannerStatus(
+        "最後の読取を取り消しました\n" + removed.displayName,
+        1100
+      );
     }
 
     async function handleReadOnlyDecoded(text) {
@@ -2516,6 +2558,29 @@ function changePreviousSettings() {
 
       const qrText =
         String(text || "").trim();
+
+      const duplicateKey =
+        normalizeLookupKey(qrText);
+
+      const alreadyScanned = scannedEntries.some(
+        function(entry) {
+          return normalizeLookupKey(entry.qrText) === duplicateKey;
+        }
+      );
+
+      if (alreadyScanned) {
+        if (navigator.vibrate) navigator.vibrate(35);
+
+        setTemporaryScannerStatus(
+          "このQRは読取済みです\n重複のため追加しません",
+          1000
+        );
+
+        setTimeout(function() {
+          scannerBusy = false;
+        }, 750);
+        return;
+      }
 
       const details =
         getScannerItemDetails(qrText);
@@ -2527,7 +2592,9 @@ function changePreviousSettings() {
           "登録データに見つかりません\n" +
           qrText;
 
-        scannerBusy = false;
+        setTimeout(function() {
+          scannerBusy = false;
+        }, 900);
         return;
       }
 
@@ -2537,16 +2604,12 @@ function changePreviousSettings() {
           wizardState.mode
         )
       ) {
-        await stopReadOnlyScanner();
-
-        document.getElementById(
-          "scannerStatus"
-        ).innerText =
+        setTemporaryScannerStatus(
           "この管理区分では「" +
           wizardState.modeLabel +
-          "」を使用できません";
-
-        renderScannerResult(details);
+          "」を使用できません",
+          1200
+        );
 
         if (
           ["校正中", "校正完了", "交換完了"]
@@ -2555,6 +2618,9 @@ function changePreviousSettings() {
           showRecLookupDiagnostic(qrText);
         }
 
+        setTimeout(function() {
+          scannerBusy = false;
+        }, 1000);
         return;
       }
 
@@ -2569,14 +2635,18 @@ function changePreviousSettings() {
         navigator.vibrate(80);
       }
 
-      await stopReadOnlyScanner();
+      scannedEntries.push(details);
+      renderScannerResults();
 
-      document.getElementById(
-        "scannerStatus"
-      ).innerText =
-        "読取成功 ✔\n確認表示のみ・送信していません";
+      setTemporaryScannerStatus(
+        "読取成功 ✔\n" + details.displayName,
+        850
+      );
 
-      renderScannerResult(details);
+      setTimeout(function() {
+        frame.classList.remove("isSuccess");
+        scannerBusy = false;
+      }, 650);
     }
 
     async function applyReadOnlyCameraSettings() {
@@ -2647,10 +2717,6 @@ function changePreviousSettings() {
       scannerBusy = false;
 
       document.getElementById(
-        "scannerResult"
-      ).classList.remove("isVisible");
-
-      document.getElementById(
         "scannerDiagnostic"
       ).classList.remove("isVisible");
 
@@ -2661,10 +2727,6 @@ function changePreviousSettings() {
       document.getElementById(
         "scannerViewport"
       ).hidden = false;
-
-      document.getElementById(
-        "scanAgainButton"
-      ).hidden = true;
 
       document.getElementById(
         "scannerFrame"
@@ -2736,7 +2798,8 @@ function changePreviousSettings() {
         document.getElementById(
           "scannerStatus"
         ).innerText =
-          "QRを読み取ってください\nQR／Data Matrix対応・確認表示のみ";
+          "QRを読み取ってください\n読取件数：" +
+          scannedEntries.length + "件";
 
         setTimeout(
           applyReadOnlyCameraSettings,
@@ -3573,6 +3636,9 @@ function changePreviousSettings() {
     function resetWizard() {
   stopReadOnlyScanner();
 
+  scannedEntries = [];
+  renderScannerResults();
+
   wizardState.receptionType = "";
   wizardState.receptionLabel = "";
 
@@ -3698,11 +3764,11 @@ document
 
 document
   .getElementById(
-    "scanAgainButton"
+    "cancelLastScanButton"
   )
   .addEventListener(
     "click",
-    startReadOnlyScanner
+    cancelLastScan
   );
 
 renderButtons();
