@@ -807,12 +807,6 @@ textarea {
   <button onclick="sendRecBatchAfterMemo()">REC読取分を送信</button>
 </div>
 
-<div id="returnMethodArea">
-  <div style="font-weight:bold; margin-bottom:10px;">返却方法を選択してください</div>
-  <button onclick="selectReturnWithQr()">QRあり：QRを読み取って返却登録する</button>
-  <button onclick="selectReturnNoQr()">QRなし：写真・追記だけ保存する</button>
-</div>
-
 <div id="returnCaseArea">
   <div style="font-weight:bold; margin-bottom:10px;">返却案件の追記</div>
   <div class="radioRow">
@@ -3949,43 +3943,7 @@ if (mode === "交換完了") {
 
   if (dateModes.includes(mode)) ensureRecDateDefault();
 
-  /*
- * 通常の返却フローだけ、
- * QRあり／QRなしの選択画面を表示する。
- *
- * イレギュラー受付では専用フローを継続するため、
- * 通常返却の選択画面は表示しない。
- */
-if (
-  mode === "返却" &&
-  !irregularFlowActive
-) {
-  document.getElementById(
-    "returnMethodArea"
-  ).style.display = "block";
-
-  log(
-    "返却方法を選択してください"
-  );
-
-  scrollToElement(
-    "returnMethodArea"
-  );
-
-} else {
-  document.getElementById(
-    "returnMethodArea"
-  ).style.display = "none";
-
-  /*
-   * イレギュラー受付中は、
-   * 専用フローの状態を壊さない。
-   */
-  if (!irregularFlowActive) {
-    returnQrMode = "";
   }
-}
-}
 
 function startNoQrReturn() {
   /*
@@ -4523,19 +4481,7 @@ function notifyScanError(message) {
   }, 900);
 }  
 async function startQr() {
-  if (document.getElementById("mode").value === "返却" && returnQrMode === "") {
-    alert("先に返却方法を選択してください");
-    document.getElementById("returnMethodArea").style.display = "block";
-    scrollToElement("returnMethodArea");
-    return;
-  }
-
-  if (document.getElementById("mode").value === "返却" && returnQrMode === "QRなし") {
-    alert("QRなし返却ではカメラ起動は不要です");
-    return;
-  }
-
-  const isLatest = await checkAppVersionNow();
+    const isLatest = await checkAppVersionNow();
 
   if (!isLatest) {
     return;
