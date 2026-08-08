@@ -10,6 +10,8 @@
 
   <title>QR在庫管理｜入口ウィザード試作</title>
 
+  <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
+
   <style>
     :root {
       --blue:#1677ff;
@@ -761,6 +763,112 @@
   background:#fff1f1;
   color:#b42318;
 }
+
+.scannerArea {
+  display:none;
+  margin-top:12px;
+}
+
+.scannerArea.isActive {
+  display:block;
+}
+
+.scannerStatus {
+  margin:0 0 10px;
+  color:var(--blue-dark);
+  font-size:17px;
+  font-weight:900;
+  line-height:1.45;
+  white-space:pre-wrap;
+}
+
+.scannerViewport {
+  position:relative;
+  width:100%;
+  max-width:340px;
+  margin:0 auto 12px;
+  overflow:hidden;
+  border-radius:14px;
+  background:#000;
+}
+
+.scannerVideo {
+  display:block;
+  width:100%;
+  aspect-ratio:3 / 4;
+  object-fit:cover;
+  background:#000;
+}
+
+.scannerFrame {
+  position:absolute;
+  left:22.5%;
+  top:29%;
+  width:55%;
+  height:41%;
+  border:4px solid rgba(255,255,255,0.92);
+  border-radius:14px;
+  pointer-events:none;
+  filter:drop-shadow(0 0 3px #000);
+}
+
+.scannerFrame.isSuccess {
+  border-color:#00e676;
+  box-shadow:0 0 18px #00e676;
+}
+
+.scannerResult {
+  display:none;
+  margin:12px 0;
+  padding:12px;
+  border:2px solid #bfe4ca;
+  border-radius:12px;
+  background:var(--green-pale);
+}
+
+.scannerResult.isVisible {
+  display:block;
+}
+
+.scannerResultTitle {
+  margin:0 0 8px;
+  color:#18733a;
+  font-size:20px;
+  font-weight:900;
+}
+
+.scannerResultList {
+  display:grid;
+  grid-template-columns:auto 1fr;
+  gap:5px 10px;
+  margin:0;
+  font-size:15px;
+  line-height:1.45;
+}
+
+.scannerResultList dt {
+  color:var(--muted);
+  font-weight:800;
+}
+
+.scannerResultList dd {
+  margin:0;
+  color:var(--ink);
+  font-weight:900;
+  overflow-wrap:anywhere;
+}
+
+.scannerActionButton {
+  width:100%;
+  min-height:56px;
+  margin-top:8px;
+  border:0;
+  border-radius:12px;
+  background:var(--blue);
+  color:#fff;
+  font-size:19px;
+  font-weight:900;
+}
   </style>
 </head>
 
@@ -1126,11 +1234,38 @@
         ></dl>
       </div>
 
-      <div
-        id="cameraPreview"
-        class="cameraPreview"
-      >
-        カメラ接続前の試作です
+      <div id="cameraPreview" class="scannerArea">
+        <div id="scannerStatus" class="scannerStatus">
+          カメラ起動準備中…
+        </div>
+
+        <div id="scannerViewport" class="scannerViewport">
+          <video
+            id="scannerVideo"
+            class="scannerVideo"
+            playsinline
+            muted
+          ></video>
+
+          <div id="scannerFrame" class="scannerFrame"></div>
+        </div>
+
+        <div id="scannerResult" class="scannerResult">
+          <div class="scannerResultTitle">
+            読取確認
+          </div>
+
+          <dl id="scannerResultList" class="scannerResultList"></dl>
+        </div>
+
+        <button
+          id="scanAgainButton"
+          class="scannerActionButton"
+          type="button"
+          hidden
+        >
+          もう一度読み取る
+        </button>
       </div>
 
       <p
@@ -1216,6 +1351,11 @@
     let simpleItemMap = new Map();
     let recItemMap = new Map();
     let quantityItemMap = new Map();
+
+    let scannerCodeReader = null;
+    let scannerStream = null;
+    let scannerRunning = false;
+    let scannerBusy = false;
 
        const MODE_OPTIONS = [
       {
@@ -2063,17 +2203,19 @@ function changePreviousSettings() {
         settings.receptionType ===
         "irregular"
       ) {
-        cameraPreview.innerText =
-          "イレギュラー受付画面への接続位置\n管理番号・品目コードを入力";
+        cameraPreview.classList.remove(
+          "isActive"
+        );
 
         connectionNote.innerText =
           "本番接続時はカメラを起動せず、番号入力／番号不明・追記・写真の画面へ進みます。";
       } else {
-        cameraPreview.innerText =
-          "カメラ自動起動の接続位置\nQRを読み取ってください";
+        cameraPreview.classList.add(
+          "isActive"
+        );
 
         connectionNote.innerText =
-          "本番接続時は、この画面に到達した直後にカメラを自動起動します。";
+          "確認版のため、読み取った内容は送信されません。";
       }
 
       document.getElementById(
@@ -2106,6 +2248,405 @@ function changePreviousSettings() {
         "入口ウィザード設定完了",
         settings
       );
+
+      if (
+        settings.receptionType ===
+        "normal"
+      ) {
+        startReadOnlyScanner();
+      } else {
+        stopReadOnlyScanner();
+      }
+    }
+
+    function getScannerItemDetails(
+      qrText
+    ) {
+      const managed =
+        findManagedItemLocal(qrText);
+
+      if (managed) {
+        const typeLabels = {
+          individual:"個体",
+          simple:"簡易個体",
+          rec:"REC"
+        };
+
+        return {
+          qrText:qrText,
+          managementType:
+            managed.managementType,
+          managementLabel:
+            typeLabels[
+              managed.managementType
+            ] || "管理品",
+          displayName:getFirstItemValue(
+            managed.item,
+            [
+              "機種表示",
+              "表示名",
+              "機種名",
+              "品名",
+              "商品名",
+              "displayName"
+            ]
+          ) || "名称なし",
+          currentState:getFirstItemValue(
+            managed.item,
+            [
+              "現在状態",
+              "状態",
+              "作業区分",
+              "status"
+            ]
+          ) || "状態なし"
+        };
+      }
+
+      const quantity =
+        findQuantityItemLocal(qrText);
+
+      if (quantity) {
+        return {
+          qrText:qrText,
+          managementType:"quantity",
+          managementLabel:"数量管理",
+          displayName:getFirstItemValue(
+            quantity,
+            [
+              "表示名",
+              "品名",
+              "商品名",
+              "displayName"
+            ]
+          ) || "名称なし",
+          currentState:getFirstItemValue(
+            quantity,
+            [
+              "現在状態",
+              "状態",
+              "status"
+            ]
+          ) || "数量管理品"
+        };
+      }
+
+      return null;
+    }
+
+    function isScannerModeAllowed(
+      managementType,
+      mode
+    ) {
+      if (
+        ["校正中", "校正完了", "交換完了"]
+          .includes(mode)
+      ) {
+        return managementType === "rec";
+      }
+
+      if (["入庫", "廃棄"].includes(mode)) {
+        return managementType === "quantity";
+      }
+
+      if (mode === "修理中") {
+        return managementType !== "quantity";
+      }
+
+      return true;
+    }
+
+    function renderScannerResult(details) {
+      const rows = [
+        ["読取番号", details.qrText],
+        ["管理区分", details.managementLabel],
+        ["機械・品名", details.displayName],
+        ["現在状態", details.currentState],
+        ["選択作業", wizardState.modeLabel]
+      ];
+
+      const list =
+        document.getElementById(
+          "scannerResultList"
+        );
+
+      list.innerHTML = "";
+
+      rows.forEach(function(row) {
+        const term =
+          document.createElement("dt");
+
+        const description =
+          document.createElement("dd");
+
+        term.innerText = row[0];
+        description.innerText = row[1];
+        list.appendChild(term);
+        list.appendChild(description);
+      });
+
+      document.getElementById(
+        "scannerResult"
+      ).classList.add("isVisible");
+
+      document.getElementById(
+        "scanAgainButton"
+      ).hidden = false;
+    }
+
+    async function handleReadOnlyDecoded(text) {
+      if (scannerBusy) return;
+
+      scannerBusy = true;
+
+      const qrText =
+        String(text || "").trim();
+
+      const details =
+        getScannerItemDetails(qrText);
+
+      if (!details) {
+        document.getElementById(
+          "scannerStatus"
+        ).innerText =
+          "登録データに見つかりません\n" +
+          qrText;
+
+        scannerBusy = false;
+        return;
+      }
+
+      if (
+        !isScannerModeAllowed(
+          details.managementType,
+          wizardState.mode
+        )
+      ) {
+        await stopReadOnlyScanner();
+
+        document.getElementById(
+          "scannerStatus"
+        ).innerText =
+          "この管理区分では「" +
+          wizardState.modeLabel +
+          "」を使用できません";
+
+        renderScannerResult(details);
+        return;
+      }
+
+      const frame =
+        document.getElementById(
+          "scannerFrame"
+        );
+
+      frame.classList.add("isSuccess");
+
+      if (navigator.vibrate) {
+        navigator.vibrate(80);
+      }
+
+      await stopReadOnlyScanner();
+
+      document.getElementById(
+        "scannerStatus"
+      ).innerText =
+        "読取成功 ✔\n確認表示のみ・送信していません";
+
+      renderScannerResult(details);
+    }
+
+    async function applyReadOnlyCameraSettings() {
+      try {
+        const video =
+          document.getElementById(
+            "scannerVideo"
+          );
+
+        const source = video.srcObject;
+
+        if (!source) return;
+
+        scannerStream = source;
+
+        const track =
+          source.getVideoTracks()[0];
+
+        if (!track) return;
+
+        const capabilities =
+          track.getCapabilities
+            ? track.getCapabilities()
+            : {};
+
+        if (capabilities.zoom) {
+          await track.applyConstraints({
+            advanced:[{
+              zoom:Math.min(
+                1.8,
+                capabilities.zoom.max
+              )
+            }]
+          });
+        }
+
+        try {
+          await track.applyConstraints({
+            advanced:[{
+              focusMode:"continuous"
+            }]
+          });
+        } catch (error) {
+          console.log(
+            "継続フォーカス未対応",
+            error
+          );
+        }
+      } catch (error) {
+        console.log(
+          "カメラ設定未対応",
+          error
+        );
+      }
+    }
+
+    async function startReadOnlyScanner() {
+      if (scannerRunning) return;
+
+      if (!appInitialDataLoaded) {
+        document.getElementById(
+          "scannerStatus"
+        ).innerText =
+          "在庫データの取得完了後に、もう一度お試しください";
+        return;
+      }
+
+      scannerBusy = false;
+
+      document.getElementById(
+        "scannerResult"
+      ).classList.remove("isVisible");
+
+      document.getElementById(
+        "scanAgainButton"
+      ).hidden = true;
+
+      document.getElementById(
+        "scannerFrame"
+      ).classList.remove("isSuccess");
+
+      document.getElementById(
+        "scannerStatus"
+      ).innerText = "カメラ起動中…";
+
+      try {
+        const hints = new Map();
+
+        hints.set(
+          ZXing.DecodeHintType.POSSIBLE_FORMATS,
+          [
+            ZXing.BarcodeFormat.QR_CODE,
+            ZXing.BarcodeFormat.DATA_MATRIX
+          ]
+        );
+
+        scannerCodeReader =
+          new ZXing.BrowserMultiFormatReader(
+            hints
+          );
+
+        const devices =
+          await scannerCodeReader
+            .listVideoInputDevices();
+
+        if (!devices || !devices.length) {
+          throw new Error(
+            "カメラが見つかりません"
+          );
+        }
+
+        const backCamera = devices.find(
+          function(device) {
+            const label = String(
+              device.label || ""
+            ).toLowerCase();
+
+            return (
+              label.includes("back") ||
+              label.includes("rear") ||
+              label.includes("environment") ||
+              label.includes("背面")
+            );
+          }
+        );
+
+        const deviceId = backCamera
+          ? backCamera.deviceId
+          : devices[devices.length - 1].deviceId;
+
+        scannerCodeReader.decodeFromVideoDevice(
+          deviceId,
+          "scannerVideo",
+          function(result) {
+            if (result) {
+              handleReadOnlyDecoded(
+                result.getText()
+              );
+            }
+          }
+        );
+
+        scannerRunning = true;
+
+        document.getElementById(
+          "scannerStatus"
+        ).innerText =
+          "QRを読み取ってください\nQR／Data Matrix対応・確認表示のみ";
+
+        setTimeout(
+          applyReadOnlyCameraSettings,
+          500
+        );
+
+        setTimeout(
+          applyReadOnlyCameraSettings,
+          1200
+        );
+
+      } catch (error) {
+        scannerRunning = false;
+        scannerBusy = false;
+
+        document.getElementById(
+          "scannerStatus"
+        ).innerText =
+          "カメラ起動失敗\n" +
+          (error && error.message
+            ? error.message
+            : String(error));
+      }
+    }
+
+    async function stopReadOnlyScanner() {
+      if (scannerCodeReader) {
+        try {
+          scannerCodeReader.reset();
+        } catch (error) {}
+
+        scannerCodeReader = null;
+      }
+
+      if (scannerStream) {
+        scannerStream
+          .getTracks()
+          .forEach(function(track) {
+            track.stop();
+          });
+
+        scannerStream = null;
+      }
+
+      scannerRunning = false;
     }
 
     function setInventoryDataStatus(
@@ -2803,6 +3344,8 @@ function changePreviousSettings() {
     currentStep ===
     "complete"
   ) {
+    stopReadOnlyScanner();
+
     showStep(
       wizardState.lastInputStep ||
       "user"
@@ -2811,6 +3354,8 @@ function changePreviousSettings() {
 }
 
     function resetWizard() {
+  stopReadOnlyScanner();
+
   wizardState.receptionType = "";
   wizardState.receptionLabel = "";
 
@@ -2932,6 +3477,15 @@ document
 
       resetWizard();
     }
+  );
+
+document
+  .getElementById(
+    "scanAgainButton"
+  )
+  .addEventListener(
+    "click",
+    startReadOnlyScanner
   );
 
 renderButtons();
