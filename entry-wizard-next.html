@@ -867,22 +867,30 @@
   overflow-wrap:anywhere;
 }
 
-.scannerCancelButton {
+.scannerReadActionButton {
+  display:none;
   width:100%;
   min-height:48px;
   margin-top:8px;
-  border:1px solid #efbcbc;
   border-radius:12px;
-  background:#fff;
-  color:var(--red);
   font-size:16px;
   font-weight:900;
 }
 
-.scannerCancelButton:disabled {
-  border-color:var(--line);
-  color:#98a2b3;
-  background:#f5f6f8;
+.scannerReadActionButton.isVisible {
+  display:block;
+}
+
+.scannerUndoButton {
+  border:1px solid #b8c4d4;
+  background:#fff;
+  color:#475467;
+}
+
+.scannerResetAllButton {
+  border:1px solid var(--red);
+  background:#fff1f1;
+  color:var(--red);
 }
 
 .scannerQuantityInput {
@@ -1421,11 +1429,18 @@
 
         <button
           id="cancelLastScanButton"
-          class="scannerCancelButton"
+          class="scannerReadActionButton scannerUndoButton"
           type="button"
-          disabled
         >
-          最後の読取を取り消す
+          最後の1件を取消
+        </button>
+
+        <button
+          id="resetAllScansButton"
+          class="scannerReadActionButton scannerResetAllButton"
+          type="button"
+        >
+          読取をすべてリセット
         </button>
 
         <button
@@ -2763,10 +2778,13 @@ function changePreviousSettings() {
         .innerText = count + "件";
 
       document.getElementById("scannerResult")
-        .classList.add("isVisible");
+        .classList.toggle("isVisible", count > 0);
 
       document.getElementById("cancelLastScanButton")
-        .disabled = count === 0;
+        .classList.toggle("isVisible", count > 0);
+
+      document.getElementById("resetAllScansButton")
+        .classList.toggle("isVisible", count > 0);
 
       const sendButton =
         document.getElementById(
@@ -2821,6 +2839,35 @@ function changePreviousSettings() {
       /*
        * 取り消し直後、まだ同じQRが画面内にある間の
        * 即時再登録を防ぐ。少しカメラを離せば再読取できる。
+       */
+      setTimeout(function() {
+        scannerBusy = false;
+      }, 900);
+    }
+
+    function resetAllScans() {
+      const count = scannedEntries.length;
+
+      if (!count) return;
+
+      const confirmed = confirm(
+        "読み取った" + count + "件をすべて消しますか？"
+      );
+
+      if (!confirmed) return;
+
+      scannerBusy = true;
+      scannedEntries = [];
+      renderScannerResults();
+
+      setTemporaryScannerStatus(
+        "読み取った内容をすべてリセットしました",
+        1100
+      );
+
+      /*
+       * リセット直後に、カメラ内へ残っているQRが
+       * 意図せず即時登録されるのを防ぐ。
        */
       setTimeout(function() {
         scannerBusy = false;
@@ -4265,6 +4312,15 @@ document
   .addEventListener(
     "click",
     cancelLastScan
+  );
+
+document
+  .getElementById(
+    "resetAllScansButton"
+  )
+  .addEventListener(
+    "click",
+    resetAllScans
   );
 
 document
