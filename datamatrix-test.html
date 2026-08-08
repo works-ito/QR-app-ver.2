@@ -8023,23 +8023,21 @@ const confirmationOpened =
   }
 
   /*
-   * AI解析後もタイトル候補がない場合は、
-   * 写真保存へ進まず停止する。
-   *
-   * 解析失敗を隠したまま、
-   * 従来タイトルでDrive保存されることを防ぐ。
-   */
-  btn.disabled =
-    false;
+ * AI・OCRでタイトル候補を取得できなかった場合でも、
+ * 写真保存そのものは止めない。
+ *
+ * 顧客名・現場名なしの従来情報で保存を継続する。
+ */
+log(
+  "伝票情報を取得できなかったため、通常タイトルで写真を保存します"
+);
 
-  alert(
-    "保存タイトルを取得できませんでした。\n" +
-    "写真はまだDriveへ保存されていません。"
-  );
-
-  log(
-    "保存タイトルを取得できませんでした"
-  );
+await executeShipmentPhotoSave(
+  files,
+  lastShipmentPhotoInfo,
+  btn,
+  photoRequestId
+);
 }
 
 
@@ -8733,7 +8731,19 @@ async function prepareSlipInfoBeforePhotoSave(
   ) {
     return updatedPhotoInfo;
   }
+  /*
+ * 新しい伝票解析の前に、
+ * 前回案件の伝票情報が残らないよう初期化する。
+ *
+ * AI・OCR解析に失敗した場合でも、
+ * 古い顧客名・現場名を次案件へ流用しない。
+ */
+clearCurrentSlipInfo();
 
+await acquireSlipInfoFromPhoto(
+  files[0],
+  photoType
+);
   await acquireSlipInfoFromPhoto(
     files[0],
     photoType
@@ -9877,21 +9887,19 @@ async function uploadReturnPhotos() {
   }
 
   /*
-   * AI解析後もタイトル候補がない場合は、
-   * 勝手に従来タイトルで保存せず停止する。
-   */
-  btn.disabled =
-    false;
+ * AI・OCRでタイトル候補を取得できなかった場合でも、
+ * 返却写真の保存そのものは止めない。
+ */
+log(
+  "伝票情報を取得できなかったため、通常タイトルで返却写真を保存します"
+);
 
-  alert(
-    "保存タイトルを取得できませんでした。\n" +
-    "写真はまだDriveへ保存されていません。"
-  );
-
-  log(
-    "保存タイトルを取得できませんでした"
-  );
-}
+await executeReturnPhotoSave(
+  files,
+  lastReturnPhotoInfo,
+  btn,
+  photoRequestId
+);
 
 
 /**
