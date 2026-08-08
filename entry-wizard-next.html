@@ -2374,7 +2374,8 @@ function changePreviousSettings() {
               "作業区分",
               "status"
             ]
-          ) || "状態なし"
+          ) || "状態なし",
+          sourceItem:managed.item
         };
       }
 
@@ -2402,11 +2403,116 @@ function changePreviousSettings() {
               "状態",
               "status"
             ]
-          ) || "数量管理品"
+          ) || "数量管理品",
+          sourceItem:quantity
         };
       }
 
       return null;
+    }
+
+    /*
+     * 読取結果を、現行HTMLのscannedRecordsと同じ形へ変換する。
+     * この段階ではGASへ送信しない。
+     */
+    function buildWizardScanRecord(details) {
+      const isQuantity =
+        details.managementType === "quantity";
+
+      const record = {
+        key:
+          normalizeManagedIdKey(details.qrText) +
+          "__" +
+          wizardState.mode +
+          (WIZARD_REC_MODES.includes(wizardState.mode)
+            ? "__" + wizardState.recTarget
+            : ""),
+
+        qrText:details.qrText,
+        mode:wizardState.mode,
+        user:wizardState.user,
+        location:wizardState.location,
+        recTarget:WIZARD_REC_MODES.includes(
+          wizardState.mode
+        ) ? wizardState.recTarget : "",
+        recDate:REC_DATE_REQUIRED_MODES.includes(
+          wizardState.mode
+        ) ? wizardState.recDate : "",
+
+        recordType:isQuantity
+          ? "quantity"
+          : "managed",
+        managementType:details.managementType,
+        managedItem:isQuantity
+          ? null
+          : details.sourceItem,
+
+        displayName:details.displayName,
+        displayText:WIZARD_REC_MODES.includes(
+          wizardState.mode
+        )
+          ? details.qrText + " / " + wizardState.recTarget
+          : details.qrText,
+
+        currentState:details.currentState,
+        managementLabel:details.managementLabel
+      };
+
+      if (isQuantity) {
+        record.itemCode = getFirstItemValue(
+          details.sourceItem,
+          [
+            "品目コード",
+            "itemCode",
+            "商品コード",
+            "コード"
+          ]
+        ) || details.qrText;
+
+        record.category = getFirstItemValue(
+          details.sourceItem,
+          ["区分", "category"]
+        );
+
+        record.unit = getFirstItemValue(
+          details.sourceItem,
+          ["単位", "unit"]
+        );
+
+        /* 数量は次工程の数量入力画面で設定する。 */
+        record.quantity = null;
+      }
+
+      return record;
+    }
+
+    /*
+     * 現行HTMLのbuildBatchRecordData()と同じ送信用形式を返す。
+     * 次工程の送信ボタン接続時に、この配列をそのまま使用する。
+     */
+    function getWizardPreparedBatchRecords() {
+      return scannedEntries.map(function(record) {
+        const data = {
+          mode:record.mode,
+          qr:record.qrText,
+          user:record.user,
+          location:record.location,
+          recTarget:record.recTarget || "",
+          recDate:record.recDate || "",
+          recordType:record.recordType || "",
+          managementType:record.managementType || "",
+          displayName:record.displayName || ""
+        };
+
+        if (record.recordType === "quantity") {
+          data.itemCode = record.itemCode;
+          data.quantity = record.quantity;
+          data.unit = record.unit;
+          data.category = record.category;
+        }
+
+        return data;
+      });
     }
 
     function isScannerModeAllowed(
@@ -2593,7 +2699,10 @@ function changePreviousSettings() {
         navigator.vibrate(80);
       }
 
-      scannedEntries.push(details);
+      const scanRecord =
+        buildWizardScanRecord(details);
+
+      scannedEntries.push(scanRecord);
       renderScannerResults();
 
       setTemporaryScannerStatus(
