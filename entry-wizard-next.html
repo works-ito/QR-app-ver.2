@@ -1540,6 +1540,8 @@
     let scannedEntries = [];
     let scannerStatusTimer = null;
     let pendingWizardQuantityRecord = null;
+    let resetAllArmed = false;
+    let resetAllArmTimer = null;
     const animatedDotsTimers = new Map();
 
     function stopAnimatedDots(elementId) {
@@ -2850,11 +2852,46 @@ function changePreviousSettings() {
 
       if (!count) return;
 
-      const confirmed = confirm(
-        "読み取った" + count + "件をすべて消しますか？"
+      const button = document.getElementById(
+        "resetAllScansButton"
       );
 
-      if (!confirmed) return;
+      /*
+       * iPhoneでは、カメラ起動中のconfirm()によって
+       * 映像だけ静止することがある。
+       * ネイティブ確認画面を使わず、3秒以内の2回押しで確認する。
+       */
+      if (!resetAllArmed) {
+        resetAllArmed = true;
+        button.innerText =
+          "もう一度押すと" + count + "件すべて削除";
+
+        setTemporaryScannerStatus(
+          "全件リセットの確認中\n赤いボタンをもう一度押してください",
+          3000
+        );
+
+        if (resetAllArmTimer) {
+          clearTimeout(resetAllArmTimer);
+        }
+
+        resetAllArmTimer = setTimeout(function() {
+          resetAllArmed = false;
+          resetAllArmTimer = null;
+          button.innerText = "読取をすべてリセット";
+        }, 3000);
+
+        return;
+      }
+
+      resetAllArmed = false;
+
+      if (resetAllArmTimer) {
+        clearTimeout(resetAllArmTimer);
+        resetAllArmTimer = null;
+      }
+
+      button.innerText = "読取をすべてリセット";
 
       scannerBusy = true;
       scannedEntries = [];
@@ -2871,6 +2908,21 @@ function changePreviousSettings() {
        */
       setTimeout(function() {
         scannerBusy = false;
+
+        const video = document.getElementById(
+          "scannerVideo"
+        );
+
+        if (video && video.srcObject) {
+          const playResult = video.play();
+
+          if (
+            playResult &&
+            typeof playResult.catch === "function"
+          ) {
+            playResult.catch(function() {});
+          }
+        }
       }, 900);
     }
 
