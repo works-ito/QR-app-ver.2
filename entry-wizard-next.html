@@ -2265,6 +2265,9 @@ function changePreviousSettings() {
       const lookupKey =
         normalizeLookupKey(qrText);
 
+      const managedLookupKey =
+        normalizeManagedIdKey(qrText);
+
       const isRecWork =
         ["校正中", "校正完了", "交換完了"]
           .includes(wizardState.mode);
@@ -2274,10 +2277,16 @@ function changePreviousSettings() {
        * REC専用作業を選択した場合だけRECデータ側を参照する。
        */
       const managed =
-        isRecWork && recItemMap.has(lookupKey)
+        isRecWork &&
+        (
+          recItemMap.has(lookupKey) ||
+          recItemMap.has(managedLookupKey)
+        )
           ? {
               managementType:"rec",
-              item:recItemMap.get(lookupKey)
+              item:
+                recItemMap.get(lookupKey) ||
+                recItemMap.get(managedLookupKey)
             }
           : findManagedItemLocal(qrText);
 
@@ -2723,6 +2732,25 @@ function changePreviousSettings() {
         .toLowerCase();
     }
 
+    /*
+     * 管理IDの3桁／4桁表記差を吸収する。
+     * 例：REC01-001 と REC01-0001 は同じ検索キーにする。
+     */
+    function normalizeManagedIdKey(value) {
+      const normalized =
+        normalizeLookupKey(value);
+
+      const matched = normalized.match(
+        /^([a-z0-9]+)-(\d+)$/
+      );
+
+      if (!matched) return normalized;
+
+      return matched[1] +
+        "-" +
+        String(Number(matched[2]));
+    }
+
     function isManagedId(value) {
       return /^[A-Za-z0-9]+-\d{3,4}$/.test(
         String(value || "").trim()
@@ -2834,6 +2862,11 @@ function changePreviousSettings() {
 
         if (normalizedKey) {
           map.set(normalizedKey, item);
+
+          map.set(
+            normalizeManagedIdKey(managedId),
+            item
+          );
         }
       });
 
@@ -2869,26 +2902,44 @@ function changePreviousSettings() {
       const key =
         normalizeLookupKey(qrText);
 
+      const managedKey =
+        normalizeManagedIdKey(qrText);
+
       if (!key) return null;
 
-      if (individualItemMap.has(key)) {
+      if (
+        individualItemMap.has(key) ||
+        individualItemMap.has(managedKey)
+      ) {
         return {
           managementType:"individual",
-          item:individualItemMap.get(key)
+          item:
+            individualItemMap.get(key) ||
+            individualItemMap.get(managedKey)
         };
       }
 
-      if (simpleItemMap.has(key)) {
+      if (
+        simpleItemMap.has(key) ||
+        simpleItemMap.has(managedKey)
+      ) {
         return {
           managementType:"simple",
-          item:simpleItemMap.get(key)
+          item:
+            simpleItemMap.get(key) ||
+            simpleItemMap.get(managedKey)
         };
       }
 
-      if (recItemMap.has(key)) {
+      if (
+        recItemMap.has(key) ||
+        recItemMap.has(managedKey)
+      ) {
         return {
           managementType:"rec",
-          item:recItemMap.get(key)
+          item:
+            recItemMap.get(key) ||
+            recItemMap.get(managedKey)
         };
       }
 
