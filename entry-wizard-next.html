@@ -885,21 +885,99 @@
   background:#f5f6f8;
 }
 
-.scannerDiagnostic {
+.scannerQuantityInput {
   display:none;
-  margin-top:10px;
-  padding:10px;
-  border:1px solid #f0c36d;
-  border-radius:10px;
-  background:#fff8e6;
-  color:#6b4b00;
-  font-size:12px;
-  line-height:1.45;
-  white-space:pre-wrap;
-  overflow-wrap:anywhere;
+  margin:12px 0;
+  padding:14px;
+  border:2px solid #b8d6ff;
+  border-radius:12px;
+  background:var(--blue-pale);
 }
 
-.scannerDiagnostic.isVisible {
+.scannerQuantityInput.isVisible {
+  display:block;
+}
+
+.scannerQuantityName {
+  color:var(--ink);
+  font-size:18px;
+  font-weight:900;
+}
+
+.scannerQuantityInfo {
+  margin-top:4px;
+  color:var(--muted);
+  font-size:13px;
+  font-weight:700;
+  line-height:1.45;
+  white-space:pre-wrap;
+}
+
+.scannerQuantityField {
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:8px;
+  align-items:center;
+  margin-top:12px;
+}
+
+.scannerQuantityField input {
+  width:100%;
+  min-height:52px;
+  padding:8px 12px;
+  border:2px solid #99c5ff;
+  border-radius:10px;
+  background:#fff;
+  color:var(--ink);
+  font-size:22px;
+  font-weight:900;
+  text-align:center;
+}
+
+.scannerQuantityUnit {
+  min-width:38px;
+  font-size:16px;
+  font-weight:900;
+}
+
+.scannerQuantityActions {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-top:10px;
+}
+
+.scannerQuantityAddButton,
+.scannerQuantityCancelButton,
+.wizardSendButton {
+  min-height:50px;
+  border-radius:12px;
+  font-size:16px;
+  font-weight:900;
+}
+
+.scannerQuantityAddButton {
+  border:1px solid var(--blue);
+  background:var(--blue);
+  color:#fff;
+}
+
+.scannerQuantityCancelButton {
+  border:1px solid var(--line);
+  background:#fff;
+  color:var(--muted);
+}
+
+.wizardSendButton {
+  display:none;
+  width:100%;
+  margin-top:10px;
+  border:1px solid var(--green);
+  background:var(--green);
+  color:#fff;
+}
+
+.wizardSendButton.isVisible {
   display:block;
 }
   </style>
@@ -1283,6 +1361,55 @@
           <div id="scannerFrame" class="scannerFrame"></div>
         </div>
 
+        <div
+          id="scannerQuantityInput"
+          class="scannerQuantityInput"
+        >
+          <div
+            id="scannerQuantityName"
+            class="scannerQuantityName"
+          ></div>
+
+          <div
+            id="scannerQuantityInfo"
+            class="scannerQuantityInfo"
+          ></div>
+
+          <div class="scannerQuantityField">
+            <input
+              id="scannerQuantityValue"
+              type="number"
+              inputmode="numeric"
+              min="1"
+              step="1"
+              placeholder="数量"
+            >
+
+            <span
+              id="scannerQuantityUnit"
+              class="scannerQuantityUnit"
+            ></span>
+          </div>
+
+          <div class="scannerQuantityActions">
+            <button
+              id="cancelQuantityButton"
+              class="scannerQuantityCancelButton"
+              type="button"
+            >
+              取消
+            </button>
+
+            <button
+              id="addQuantityButton"
+              class="scannerQuantityAddButton"
+              type="button"
+            >
+              一覧へ追加
+            </button>
+          </div>
+        </div>
+
         <div id="scannerResult" class="scannerResult">
           <div class="scannerResultTitle">
             <span>読取済み</span>
@@ -1299,6 +1426,14 @@
           disabled
         >
           最後の読取を取り消す
+        </button>
+
+        <button
+          id="wizardSendBatchButton"
+          class="wizardSendButton"
+          type="button"
+        >
+          読取分をまとめて送信
         </button>
 
       </div>
@@ -1389,6 +1524,7 @@
     let scannerBusy = false;
     let scannedEntries = [];
     let scannerStatusTimer = null;
+    let pendingWizardQuantityRecord = null;
 
        const MODE_OPTIONS = [
       {
@@ -2259,6 +2395,8 @@ function changePreviousSettings() {
       );
 
       scannedEntries = [];
+      pendingWizardQuantityRecord = null;
+      hideWizardQuantityInput();
       renderScannerResults();
 
       window.dispatchEvent(
@@ -2559,10 +2697,18 @@ function changePreviousSettings() {
 
         number.innerText = String(index + 1);
         name.innerText = details.displayName;
+        const quantityText =
+          details.recordType === "quantity"
+            ? " ／ 数量：" +
+              details.quantity +
+              (details.unit || "")
+            : "";
+
         meta.innerText =
           details.qrText + " ／ " +
           details.managementLabel + " ／ " +
-          details.currentState;
+          details.currentState +
+          quantityText;
 
         body.appendChild(name);
         body.appendChild(meta);
@@ -2581,6 +2727,23 @@ function changePreviousSettings() {
 
       document.getElementById("cancelLastScanButton")
         .disabled = count === 0;
+
+      const sendButton =
+        document.getElementById(
+          "wizardSendBatchButton"
+        );
+
+      sendButton.classList.toggle(
+        "isVisible",
+        count > 0
+      );
+
+      sendButton.innerText =
+        WIZARD_REC_MODES.includes(
+          wizardState.mode
+        )
+          ? "REC読取分を送信"
+          : "読取分をまとめて送信";
     }
 
     function setTemporaryScannerStatus(message, duration) {
@@ -2620,6 +2783,166 @@ function changePreviousSettings() {
       setTimeout(function() {
         scannerBusy = false;
       }, 900);
+    }
+
+    function hideWizardQuantityInput() {
+      document.getElementById(
+        "scannerQuantityInput"
+      ).classList.remove("isVisible");
+
+      document.getElementById(
+        "scannerQuantityValue"
+      ).value = "";
+    }
+
+    function showWizardQuantityInput(record) {
+      pendingWizardQuantityRecord = record;
+
+      document.getElementById(
+        "scannerQuantityName"
+      ).innerText =
+        record.displayName || record.itemCode;
+
+      document.getElementById(
+        "scannerQuantityInfo"
+      ).innerText =
+        "品目コード：" + record.itemCode +
+        "\n区分：" + (record.category || "未設定");
+
+      document.getElementById(
+        "scannerQuantityUnit"
+      ).innerText = record.unit || "";
+
+      const area = document.getElementById(
+        "scannerQuantityInput"
+      );
+
+      area.classList.add("isVisible");
+
+      document.getElementById(
+        "scannerStatus"
+      ).innerText =
+        "数量を入力してください\n" +
+        (record.displayName || record.itemCode);
+
+      area.scrollIntoView({
+        behavior:"smooth",
+        block:"center"
+      });
+
+      setTimeout(function() {
+        document.getElementById(
+          "scannerQuantityValue"
+        ).focus();
+      }, 250);
+    }
+
+    function commitWizardScanRecord(record) {
+      const frame =
+        document.getElementById(
+          "scannerFrame"
+        );
+
+      frame.classList.add("isSuccess");
+
+      if (navigator.vibrate) {
+        navigator.vibrate(80);
+      }
+
+      scannedEntries.push(record);
+      renderScannerResults();
+
+      setTemporaryScannerStatus(
+        "読取成功 ✔\n" +
+        (
+          record.recordType === "quantity"
+            ? record.displayText
+            : record.displayName
+        ),
+        850
+      );
+
+      setTimeout(function() {
+        frame.classList.remove("isSuccess");
+        scannerBusy = false;
+      }, 650);
+    }
+
+    function addWizardQuantityItem() {
+      if (!pendingWizardQuantityRecord) return;
+
+      const quantity = Number(
+        document.getElementById(
+          "scannerQuantityValue"
+        ).value
+      );
+
+      if (
+        !Number.isInteger(quantity) ||
+        quantity <= 0
+      ) {
+        alert("数量を1以上の整数で入力してください");
+        return;
+      }
+
+      const record = pendingWizardQuantityRecord;
+      record.quantity = quantity;
+      record.displayText =
+        (record.displayName || record.itemCode) +
+        " × " +
+        quantity +
+        (record.unit || "");
+
+      pendingWizardQuantityRecord = null;
+      hideWizardQuantityInput();
+      commitWizardScanRecord(record);
+    }
+
+    function cancelWizardQuantityInput() {
+      pendingWizardQuantityRecord = null;
+      hideWizardQuantityInput();
+
+      setTemporaryScannerStatus(
+        "数量入力を取り消しました\nQRは再読取できます",
+        900
+      );
+
+      setTimeout(function() {
+        scannerBusy = false;
+      }, 500);
+    }
+
+    function previewWizardBatchSend() {
+      const records =
+        getWizardPreparedBatchRecords();
+
+      if (!records.length) {
+        alert("送信するQRがありません");
+        return;
+      }
+
+      const invalidQuantity = records.some(
+        function(record) {
+          return (
+            record.recordType === "quantity" &&
+            (
+              !Number.isInteger(record.quantity) ||
+              record.quantity <= 0
+            )
+          );
+        }
+      );
+
+      if (invalidQuantity) {
+        alert("数量が未入力の品目があります");
+        return;
+      }
+
+      alert(
+        "送信準備OK\n" +
+        records.length +
+        "件\n\nGAS送信は次の工程で接続します"
+      );
     }
 
     async function handleReadOnlyDecoded(text) {
@@ -2688,32 +3011,15 @@ function changePreviousSettings() {
         return;
       }
 
-      const frame =
-        document.getElementById(
-          "scannerFrame"
-        );
-
-      frame.classList.add("isSuccess");
-
-      if (navigator.vibrate) {
-        navigator.vibrate(80);
-      }
-
       const scanRecord =
         buildWizardScanRecord(details);
 
-      scannedEntries.push(scanRecord);
-      renderScannerResults();
+      if (scanRecord.recordType === "quantity") {
+        showWizardQuantityInput(scanRecord);
+        return;
+      }
 
-      setTemporaryScannerStatus(
-        "読取成功 ✔\n" + details.displayName,
-        850
-      );
-
-      setTimeout(function() {
-        frame.classList.remove("isSuccess");
-        scannerBusy = false;
-      }, 650);
+      commitWizardScanRecord(scanRecord);
     }
 
     async function applyReadOnlyCameraSettings() {
@@ -3718,6 +4024,8 @@ function changePreviousSettings() {
   stopReadOnlyScanner();
 
   scannedEntries = [];
+  pendingWizardQuantityRecord = null;
+  hideWizardQuantityInput();
   renderScannerResults();
 
   wizardState.receptionType = "";
@@ -3850,6 +4158,33 @@ document
   .addEventListener(
     "click",
     cancelLastScan
+  );
+
+document
+  .getElementById(
+    "addQuantityButton"
+  )
+  .addEventListener(
+    "click",
+    addWizardQuantityItem
+  );
+
+document
+  .getElementById(
+    "cancelQuantityButton"
+  )
+  .addEventListener(
+    "click",
+    cancelWizardQuantityInput
+  );
+
+document
+  .getElementById(
+    "wizardSendBatchButton"
+  )
+  .addEventListener(
+    "click",
+    previewWizardBatchSend
   );
 
 renderButtons();
