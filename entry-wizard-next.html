@@ -1065,6 +1065,12 @@
       padding:14px; margin:10px 0; border:2px solid var(--ink); border-radius:10px;
       background:#fff; text-align:center; font-size:22px; font-weight:700; word-break:break-word;
     }
+    .wizardRadioGrid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:12px 0; }
+    .wizardRadioGrid label {
+      display:flex; align-items:center; gap:8px; margin:0; padding:12px 8px;
+      border:1px solid var(--line); border-radius:10px; background:#fff;
+    }
+    .wizardRadioGrid input { width:24px; height:24px; flex:0 0 auto; }
   </style>
 </head>
 
@@ -1590,6 +1596,31 @@
 
   <!-- 送信後の写真・REC追記フロー -->
   <section id="wizardPostSendArea" class="wizardPostSendArea" hidden>
+    <div id="wizardIrregularArea" class="wizardPostCard" hidden>
+      <h3>イレギュラー受付内容</h3>
+      <div class="wizardRadioGrid">
+        <label><input type="radio" name="wizardIrregularNumberType" value="入力" checked>番号を入力する</label>
+        <label><input type="radio" name="wizardIrregularNumberType" value="番号不明">番号が読めない</label>
+      </div>
+      <label for="wizardIrregularNumber">管理番号または品目コード</label>
+      <input id="wizardIrregularNumber" type="text" autocomplete="off" placeholder="管理番号または品目コードを入力">
+      <div class="wizardRadioGrid">
+        <label><input type="radio" name="wizardIrregularSlipStatus" value="伝票あり" checked>伝票あり</label>
+        <label><input type="radio" name="wizardIrregularSlipStatus" value="伝票なし">伝票なし</label>
+      </div>
+      <div id="wizardIrregularSlipGuide" class="wizardPostSummary">1枚目に伝票写真を追加してください。</div>
+      <label for="wizardIrregularNote">状況・理由・機械の特徴</label>
+      <textarea id="wizardIrregularNote" placeholder="QR破損・汚れ・管理番号が読めない・機械の特徴などを必ず入力"></textarea>
+      <div id="wizardIrregularQuantityBox" hidden>
+        <label for="wizardIrregularQuantity">数量</label>
+        <input id="wizardIrregularQuantity" type="number" inputmode="numeric" min="1" step="1" placeholder="数量">
+        <div id="wizardIrregularQuantityUnit" class="wizardPostSummary"></div>
+      </div>
+      <div id="wizardIrregularCheckResult" class="wizardPostSummary"></div>
+      <button type="button" id="wizardConfirmIrregularButton">入力内容を確認して写真へ進む</button>
+      <button type="button" id="wizardCancelIrregularButton" class="secondaryButton">イレギュラー受付を取消</button>
+    </div>
+
     <div id="wizardRecMemoArea" class="wizardPostCard" hidden>
       <h3>REC追記</h3>
       <div id="wizardRecMemoTarget" class="wizardPostSummary"></div>
@@ -1684,6 +1715,8 @@
     let wizardCurrentSlipInfo = null;
     let wizardPendingPhotoSave = null;
     let wizardPostSendBusy = false;
+    let wizardIrregularRecord = null;
+    let wizardIrregularDetected = null;
 
     function stopAnimatedDots(elementId) {
       const timer = animatedDotsTimers.get(
@@ -2620,6 +2653,7 @@ function changePreviousSettings() {
         startReadOnlyScanner();
       } else {
         stopReadOnlyScanner();
+        openWizardIrregularArea();
       }
     }
 
@@ -3544,6 +3578,147 @@ function changePreviousSettings() {
       });
     }
 
+    function createWizardIrregularCaseId() {
+      return "IRR-" + new Date().toISOString()
+        .replace(/[-:.TZ]/g, "").slice(0, 14) + "-" +
+        String(Math.floor(Math.random() * 1000)).padStart(3, "0");
+    }
+
+    function openWizardIrregularArea() {
+      wizardIrregularRecord = null;
+      wizardIrregularDetected = null;
+      document.getElementById("wizardPostSendArea").hidden = false;
+      document.getElementById("wizardIrregularArea").hidden = false;
+      document.getElementById("wizardIrregularNumber").value = "";
+      document.getElementById("wizardIrregularNumber").disabled = false;
+      document.getElementById("wizardIrregularNote").value = "";
+      document.getElementById("wizardIrregularQuantity").value = "";
+      document.getElementById("wizardIrregularQuantityBox").hidden = true;
+      document.getElementById("wizardIrregularCheckResult").innerText = "";
+      document.querySelectorAll('input[name="wizardIrregularNumberType"]').forEach(function(radio) {
+        radio.checked = radio.value === "入力";
+      });
+      document.querySelectorAll('input[name="wizardIrregularSlipStatus"]').forEach(function(radio) {
+        radio.checked = radio.value === "伝票あり";
+      });
+      updateWizardIrregularSlipGuide();
+      scrollToWizardPostSend("wizardIrregularArea");
+      setTimeout(function() { document.getElementById("wizardIrregularNumber").focus(); }, 300);
+    }
+
+    function updateWizardIrregularNumberType() {
+      const selected = document.querySelector('input[name="wizardIrregularNumberType"]:checked');
+      const input = document.getElementById("wizardIrregularNumber");
+      const unknown = selected && selected.value === "番号不明";
+      input.disabled = Boolean(unknown);
+      input.value = unknown ? "" : input.value;
+      input.placeholder = unknown ? "番号不明として登録します" : "管理番号または品目コードを入力";
+      document.getElementById("wizardIrregularQuantityBox").hidden = true;
+      document.getElementById("wizardIrregularCheckResult").innerText = unknown
+        ? "番号不明は通常管理ログと在庫状態を更新しません。" : "";
+    }
+
+    function updateWizardIrregularSlipGuide() {
+      const selected = document.querySelector('input[name="wizardIrregularSlipStatus"]:checked');
+      const hasSlip = selected && selected.value === "伝票あり";
+      document.getElementById("wizardIrregularSlipGuide").innerText = hasSlip
+        ? "1枚目に伝票写真を追加してください。"
+        : "機械全体・管理番号・QRラベル・状態が分かる写真を追加してください。";
+    }
+
+    function buildWizardIrregularRecord() {
+      const numberTypeNode = document.querySelector('input[name="wizardIrregularNumberType"]:checked');
+      const slipNode = document.querySelector('input[name="wizardIrregularSlipStatus"]:checked');
+      const numberType = numberTypeNode ? numberTypeNode.value : "";
+      const slipStatus = slipNode ? slipNode.value : "";
+      const enteredNumber = document.getElementById("wizardIrregularNumber").value.trim();
+      const note = document.getElementById("wizardIrregularNote").value.trim();
+
+      if (!numberType || !slipStatus) throw new Error("番号の状態と伝票の有無を選択してください");
+      if (numberType === "入力" && !enteredNumber) throw new Error("管理番号または品目コードを入力してください");
+      if (!note) throw new Error("状況・理由・機械の特徴を入力してください");
+
+      const base = {
+        irregularCaseId:createWizardIrregularCaseId(),
+        qrText:numberType === "番号不明" ? "番号不明" : enteredNumber,
+        numberType:numberType,
+        mode:wizardState.mode,
+        user:wizardState.user,
+        location:wizardState.location,
+        recTarget:wizardState.recTarget || "",
+        recDate:wizardState.recDate || "",
+        irregularNote:note,
+        slipStatus:slipStatus,
+        readMethod:numberType === "番号不明"
+          ? "イレギュラーQR（番号不明）" : "イレギュラーQR（手入力）"
+      };
+
+      if (numberType === "番号不明") {
+        return Object.assign(base, {
+          managementType:"unknown", displayName:"番号不明", currentState:""
+        });
+      }
+
+      const managed = findManagedItemLocal(enteredNumber);
+      if (managed) {
+        const details = getScannerItemDetails(enteredNumber);
+        if (!details) throw new Error("管理番号の情報を取得できませんでした");
+        if (!isScannerModeAllowed(details.managementType, wizardState.mode)) {
+          throw new Error("この管理区分では「" + wizardState.modeLabel + "」を使用できません");
+        }
+        const knownState = details.currentState === "状態なし" ? "" : details.currentState;
+        if (wizardState.mode === "出庫" && knownState === "出庫中") {
+          throw new Error("この機械はすでに出庫中です。二重出庫の可能性があるため登録できません。");
+        }
+        if (wizardState.mode === "返却" && knownState && knownState !== "出庫中") {
+          throw new Error("この機械は出庫中ではないため返却登録できません。\n現在状態：" + knownState);
+        }
+        wizardIrregularDetected = details;
+        return Object.assign(base, {
+          managementType:details.managementType,
+          displayName:details.displayName,
+          currentState:details.currentState === "状態なし" ? "" : details.currentState
+        });
+      }
+
+      const quantity = findQuantityItemLocal(enteredNumber);
+      if (quantity) {
+        if (!isScannerModeAllowed("quantity", wizardState.mode)) {
+          throw new Error("数量管理品では「" + wizardState.modeLabel + "」を使用できません");
+        }
+        const displayName = getFirstItemValue(quantity, ["表示名", "品名", "商品名", "名称", "displayName", "name"]) || enteredNumber;
+        throw new Error(
+          "数量管理品「" + displayName + "」を確認しました。\n\n" +
+          "現行GASでは数量管理品のイレギュラー受付が未接続のため、登録を停止しました。"
+        );
+      }
+
+      throw new Error("入力した番号がマスタに登録されていません\n入力番号：" + enteredNumber);
+    }
+
+    function confirmWizardIrregularInput() {
+      try {
+        const record = buildWizardIrregularRecord();
+        wizardIrregularRecord = record;
+        document.getElementById("wizardIrregularCheckResult").innerText =
+          "受付内容\n" + record.displayName + "\n" + record.qrText +
+          " ／ " + (record.managementType === "unknown" ? "番号不明" : record.managementType) +
+          (record.quantity ? " ／ 数量：" + record.quantity + (record.unit || "") : "") +
+          "\n追記：" + record.irregularNote;
+        if (!confirm(
+          "イレギュラー受付内容を確認してください\n\n" +
+          "番号：" + record.qrText + "\n品名：" + record.displayName +
+          "\n作業区分：" + record.mode + "\n拠点：" + record.location +
+          "\n担当者：" + record.user + "\n伝票：" + record.slipStatus +
+          "\n追記：" + record.irregularNote + "\n\n写真登録へ進みます。"
+        )) return;
+        document.getElementById("wizardIrregularArea").hidden = true;
+        openWizardIrregularPhotoArea(record);
+      } catch (error) {
+        alert(error.message || String(error));
+      }
+    }
+
     function sanitizeWizardPhotoTitlePart(value) {
       return String(value || "").normalize("NFKC").trim()
         .replace(/[\\/:*?"<>|]/g, " ").replace(/\s+/g, " ");
@@ -3629,6 +3804,7 @@ function changePreviousSettings() {
     function openWizardPhotoArea(context) {
       wizardSelectedPhotos = [];
       wizardCurrentSlipInfo = null;
+      document.getElementById("wizardSkipPhotosButton").hidden = false;
       document.getElementById("wizardPhotoHeading").innerText =
         context.mode === "出庫" ? "出庫写真の添付" : "返却写真の添付";
       document.getElementById("wizardPhotoSummary").innerText =
@@ -3636,6 +3812,32 @@ function changePreviousSettings() {
       document.getElementById("wizardPhotoPreview").innerText =
         "写真はまだ選択されていません。最大6枚まで追加できます。";
       document.getElementById("wizardSavePhotosButton").hidden = true;
+      document.getElementById("wizardPhotoArea").hidden = false;
+      scrollToWizardPostSend("wizardPhotoArea");
+    }
+
+    function openWizardIrregularPhotoArea(record) {
+      wizardPostSendContext = {
+        isIrregular:true,
+        mode:record.mode,
+        records:[record],
+        entries:[],
+        logIds:[],
+        sendId:"",
+        sentAt:new Date().toISOString(),
+        irregularRecord:record
+      };
+      wizardSelectedPhotos = [];
+      wizardCurrentSlipInfo = null;
+      document.getElementById("wizardPhotoHeading").innerText = "イレギュラー受付写真";
+      document.getElementById("wizardPhotoSummary").innerText =
+        (record.slipStatus === "伝票あり"
+          ? "1枚目は伝票写真を選択してください。"
+          : "機械全体・管理番号・QRラベル・状態が分かる写真を選択してください。") +
+        "\n写真は1枚以上必須・最大6枚です。";
+      document.getElementById("wizardPhotoPreview").innerText = "写真はまだ選択されていません。";
+      document.getElementById("wizardSavePhotosButton").hidden = true;
+      document.getElementById("wizardSkipPhotosButton").hidden = true;
       document.getElementById("wizardPhotoArea").hidden = false;
       scrollToWizardPostSend("wizardPhotoArea");
     }
@@ -3763,9 +3965,9 @@ function changePreviousSettings() {
     function buildWizardPhotoInfo(context) {
       const first = context.records[0] || {};
       const confirmedTitle = wizardCurrentSlipInfo ? wizardCurrentSlipInfo.confirmedTitle : "";
-      return {
+      const info = {
         mode:context.mode,
-        ids:context.records.map(function(record) { return record.qr; }),
+        ids:context.records.map(function(record) { return record.qr || record.qrText; }),
         user:first.user || wizardState.user,
         location:first.location || wizardState.location,
         sendId:context.sendId,
@@ -3775,6 +3977,16 @@ function changePreviousSettings() {
         saveTitleCandidate:confirmedTitle,
         confirmedTitle:confirmedTitle
       };
+      if (context.isIrregular) {
+        info.photoType = "irregular";
+        info.irregularCaseId = context.irregularRecord.irregularCaseId;
+        info.irregularRecord = Object.assign({}, context.irregularRecord, {
+          photoCount:wizardSelectedPhotos.length
+        });
+        info.slipStatus = context.irregularRecord.slipStatus;
+        info.photoRequired = true;
+      }
+      return info;
     }
 
     async function saveWizardPhotoNow() {
@@ -3787,20 +3999,31 @@ function changePreviousSettings() {
         const pending = wizardPendingPhotoSave;
         const photoInfo = pending.photoInfo;
         const collage = await makeWizardPhotoCollage(pending.files, photoInfo);
-        const action = photoInfo.mode === "出庫" ? "saveShipmentPhoto" : "saveReturnPhoto";
+        const action = photoInfo.photoType === "irregular"
+          ? "saveIrregularRegistration"
+          : photoInfo.mode === "出庫" ? "saveShipmentPhoto" : "saveReturnPhoto";
+        const extraPayload = photoInfo.photoType === "irregular"
+          ? {record:photoInfo.irregularRecord, irregularCaseId:photoInfo.irregularCaseId}
+          : {};
         const response = await fetch(GAS_URL, {
           method:"POST", headers:{"Content-Type":"text/plain"},
           body:JSON.stringify({
             action:action, photoRequestId:pending.photoRequestId,
             photoBase64:collage, photoInfo:photoInfo,
             slipInfo:photoInfo.slipInfo, saveTitleCandidate:photoInfo.confirmedTitle,
-            confirmedTitle:photoInfo.confirmedTitle
+            confirmedTitle:photoInfo.confirmedTitle,
+            ...extraPayload
           })
         });
         const result = JSON.parse(await response.text());
         if (!result.ok) throw new Error(result.message || "写真を保存できませんでした");
-        alert(photoInfo.mode + "写真を保存しました");
-        await resumeWizardContinuousScan("写真保存完了 ✔\n続けてQRを読み取れます");
+        if (photoInfo.photoType === "irregular") {
+          alert("イレギュラー受付を保存しました");
+          await finishWizardIrregularFlow();
+        } else {
+          alert(photoInfo.mode + "写真を保存しました");
+          await resumeWizardContinuousScan("写真保存完了 ✔\n続けてQRを読み取れます");
+        }
       } catch (error) {
         alert("写真保存失敗\n" + (error.message || String(error)));
       } finally {
@@ -3815,20 +4038,39 @@ function changePreviousSettings() {
       wizardPostSendBusy = true;
       document.getElementById("wizardSavePhotosButton").disabled = true;
       try {
-        await analyzeWizardSlipPhoto(
-          wizardSelectedPhotos[0],
-          wizardPostSendContext.mode === "出庫" ? "shipment" : "return"
-        );
+        const isIrregular = Boolean(wizardPostSendContext.isIrregular);
+        const hasSlip = !isIrregular || wizardPostSendContext.irregularRecord.slipStatus === "伝票あり";
+        if (hasSlip) {
+          await analyzeWizardSlipPhoto(
+            wizardSelectedPhotos[0],
+            isIrregular ? "irregular" :
+              wizardPostSendContext.mode === "出庫" ? "shipment" : "return"
+          );
+        } else {
+          wizardCurrentSlipInfo = {
+            customerName:"", siteName:"", originalSiteName:"",
+            acquisitionMethod:"manual_no_slip", siteNameEdited:true,
+            confirmedTitle:"", acquiredAt:new Date().toISOString()
+          };
+        }
         const photoInfo = buildWizardPhotoInfo(wizardPostSendContext);
         wizardPendingPhotoSave = {
           files:wizardSelectedPhotos.slice(), photoInfo:photoInfo,
           photoRequestId:createWizardPhotoRequestId()
         };
-        if (!wizardCurrentSlipInfo) {
+        if (!wizardCurrentSlipInfo && !isIrregular) {
           /* AI失敗時はタイトル確認を飛ばし、従来タイトルで保存を継続する。 */
           wizardPostSendBusy = false;
           await saveWizardPhotoNow();
           return;
+        }
+        if (!wizardCurrentSlipInfo) {
+          wizardCurrentSlipInfo = {
+            customerName:"", siteName:"", originalSiteName:"",
+            acquisitionMethod:"manual_after_analysis_failure", siteNameEdited:true,
+            confirmedTitle:"", acquiredAt:new Date().toISOString()
+          };
+          wizardPendingPhotoSave.photoInfo.slipInfo = wizardCurrentSlipInfo;
         }
         document.getElementById("wizardPhotoCustomerName").value = wizardCurrentSlipInfo.customerName || "";
         document.getElementById("wizardPhotoSiteName").value = wizardCurrentSlipInfo.siteName || "";
@@ -3846,6 +4088,13 @@ function changePreviousSettings() {
       if (!wizardPendingPhotoSave) return;
       const customerName = sanitizeWizardPhotoTitlePart(document.getElementById("wizardPhotoCustomerName").value);
       const siteName = sanitizeWizardPhotoTitlePart(document.getElementById("wizardPhotoSiteName").value);
+      if (
+        wizardPendingPhotoSave.photoInfo.photoType === "irregular" &&
+        (!customerName || !siteName)
+      ) {
+        alert("イレギュラー受付は顧客名と現場名を入力してください");
+        return;
+      }
       wizardCurrentSlipInfo.customerName = customerName;
       wizardCurrentSlipInfo.siteName = siteName;
       wizardCurrentSlipInfo.siteNameEdited = true;
@@ -3856,6 +4105,21 @@ function changePreviousSettings() {
         confirmedTitle:wizardCurrentSlipInfo.confirmedTitle
       });
       await saveWizardPhotoNow();
+    }
+
+    async function finishWizardIrregularFlow() {
+      wizardIrregularRecord = null;
+      wizardIrregularDetected = null;
+      wizardPostSendContext = null;
+      wizardSelectedPhotos = [];
+      wizardCurrentSlipInfo = null;
+      wizardPendingPhotoSave = null;
+      document.getElementById("wizardPostSendArea").hidden = true;
+      document.getElementById("wizardIrregularArea").hidden = true;
+      document.getElementById("wizardPhotoArea").hidden = true;
+      document.getElementById("wizardPhotoTitleArea").hidden = true;
+      resetWizard();
+      void refreshInventoryInBackground();
     }
 
     async function saveWizardRecMemo() {
@@ -5311,6 +5575,18 @@ function changePreviousSettings() {
     function resetWizard() {
   stopReadOnlyScanner();
 
+  wizardIrregularRecord = null;
+  wizardIrregularDetected = null;
+  wizardPostSendContext = null;
+  wizardSelectedPhotos = [];
+  wizardCurrentSlipInfo = null;
+  wizardPendingPhotoSave = null;
+  document.getElementById("wizardPostSendArea").hidden = true;
+  document.getElementById("wizardIrregularArea").hidden = true;
+  document.getElementById("wizardRecMemoArea").hidden = true;
+  document.getElementById("wizardPhotoArea").hidden = true;
+  document.getElementById("wizardPhotoTitleArea").hidden = true;
+
   scannedEntries = [];
   pendingWizardQuantityRecord = null;
   hideWizardQuantityInput();
@@ -5515,6 +5791,18 @@ document.getElementById("wizardBackToPhotosButton").addEventListener("click", fu
 document.getElementById("wizardSaveRecMemoButton").addEventListener("click", saveWizardRecMemo);
 document.getElementById("wizardSkipRecMemoButton").addEventListener("click", function() {
   resumeWizardContinuousScan("REC追記なしで完了 ✔\n続けてQRを読み取れます");
+});
+document.querySelectorAll('input[name="wizardIrregularNumberType"]').forEach(function(radio) {
+  radio.addEventListener("change", updateWizardIrregularNumberType);
+});
+document.querySelectorAll('input[name="wizardIrregularSlipStatus"]').forEach(function(radio) {
+  radio.addEventListener("change", updateWizardIrregularSlipGuide);
+});
+document.getElementById("wizardConfirmIrregularButton").addEventListener("click", confirmWizardIrregularInput);
+document.getElementById("wizardCancelIrregularButton").addEventListener("click", function() {
+  if (confirm("イレギュラー受付を取り消して最初に戻りますか？")) {
+    finishWizardIrregularFlow();
+  }
 });
 
 renderButtons();
