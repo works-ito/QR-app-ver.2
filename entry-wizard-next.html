@@ -2691,17 +2691,10 @@ function changePreviousSettings() {
             typeLabels[
               managed.managementType
             ] || "管理品",
-          displayName:getFirstItemValue(
-            managed.item,
-            [
-              "機種表示",
-              "表示名",
-              "機種名",
-              "品名",
-              "商品名",
-              "displayName"
-            ]
-          ) || "名称なし",
+          displayName:getManagedDisplayName(
+            qrText,
+            managed.item
+          ),
           currentState:getFirstItemValue(
             managed.item,
             [
@@ -4741,6 +4734,65 @@ function changePreviousSettings() {
       }
 
       return null;
+    }
+
+    /*
+     * 状態データ側に名称がない場合だけ、
+     * 同じ管理IDの別データから表示名を補完する。
+     * 管理区分・状態・検索順には影響させない。
+     */
+    function getManagedDisplayName(
+      qrText,
+      primaryItem
+    ) {
+      const key =
+        normalizeLookupKey(qrText);
+
+      const managedKey =
+        normalizeManagedIdKey(qrText);
+
+      const candidates = [
+        primaryItem,
+        simpleItemMap.get(key),
+        simpleItemMap.get(managedKey),
+        individualItemMap.get(key),
+        individualItemMap.get(managedKey),
+        recItemMap.get(key),
+        recItemMap.get(managedKey),
+        managedMasterItemMap.get(key),
+        managedMasterItemMap.get(managedKey)
+      ];
+
+      const nameKeys = [
+        "機種表示",
+        "表示名",
+        "機種名",
+        "機械名",
+        "名称",
+        "品名",
+        "商品名",
+        "機種",
+        "displayName",
+        "name"
+      ];
+
+      for (
+        let index = 0;
+        index < candidates.length;
+        index++
+      ) {
+        const displayName =
+          getFirstItemValue(
+            candidates[index],
+            nameKeys
+          );
+
+        if (displayName) {
+          return displayName;
+        }
+      }
+
+      return String(qrText || "名称なし");
     }
 
     function findQuantityItemLocal(itemCode) {
