@@ -989,6 +989,28 @@
   display:block;
 }
 
+.wizardCancelSendButton {
+  display:none;
+  width:100%;
+  min-height:50px;
+  margin-top:10px;
+  border:2px solid var(--red);
+  border-radius:12px;
+  background:#fff;
+  color:var(--red);
+  font-size:16px;
+  font-weight:900;
+}
+
+.wizardCancelSendButton.isVisible {
+  display:block;
+}
+
+.wizardCancelSendButton:disabled,
+.wizardSendButton:disabled {
+  opacity:0.55;
+}
+
 .wizardSendStatus {
   display:none;
   margin-top:10px;
@@ -1493,6 +1515,14 @@
           aria-live="polite"
         ></div>
 
+        <button
+          id="wizardCancelSendButton"
+          class="wizardCancelSendButton"
+          type="button"
+        >
+          直前送信を取消（5分間有効）
+        </button>
+
       </div>
 
       <p
@@ -1569,11 +1599,13 @@
     let simpleItems = [];
     let recItems = [];
     let quantityItems = [];
+    let managedMasterItems = [];
 
     let individualItemMap = new Map();
     let simpleItemMap = new Map();
     let recItemMap = new Map();
     let quantityItemMap = new Map();
+    let managedMasterItemMap = new Map();
 
     let scannerCodeReader = null;
     let scannerStream = null;
@@ -1586,6 +1618,11 @@
     let resetAllArmTimer = null;
     let wizardSendBusy = false;
     let lastPendingSendId = "";
+    let lastSuccessfulSend = null;
+    let cancelSendExpiryTimer = null;
+    const LAST_SUCCESSFUL_SEND_STORAGE_KEY =
+      "qrInventoryWizardLastSuccessfulSendV1";
+    const CANCEL_SEND_VALID_MS = 5 * 60 * 1000;
     const animatedDotsTimers = new Map();
 
     function stopAnimatedDots(elementId) {
@@ -2609,6 +2646,7 @@ function changePreviousSettings() {
             managed.item,
             [
               "現在状態",
+              "最新状態",
               "状態",
               "作業区分",
               "status"
@@ -3128,6 +3166,226 @@ function changePreviousSettings() {
       return data;
     }
 
+    function getLocalManagedItem(qrText, managementType) {
+      const key = normalizeLookupKey(qrText);
+      const managedKey = normalizeManagedIdKey(qrText);
+      const map = managementType === "simple"
+        ? simpleItemMap
+        : managementType === "rec"
+          ? recItemMap
+          : individualItemMap;
+
+      return (
+        map.get(key) ||
+        map.get(managedKey) ||
+        managedMasterItemMap.get(key) ||
+        managedMasterItemMap.get(managedKey) ||
+        null
+      );
+    }
+
+    function getLocalItemState(item) {
+      return getFirstItemValue(item || {}, [
+        "現在状態", "最新状態", "状態", "作業区分", "status"
+      ]) || "";
+    }
+
+    function getLocalItemLocation(item) {
+      return getFirstItemValue(item || {}, [
+        "現在拠点", "拠点", "保管拠点", "location"
+      ]) || "";
+    }
+
+    function setFirstLocalValue(item, keys, value, fallbackKey) {
+      if (!item) return;
+      const existingKey = keys.find(function(key) {
+        return Object.prototype.hasOwnProperty.call(item, key);
+      });
+      item[existingKey || fallbackKey] = value;
+    }
+
+    function getNextLocalState(mode) {
+      const states = {
+        "出庫":"出庫中",
+        "返却":"未点検",
+        "修理中":"修理中",
+        "完成機":"完成機",
+        "校正中":"校正中",
+        "校正完了":"校正完了",
+        "交換完了":"交換完了"
+      };
+      return states[mode] || "";
+    }
+
+    function captureLocalState(record) {
+      if (!record || record.recordType === "quantity") return null;
+      const item = getLocalManagedItem(record.qr, record.managementType);
+      return {
+        qr:record.qr,
+        managementType:record.managementType,
+        previousState:getLocalItemState(item),
+        previousLocation:getLocalItemLocation(item),
+        mode:record.mode
+      };
+    }
+
+    function applySuccessfulLocalState(record) {
+      if (!record || record.recordType === "quantity") return;
+      const item = getLocalManagedItem(record.qr, record.managementType);
+      const nextState = getNextLocalState(record.mode);
+      if (nextState) {
+        setFirstLocalValue(
+          item,
+          ["現在状態", "最新状態", "状態", "作業区分", "status"],
+          nextState,
+          "現在状態"
+        );
+      }
+      if (record.mode === "拠点移動" && record.location) {
+        setFirstLocalValue(
+          item,
+          ["現在拠点", "拠点", "保管拠点", "location"],
+          record.location,
+          "現在拠点"
+        );
+      }
+    }
+
+    function restoreLocalState(snapshot) {
+      if (!snapshot) return;
+      const item = getLocalManagedItem(
+        snapshot.qr,
+        snapshot.managementType
+      );
+      setFirstLocalValue(
+        item,
+        ["現在状態", "最新状態", "状態", "作業区分", "status"],
+        snapshot.previousState || "",
+        "現在状態"
+      );
+      setFirstLocalValue(
+        item,
+        ["現在拠点", "拠点", "保管拠点", "location"],
+        snapshot.previousLocation || "",
+        "現在拠点"
+      );
+    }
+
+    function saveLastSuccessfulSend(transaction) {
+      lastSuccessfulSend = transaction;
+      localStorage.setItem(
+        LAST_SUCCESSFUL_SEND_STORAGE_KEY,
+        JSON.stringify(transaction)
+      );
+      renderCancelSendButton();
+    }
+
+    function clearLastSuccessfulSend() {
+      lastSuccessfulSend = null;
+      localStorage.removeItem(LAST_SUCCESSFUL_SEND_STORAGE_KEY);
+      renderCancelSendButton();
+    }
+
+    function renderCancelSendButton() {
+      const button = document.getElementById("wizardCancelSendButton");
+      if (!button) return;
+      if (cancelSendExpiryTimer) clearTimeout(cancelSendExpiryTimer);
+
+      const remaining = lastSuccessfulSend
+        ? Number(lastSuccessfulSend.expiresAt || 0) - Date.now()
+        : 0;
+      button.classList.toggle("isVisible", remaining > 0);
+      button.disabled = wizardSendBusy || !appInitialDataLoaded;
+
+      if (remaining > 0) {
+        cancelSendExpiryTimer = setTimeout(function() {
+          renderCancelSendButton();
+        }, Math.min(remaining + 50, 30000));
+      }
+    }
+
+    function restoreLastSuccessfulSend() {
+      try {
+        const value = JSON.parse(
+          localStorage.getItem(LAST_SUCCESSFUL_SEND_STORAGE_KEY) || "null"
+        );
+        if (value && Number(value.expiresAt || 0) > Date.now()) {
+          lastSuccessfulSend = value;
+        } else {
+          localStorage.removeItem(LAST_SUCCESSFUL_SEND_STORAGE_KEY);
+        }
+      } catch (error) {
+        localStorage.removeItem(LAST_SUCCESSFUL_SEND_STORAGE_KEY);
+      }
+      renderCancelSendButton();
+    }
+
+    async function refreshInventoryInBackground() {
+      try {
+        await loadAppInitialData(false);
+      } catch (error) {
+        console.warn("バックグラウンド状態更新失敗", error);
+      }
+    }
+
+    async function cancelLastSuccessfulSend() {
+      if (wizardSendBusy || !lastSuccessfulSend) return;
+      if (Date.now() >= Number(lastSuccessfulSend.expiresAt || 0)) {
+        clearLastSuccessfulSend();
+        alert("直前送信の取消可能時間（5分）を過ぎています");
+        return;
+      }
+      if (!confirm(
+        "直前に送信した" + lastSuccessfulSend.successCount +
+        "件を取り消します。よろしいですか？"
+      )) return;
+
+      wizardSendBusy = true;
+      scannerBusy = true;
+      renderCancelSendButton();
+      startAnimatedDots("wizardSendStatus", "取消中");
+      document.getElementById("wizardSendStatus").className =
+        "wizardSendStatus isVisible isSending";
+
+      try {
+        const response = await fetch(GAS_URL, {
+          method:"POST",
+          headers:{"Content-Type":"text/plain"},
+          body:JSON.stringify({
+            action:"cancelSend",
+            sendId:lastSuccessfulSend.sendId,
+            sentAt:lastSuccessfulSend.sentAt
+          })
+        });
+        const result = JSON.parse(await response.text());
+        if (!result.ok) throw new Error(result.error || result.message || "取消失敗");
+
+        (lastSuccessfulSend.snapshots || []).forEach(restoreLocalState);
+        await saveInventoryCache();
+        setWizardSendStatus(
+          "直前送信を取消しました ✔\n" +
+          result.cancelCount + "件\n送信ID：" + result.sendId,
+          "isSuccess"
+        );
+        clearLastSuccessfulSend();
+        setTemporaryScannerStatus(
+          "取消完了 ✔\n同じQRを再読取できます",
+          1400
+        );
+        void refreshInventoryInBackground();
+      } catch (error) {
+        setWizardSendStatus(
+          "取消失敗\n" + (error.message || String(error)),
+          "isError"
+        );
+      } finally {
+        stopAnimatedDots("wizardSendStatus");
+        wizardSendBusy = false;
+        scannerBusy = false;
+        renderCancelSendButton();
+      }
+    }
+
     function sendBatchRecords(records) {
       const batchId = createBatchId();
       lastPendingSendId = batchId;
@@ -3150,6 +3408,8 @@ function changePreviousSettings() {
           action:"batchWrite",
           batchId:batchId,
           sendId:batchId,
+          initialDataVersion:"status-light-v2",
+          stateValidationVersion:"known-state-v2",
           records:recordsWithIds
         })
       }).then(async function(response) {
@@ -3264,6 +3524,9 @@ function changePreviousSettings() {
       startWizardSendLoading();
 
       try {
+        const sentAt = new Date().toISOString();
+        const sourceEntries = scannedEntries.slice();
+        const snapshots = sourceEntries.map(captureLocalState);
         const sendRecords = records.map(
           buildBatchRecordData
         );
@@ -3283,6 +3546,39 @@ function changePreviousSettings() {
         const failedCount = Number(
           result.failedCount || failures.length || 0
         );
+
+        const resultItems = Array.isArray(result.results)
+          ? result.results
+          : [];
+        const successfulIndexes = resultItems
+          .filter(function(item) { return item.ok; })
+          .map(function(item) { return Number(item.index); });
+        const successfulSet = new Set(successfulIndexes);
+
+        successfulIndexes.forEach(function(index) {
+          applySuccessfulLocalState(sendRecords[index]);
+        });
+
+        if (successfulIndexes.length > 0) {
+          await saveInventoryCache();
+          saveLastSuccessfulSend({
+            sendId:result.sendId || lastPendingSendId,
+            sentAt:sentAt,
+            expiresAt:Date.now() + CANCEL_SEND_VALID_MS,
+            successCount:successfulIndexes.length,
+            logIds:resultItems
+              .filter(function(item) { return item.ok && item.logId; })
+              .map(function(item) { return item.logId; }),
+            snapshots:successfulIndexes
+              .map(function(index) { return snapshots[index]; })
+              .filter(Boolean)
+          });
+        }
+
+        scannedEntries = sourceEntries.filter(function(entry, index) {
+          return !successfulSet.has(index);
+        });
+        renderScannerResults();
 
         if (!result.ok || failedCount > 0) {
           const failureText = failures.map(
@@ -3305,6 +3601,7 @@ function changePreviousSettings() {
           );
 
           scannerBusy = false;
+          void refreshInventoryInBackground();
           return;
         }
 
@@ -3316,15 +3613,13 @@ function changePreviousSettings() {
           "isSuccess"
         );
 
-        scannedEntries = [];
-        renderScannerResults();
-
         setTemporaryScannerStatus(
           "送信完了 ✔\n続けてQRを読み取れます",
           1400
         );
 
         scannerBusy = false;
+        void refreshInventoryInBackground();
       } catch (error) {
         const sendId =
           error.sendId ||
@@ -3938,6 +4233,11 @@ function changePreviousSettings() {
           "コード"
         ]
       );
+
+      managedMasterItemMap =
+        createManagedItemMap(
+          managedMasterItems
+        );
     }
 
     function findManagedItemLocal(qrText) {
@@ -3948,18 +4248,6 @@ function changePreviousSettings() {
         normalizeManagedIdKey(qrText);
 
       if (!key) return null;
-
-      if (
-        individualItemMap.has(key) ||
-        individualItemMap.has(managedKey)
-      ) {
-        return {
-          managementType:"individual",
-          item:
-            individualItemMap.get(key) ||
-            individualItemMap.get(managedKey)
-        };
-      }
 
       if (
         simpleItemMap.has(key) ||
@@ -3974,6 +4262,18 @@ function changePreviousSettings() {
       }
 
       if (
+        individualItemMap.has(key) ||
+        individualItemMap.has(managedKey)
+      ) {
+        return {
+          managementType:"individual",
+          item:
+            individualItemMap.get(key) ||
+            individualItemMap.get(managedKey)
+        };
+      }
+
+      if (
         recItemMap.has(key) ||
         recItemMap.has(managedKey)
       ) {
@@ -3982,6 +4282,26 @@ function changePreviousSettings() {
           item:
             recItemMap.get(key) ||
             recItemMap.get(managedKey)
+        };
+      }
+
+      if (
+        managedMasterItemMap.has(key) ||
+        managedMasterItemMap.has(managedKey)
+      ) {
+        const item =
+          managedMasterItemMap.get(key) ||
+          managedMasterItemMap.get(managedKey);
+        const managementCategory = String(
+          getFirstItemValue(item, ["管理区分", "managementType"]) || ""
+        ).trim();
+
+        return {
+          managementType:
+            managementCategory === "数量"
+              ? "simple"
+              : "individual",
+          item:item
         };
       }
 
@@ -4043,7 +4363,8 @@ function changePreviousSettings() {
         individualItems:individualItems,
         simpleItems:simpleItems,
         recItems:recItems,
-        quantityItems:quantityItems
+        quantityItems:quantityItems,
+        managedMasterItems:managedMasterItems
       };
 
       return new Promise(
@@ -4127,8 +4448,13 @@ function changePreviousSettings() {
           cache.quantityItems
         ) ? cache.quantityItems : [];
 
+        managedMasterItems = Array.isArray(
+          cache.managedMasterItems
+        ) ? cache.managedMasterItems : [];
+
         buildAppInitialDataMaps();
         appInitialDataLoaded = true;
+        renderCancelSendButton();
 
         return cache;
 
@@ -4178,7 +4504,8 @@ function changePreviousSettings() {
               },
               cache:"no-store",
               body:JSON.stringify({
-                action:"getAppInitialData"
+                action:"getAppInitialData",
+                initialDataVersion:"status-light-v2"
               })
             }
           );
@@ -4231,8 +4558,13 @@ function changePreviousSettings() {
           result.quantityItems
         ) ? result.quantityItems : [];
 
+        managedMasterItems = Array.isArray(
+          result.managedMasterItems
+        ) ? result.managedMasterItems : [];
+
         buildAppInitialDataMaps();
         appInitialDataLoaded = true;
+        renderCancelSendButton();
 
         const cache =
           await saveInventoryCache();
@@ -4250,6 +4582,8 @@ function changePreviousSettings() {
             recItems.length +
             "／数量 " +
             quantityItems.length +
+            "／索引 " +
+            managedMasterItems.length +
             "）",
           "isReady"
         );
@@ -4663,8 +4997,13 @@ document
     sendWizardBatch
   );
 
+document
+  .getElementById("wizardCancelSendButton")
+  .addEventListener("click", cancelLastSuccessfulSend);
+
 renderButtons();
 resetWizard();
+restoreLastSuccessfulSend();
 initializeInventoryDataFoundation();
     
   </script>
