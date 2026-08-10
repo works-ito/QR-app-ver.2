@@ -1045,6 +1045,26 @@
   background:#fff1f1;
   color:#b42318;
 }
+    .wizardPostSendArea { margin-top:18px; }
+    .wizardPostCard {
+      padding:16px; border:2px solid var(--blue); border-radius:14px;
+      background:var(--surface); box-shadow:var(--shadow);
+    }
+    .wizardPostCard h3 { margin:0 0 12px; font-size:23px; }
+    .wizardPostCard p, .wizardPostCard label { font-size:16px; line-height:1.55; }
+    .wizardPostCard label { display:block; margin:10px 0 5px; font-weight:700; }
+    .wizardPostCard textarea, .wizardPostCard input[type="text"] {
+      width:100%; padding:12px; margin-bottom:10px; border:1px solid var(--line);
+      border-radius:10px; font-size:20px; background:#fff;
+    }
+    .wizardPostCard textarea { min-height:110px; resize:vertical; }
+    .wizardPostCard button { width:100%; margin-top:9px; min-height:54px; }
+    .wizardPostCard .secondaryButton { background:#fff; color:var(--ink); border:1px solid var(--line); }
+    .wizardPostSummary { margin:10px 0; white-space:pre-wrap; line-height:1.5; color:var(--muted); }
+    .wizardTitleCandidate {
+      padding:14px; margin:10px 0; border:2px solid var(--ink); border-radius:10px;
+      background:#fff; text-align:center; font-size:22px; font-weight:700; word-break:break-word;
+    }
   </style>
 </head>
 
@@ -1568,7 +1588,42 @@
     <input id="recDate" type="date" aria-hidden="true">
   </div>
 
-  <!-- 現行のカメラ・送信・写真画面を段階的に移植する領域 -->
+  <!-- 送信後の写真・REC追記フロー -->
+  <section id="wizardPostSendArea" class="wizardPostSendArea" hidden>
+    <div id="wizardRecMemoArea" class="wizardPostCard" hidden>
+      <h3>REC追記</h3>
+      <div id="wizardRecMemoTarget" class="wizardPostSummary"></div>
+      <textarea id="wizardRecMemoText" placeholder="発送日・発送先・証明書待ち等"></textarea>
+      <button type="button" id="wizardSaveRecMemoButton">追記を保存</button>
+      <button type="button" id="wizardSkipRecMemoButton" class="secondaryButton">追記なしで完了</button>
+    </div>
+
+    <div id="wizardPhotoArea" class="wizardPostCard" hidden>
+      <h3 id="wizardPhotoHeading">写真の添付</h3>
+      <p>1枚目は伝票写真を選択してください。顧客名・現場名の自動取得に使用します。</p>
+      <div id="wizardPhotoSummary" class="wizardPostSummary"></div>
+      <input id="wizardPhotoCameraInput" type="file" accept="image/*" capture="environment" hidden>
+      <input id="wizardPhotoLibraryInput" type="file" accept="image/*" multiple hidden>
+      <button type="button" id="wizardPhotoCameraButton">カメラで撮影</button>
+      <button type="button" id="wizardPhotoLibraryButton">ライブラリから選ぶ</button>
+      <button type="button" id="wizardClearPhotosButton" class="secondaryButton">選択写真をクリア</button>
+      <div id="wizardPhotoPreview" class="wizardPostSummary">写真はまだ選択されていません。</div>
+      <button type="button" id="wizardSavePhotosButton" hidden>写真を保存</button>
+      <button type="button" id="wizardSkipPhotosButton" class="secondaryButton">写真なしで完了</button>
+    </div>
+
+    <div id="wizardPhotoTitleArea" class="wizardPostCard" hidden>
+      <h3>保存タイトルを確認してください</h3>
+      <div id="wizardPhotoTitleCandidate" class="wizardTitleCandidate">タイトル未取得</div>
+      <label for="wizardPhotoCustomerName">顧客名</label>
+      <input id="wizardPhotoCustomerName" type="text" autocomplete="off" placeholder="顧客名">
+      <label for="wizardPhotoSiteName">現場名</label>
+      <input id="wizardPhotoSiteName" type="text" autocomplete="off" placeholder="現場名">
+      <button type="button" id="wizardConfirmPhotoTitleButton">このタイトルで保存</button>
+      <button type="button" id="wizardBackToPhotosButton" class="secondaryButton">写真選択画面へ戻る</button>
+    </div>
+  </section>
+
   <div id="inventoryRuntime" hidden></div>
 
   <script>
@@ -1624,6 +1679,11 @@
       "qrInventoryWizardLastSuccessfulSendV1";
     const CANCEL_SEND_VALID_MS = 5 * 60 * 1000;
     const animatedDotsTimers = new Map();
+    let wizardPostSendContext = null;
+    let wizardSelectedPhotos = [];
+    let wizardCurrentSlipInfo = null;
+    let wizardPendingPhotoSave = null;
+    let wizardPostSendBusy = false;
 
     function stopAnimatedDots(elementId) {
       const timer = animatedDotsTimers.get(
@@ -3367,6 +3427,20 @@ function changePreviousSettings() {
           result.cancelCount + "件\n送信ID：" + result.sendId,
           "isSuccess"
         );
+        if (
+          wizardPostSendContext &&
+          String(wizardPostSendContext.sendId || "") ===
+            String(lastSuccessfulSend.sendId || "")
+        ) {
+          wizardPostSendContext = null;
+          wizardSelectedPhotos = [];
+          wizardCurrentSlipInfo = null;
+          wizardPendingPhotoSave = null;
+          document.getElementById("wizardPostSendArea").hidden = true;
+          document.getElementById("wizardRecMemoArea").hidden = true;
+          document.getElementById("wizardPhotoArea").hidden = true;
+          document.getElementById("wizardPhotoTitleArea").hidden = true;
+        }
         clearLastSuccessfulSend();
         setTemporaryScannerStatus(
           "取消完了 ✔\n同じQRを再読取できます",
@@ -3477,6 +3551,357 @@ function changePreviousSettings() {
       });
     }
 
+    function sanitizeWizardPhotoTitlePart(value) {
+      return String(value || "").normalize("NFKC").trim()
+        .replace(/[\\/:*?"<>|]/g, " ").replace(/\s+/g, " ");
+    }
+
+    function buildWizardPhotoTitle(customerName, siteName) {
+      return [customerName, siteName]
+        .map(sanitizeWizardPhotoTitlePart).filter(Boolean).join("_");
+    }
+
+    function createWizardPhotoRequestId() {
+      return "PHOTO-" + (
+        window.crypto && typeof window.crypto.randomUUID === "function"
+          ? window.crypto.randomUUID()
+          : Date.now() + "-" + Math.random().toString(36).slice(2, 10)
+      );
+    }
+
+    function scrollToWizardPostSend(elementId) {
+      setTimeout(function() {
+        const element = document.getElementById(elementId);
+        if (element) element.scrollIntoView({behavior:"smooth", block:"start"});
+      }, 120);
+    }
+
+    async function resumeWizardContinuousScan(message) {
+      wizardPostSendContext = null;
+      wizardSelectedPhotos = [];
+      wizardCurrentSlipInfo = null;
+      wizardPendingPhotoSave = null;
+      document.getElementById("wizardPostSendArea").hidden = true;
+      document.getElementById("wizardRecMemoArea").hidden = true;
+      document.getElementById("wizardPhotoArea").hidden = true;
+      document.getElementById("wizardPhotoTitleArea").hidden = true;
+      scannerBusy = false;
+      setTemporaryScannerStatus(message || "完了 ✔\n続けてQRを読み取れます", 1400);
+      if (!scannerRunning) await startReadOnlyScanner();
+    }
+
+    function successfulWizardSendContext(sourceEntries, sendRecords, result, indexes) {
+      const resultItems = Array.isArray(result.results) ? result.results : [];
+      return {
+        mode:wizardState.mode,
+        modeLabel:wizardState.modeLabel,
+        sendId:String(result.sendId || lastPendingSendId || ""),
+        sentAt:new Date().toISOString(),
+        entries:indexes.map(function(index) { return sourceEntries[index]; }).filter(Boolean),
+        records:indexes.map(function(index) { return sendRecords[index]; }).filter(Boolean),
+        logIds:indexes.map(function(index) {
+          const item = resultItems.find(function(row) { return Number(row.index) === index; });
+          return item && item.logId ? item.logId : "";
+        }).filter(Boolean)
+      };
+    }
+
+    async function beginWizardPostSendFlow(context) {
+      if (!context || !context.records.length) return;
+      wizardPostSendContext = context;
+      await stopReadOnlyScanner();
+      scannerBusy = true;
+      document.getElementById("wizardPostSendArea").hidden = false;
+
+      if (["校正中", "校正完了", "交換完了"].includes(context.mode)) {
+        const names = context.entries.map(function(entry) {
+          return entry.displayText || entry.displayName || entry.qrText;
+        }).join("\n");
+        document.getElementById("wizardRecMemoTarget").innerText =
+          "送信済：" + context.records.length + "件\n" + names;
+        document.getElementById("wizardRecMemoText").value = "";
+        document.getElementById("wizardRecMemoArea").hidden = false;
+        scrollToWizardPostSend("wizardRecMemoArea");
+        return;
+      }
+
+      if (context.mode === "出庫" || context.mode === "返却") {
+        openWizardPhotoArea(context);
+        return;
+      }
+
+      await resumeWizardContinuousScan();
+    }
+
+    function openWizardPhotoArea(context) {
+      wizardSelectedPhotos = [];
+      wizardCurrentSlipInfo = null;
+      document.getElementById("wizardPhotoHeading").innerText =
+        context.mode === "出庫" ? "出庫写真の添付" : "返却写真の添付";
+      document.getElementById("wizardPhotoSummary").innerText =
+        context.mode + "送信完了：" + context.records.length + "件\n送信ID：" + context.sendId;
+      document.getElementById("wizardPhotoPreview").innerText =
+        "写真はまだ選択されていません。最大6枚まで追加できます。";
+      document.getElementById("wizardSavePhotosButton").hidden = true;
+      document.getElementById("wizardPhotoArea").hidden = false;
+      scrollToWizardPostSend("wizardPhotoArea");
+    }
+
+    function addWizardPhotos(fileList) {
+      const files = Array.from(fileList || []);
+      if (!files.length) return;
+      if (wizardSelectedPhotos.length + files.length > 6) {
+        alert("写真は最大6枚までです\n現在：" + wizardSelectedPhotos.length + "枚");
+        return;
+      }
+      wizardSelectedPhotos.push.apply(wizardSelectedPhotos, files);
+      document.getElementById("wizardPhotoPreview").innerText =
+        wizardSelectedPhotos.length + "枚追加済み\n最大6枚まで。1枚のコラージュ画像にして保存します。";
+      document.getElementById("wizardSavePhotosButton").hidden = false;
+    }
+
+    function clearWizardPhotos() {
+      wizardSelectedPhotos = [];
+      document.getElementById("wizardPhotoCameraInput").value = "";
+      document.getElementById("wizardPhotoLibraryInput").value = "";
+      document.getElementById("wizardPhotoPreview").innerText = "写真はまだ選択されていません。";
+      document.getElementById("wizardSavePhotosButton").hidden = true;
+    }
+
+    function loadWizardPhotoImage(file) {
+      return new Promise(function(resolve, reject) {
+        const reader = new FileReader();
+        reader.onerror = reject;
+        reader.onload = function(event) {
+          const image = new Image();
+          image.onerror = reject;
+          image.onload = function() { resolve(image); };
+          image.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function makeWizardSlipAnalysisImage(file) {
+      const image = await loadWizardPhotoImage(file);
+      const width = image.naturalWidth || image.width;
+      const height = image.naturalHeight || image.height;
+      const scale = Math.min(1, 1600 / Math.max(width, height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(width * scale));
+      canvas.height = Math.max(1, Math.round(height * scale));
+      const context = canvas.getContext("2d");
+      context.fillStyle = "#fff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL("image/jpeg", 0.85);
+    }
+
+    async function analyzeWizardSlipPhoto(file, photoType) {
+      startAnimatedDots("wizardPhotoPreview", "伝票情報を確認しています");
+      try {
+        const photoBase64 = await makeWizardSlipAnalysisImage(file);
+        const response = await fetch(GAS_URL, {
+          method:"POST", headers:{"Content-Type":"text/plain"},
+          body:JSON.stringify({
+            action:"analyzeSlipPhoto", photoBase64:photoBase64,
+            photoType:photoType, requestedFields:["customerName", "siteName"]
+          })
+        });
+        const result = JSON.parse(await response.text());
+        if (!result.ok) throw new Error(result.message || "伝票情報を取得できませんでした");
+        const customerName = sanitizeWizardPhotoTitlePart(result.customerName);
+        const siteName = sanitizeWizardPhotoTitlePart(result.siteName);
+        if (!customerName && !siteName) throw new Error("顧客名・現場名を判定できませんでした");
+        wizardCurrentSlipInfo = {
+          customerName:customerName, siteName:siteName, originalSiteName:siteName,
+          acquisitionMethod:result.acquisitionMethod || "ai_ocr", siteNameEdited:false,
+          confirmedTitle:buildWizardPhotoTitle(customerName, siteName),
+          acquiredAt:new Date().toISOString()
+        };
+        return wizardCurrentSlipInfo;
+      } catch (error) {
+        console.warn("伝票情報取得失敗", error);
+        alert("伝票情報の解析に失敗しました\n\n" + (error.message || String(error)) +
+          "\n\n写真保存はこのまま続行できます。");
+        wizardCurrentSlipInfo = null;
+        return null;
+      } finally {
+        stopAnimatedDots("wizardPhotoPreview");
+      }
+    }
+
+    function drawWizardImageCover(context, image, x, y, width, height) {
+      const scale = Math.max(width / image.width, height / image.height);
+      const drawWidth = image.width * scale;
+      const drawHeight = image.height * scale;
+      context.drawImage(image, x + (width - drawWidth) / 2, y + (height - drawHeight) / 2, drawWidth, drawHeight);
+    }
+
+    async function makeWizardPhotoCollage(files, info) {
+      const images = [];
+      for (const file of files) images.push(await loadWizardPhotoImage(file));
+      const cellWidth = 800, cellHeight = 600, headerHeight = 150;
+      const canvas = document.createElement("canvas");
+      canvas.width = cellWidth * 3;
+      canvas.height = cellHeight * 2 + headerHeight;
+      const context = canvas.getContext("2d");
+      context.fillStyle = "#fff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = "#000";
+      context.font = "28px sans-serif";
+      context.fillText(info.mode + "写真", 16, 36);
+      context.font = "20px sans-serif";
+      context.fillText("日時：" + new Date().toLocaleString("ja-JP"), 16, 72);
+      context.fillText("担当：" + (info.user || "") + "　拠点：" + (info.location || ""), 16, 106);
+      context.fillText("送信ID：" + (info.sendId || ""), 580, 72);
+      context.fillText("QR：" + (info.ids || []).join(" ").slice(0, 120), 580, 106);
+      images.forEach(function(image, index) {
+        const x = (index % 3) * cellWidth;
+        const y = Math.floor(index / 3) * cellHeight + headerHeight;
+        context.save();
+        context.beginPath(); context.rect(x, y, cellWidth, cellHeight); context.clip();
+        drawWizardImageCover(context, image, x, y, cellWidth, cellHeight);
+        context.restore();
+      });
+      return canvas.toDataURL("image/jpeg", 0.85);
+    }
+
+    function buildWizardPhotoInfo(context) {
+      const first = context.records[0] || {};
+      const confirmedTitle = wizardCurrentSlipInfo ? wizardCurrentSlipInfo.confirmedTitle : "";
+      return {
+        mode:context.mode,
+        ids:context.records.map(function(record) { return record.qr; }),
+        user:first.user || wizardState.user,
+        location:first.location || wizardState.location,
+        sendId:context.sendId,
+        logIds:context.logIds.slice(),
+        createdAt:context.sentAt,
+        slipInfo:wizardCurrentSlipInfo,
+        saveTitleCandidate:confirmedTitle,
+        confirmedTitle:confirmedTitle
+      };
+    }
+
+    async function saveWizardPhotoNow() {
+      if (wizardPostSendBusy || !wizardPendingPhotoSave) return;
+      wizardPostSendBusy = true;
+      const button = document.getElementById("wizardConfirmPhotoTitleButton");
+      button.disabled = true;
+      startAnimatedDots("wizardPhotoTitleCandidate", "写真を保存中");
+      try {
+        const pending = wizardPendingPhotoSave;
+        const photoInfo = pending.photoInfo;
+        const collage = await makeWizardPhotoCollage(pending.files, photoInfo);
+        const action = photoInfo.mode === "出庫" ? "saveShipmentPhoto" : "saveReturnPhoto";
+        const response = await fetch(GAS_URL, {
+          method:"POST", headers:{"Content-Type":"text/plain"},
+          body:JSON.stringify({
+            action:action, photoRequestId:pending.photoRequestId,
+            photoBase64:collage, photoInfo:photoInfo,
+            slipInfo:photoInfo.slipInfo, saveTitleCandidate:photoInfo.confirmedTitle,
+            confirmedTitle:photoInfo.confirmedTitle
+          })
+        });
+        const result = JSON.parse(await response.text());
+        if (!result.ok) throw new Error(result.message || "写真を保存できませんでした");
+        alert(photoInfo.mode + "写真を保存しました");
+        await resumeWizardContinuousScan("写真保存完了 ✔\n続けてQRを読み取れます");
+      } catch (error) {
+        alert("写真保存失敗\n" + (error.message || String(error)));
+      } finally {
+        stopAnimatedDots("wizardPhotoTitleCandidate");
+        wizardPostSendBusy = false;
+        button.disabled = false;
+      }
+    }
+
+    async function prepareWizardPhotoSave() {
+      if (!wizardPostSendContext || !wizardSelectedPhotos.length || wizardPostSendBusy) return;
+      wizardPostSendBusy = true;
+      document.getElementById("wizardSavePhotosButton").disabled = true;
+      try {
+        await analyzeWizardSlipPhoto(
+          wizardSelectedPhotos[0],
+          wizardPostSendContext.mode === "出庫" ? "shipment" : "return"
+        );
+        const photoInfo = buildWizardPhotoInfo(wizardPostSendContext);
+        wizardPendingPhotoSave = {
+          files:wizardSelectedPhotos.slice(), photoInfo:photoInfo,
+          photoRequestId:createWizardPhotoRequestId()
+        };
+        if (!wizardCurrentSlipInfo) {
+          /* AI失敗時はタイトル確認を飛ばし、従来タイトルで保存を継続する。 */
+          wizardPostSendBusy = false;
+          await saveWizardPhotoNow();
+          return;
+        }
+        document.getElementById("wizardPhotoCustomerName").value = wizardCurrentSlipInfo.customerName || "";
+        document.getElementById("wizardPhotoSiteName").value = wizardCurrentSlipInfo.siteName || "";
+        document.getElementById("wizardPhotoTitleCandidate").innerText = wizardCurrentSlipInfo.confirmedTitle;
+        document.getElementById("wizardPhotoArea").hidden = true;
+        document.getElementById("wizardPhotoTitleArea").hidden = false;
+        scrollToWizardPostSend("wizardPhotoTitleArea");
+      } finally {
+        wizardPostSendBusy = false;
+        document.getElementById("wizardSavePhotosButton").disabled = false;
+      }
+    }
+
+    async function confirmWizardPhotoTitle() {
+      if (!wizardPendingPhotoSave) return;
+      const customerName = sanitizeWizardPhotoTitlePart(document.getElementById("wizardPhotoCustomerName").value);
+      const siteName = sanitizeWizardPhotoTitlePart(document.getElementById("wizardPhotoSiteName").value);
+      wizardCurrentSlipInfo.customerName = customerName;
+      wizardCurrentSlipInfo.siteName = siteName;
+      wizardCurrentSlipInfo.siteNameEdited = true;
+      wizardCurrentSlipInfo.confirmedTitle = buildWizardPhotoTitle(customerName, siteName);
+      Object.assign(wizardPendingPhotoSave.photoInfo, {
+        slipInfo:wizardCurrentSlipInfo,
+        saveTitleCandidate:wizardCurrentSlipInfo.confirmedTitle,
+        confirmedTitle:wizardCurrentSlipInfo.confirmedTitle
+      });
+      await saveWizardPhotoNow();
+    }
+
+    async function saveWizardRecMemo() {
+      if (!wizardPostSendContext || wizardPostSendBusy) return;
+      const memo = document.getElementById("wizardRecMemoText").value.trim();
+      if (!memo) { alert("追記内容を入力してください"); return; }
+      wizardPostSendBusy = true;
+      const button = document.getElementById("wizardSaveRecMemoButton");
+      button.disabled = true;
+      startAnimatedDots("wizardRecMemoTarget", "追記保存中");
+      try {
+        const context = wizardPostSendContext;
+        const results = await Promise.all(context.records.map(async function(record, index) {
+          const entry = context.entries[index] || {};
+          const response = await fetch(GAS_URL, {
+            method:"POST", headers:{"Content-Type":"text/plain"},
+            body:JSON.stringify({
+              action:"addMemo", kanriNo:record.qr,
+              kubun:record.managementType || record.recordType || "",
+              kishu:record.displayName || entry.displayName || record.qr,
+              sendId:context.sendId, logId:context.logIds[index] || "",
+              memo:memo, user:record.user || wizardState.user
+            })
+          });
+          const result = JSON.parse(await response.text());
+          if (!result.ok) throw new Error((record.qr || "不明") + "：" + (result.message || "追記保存失敗"));
+          return result;
+        }));
+        alert("REC追記を保存しました\n" + results.length + "件");
+        await resumeWizardContinuousScan("REC追記保存完了 ✔\n続けてQRを読み取れます");
+      } catch (error) {
+        alert("REC追記保存失敗\n" + (error.message || String(error)));
+      } finally {
+        stopAnimatedDots("wizardRecMemoTarget");
+        wizardPostSendBusy = false;
+        button.disabled = false;
+      }
+    }
+
     async function sendWizardBatch() {
       if (wizardSendBusy) return;
 
@@ -3554,6 +3979,12 @@ function changePreviousSettings() {
           .filter(function(item) { return item.ok; })
           .map(function(item) { return Number(item.index); });
         const successfulSet = new Set(successfulIndexes);
+        const postSendContext = successfulWizardSendContext(
+          sourceEntries,
+          sendRecords,
+          result,
+          successfulIndexes
+        );
 
         successfulIndexes.forEach(function(index) {
           applySuccessfulLocalState(sendRecords[index]);
@@ -3602,6 +4033,9 @@ function changePreviousSettings() {
 
           scannerBusy = false;
           void refreshInventoryInBackground();
+          if (successfulIndexes.length > 0) {
+            await beginWizardPostSendFlow(postSendContext);
+          }
           return;
         }
 
@@ -3620,6 +4054,7 @@ function changePreviousSettings() {
 
         scannerBusy = false;
         void refreshInventoryInBackground();
+        await beginWizardPostSendFlow(postSendContext);
       } catch (error) {
         const sendId =
           error.sendId ||
@@ -5000,6 +5435,35 @@ document
 document
   .getElementById("wizardCancelSendButton")
   .addEventListener("click", cancelLastSuccessfulSend);
+
+document.getElementById("wizardPhotoCameraButton").addEventListener("click", function() {
+  document.getElementById("wizardPhotoCameraInput").click();
+});
+document.getElementById("wizardPhotoLibraryButton").addEventListener("click", function() {
+  document.getElementById("wizardPhotoLibraryInput").click();
+});
+document.getElementById("wizardPhotoCameraInput").addEventListener("change", function(event) {
+  addWizardPhotos(event.target.files); event.target.value = "";
+});
+document.getElementById("wizardPhotoLibraryInput").addEventListener("change", function(event) {
+  addWizardPhotos(event.target.files); event.target.value = "";
+});
+document.getElementById("wizardClearPhotosButton").addEventListener("click", clearWizardPhotos);
+document.getElementById("wizardSavePhotosButton").addEventListener("click", prepareWizardPhotoSave);
+document.getElementById("wizardSkipPhotosButton").addEventListener("click", function() {
+  resumeWizardContinuousScan("写真なしで完了 ✔\n続けてQRを読み取れます");
+});
+document.getElementById("wizardConfirmPhotoTitleButton").addEventListener("click", confirmWizardPhotoTitle);
+document.getElementById("wizardBackToPhotosButton").addEventListener("click", function() {
+  wizardPendingPhotoSave = null;
+  document.getElementById("wizardPhotoTitleArea").hidden = true;
+  document.getElementById("wizardPhotoArea").hidden = false;
+  scrollToWizardPostSend("wizardPhotoArea");
+});
+document.getElementById("wizardSaveRecMemoButton").addEventListener("click", saveWizardRecMemo);
+document.getElementById("wizardSkipRecMemoButton").addEventListener("click", function() {
+  resumeWizardContinuousScan("REC追記なしで完了 ✔\n続けてQRを読み取れます");
+});
 
 renderButtons();
 resetWizard();
