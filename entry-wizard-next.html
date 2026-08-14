@@ -4399,7 +4399,60 @@ function changePreviousSettings() {
         }, 1000);
         return;
       }
+　　　　      /*
+       * 個体・簡易個体・RECの既知状態を読取時点で確認する。
+       * 状態なしは段階導入中のため許可し、
+       * 最終判定はGAS側でも行う。
+       * 数量管理品は在庫数管理なので、この状態判定の対象外。
+       */
+      if (details.managementType !== "quantity") {
+        const knownState =
+          details.currentState === "状態なし"
+            ? ""
+            : details.currentState;
 
+        if (
+          wizardState.mode === "出庫" &&
+          knownState === "出庫中"
+        ) {
+          if (navigator.vibrate) {
+            navigator.vibrate([80, 60, 80]);
+          }
+
+          setTemporaryScannerStatus(
+            "この機械はすでに出庫中です\n二重出庫の可能性があるため登録できません",
+            1600
+          );
+
+          setTimeout(function() {
+            scannerBusy = false;
+          }, 1400);
+
+          return;
+        }
+
+        if (
+          wizardState.mode === "返却" &&
+          knownState &&
+          knownState !== "出庫中"
+        ) {
+          if (navigator.vibrate) {
+            navigator.vibrate([80, 60, 80]);
+          }
+
+          setTemporaryScannerStatus(
+            "この機械は出庫中ではないため返却登録できません\n現在状態：" +
+              knownState,
+            1800
+          );
+
+          setTimeout(function() {
+            scannerBusy = false;
+          }, 1600);
+
+          return;
+        }
+      }
       const scanRecord =
         buildWizardScanRecord(details);
 
