@@ -30,11 +30,11 @@
 
 ## 主なファイル
 
-- `datamatrix-test.html`：本番画面のHTML
+- `index.html`：正式な本番画面
+- `datamatrix-test.html`：旧URLから正式入口へ転送する互換ファイル
 - `styles.css`：画面デザイン
 - `app.js`：画面制御・QR読取・GAS連携
 - `version.json`：キャッシュ更新用バージョン
-- `entry-wizard-next.html`：移行時の参照用ファイル
 
 ## 更新時の注意
 
