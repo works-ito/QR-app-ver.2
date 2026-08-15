@@ -4458,18 +4458,6 @@ function changePreviousSettings() {
       }
 
       if (
-        recItemMap.has(key) ||
-        recItemMap.has(managedKey)
-      ) {
-        return {
-          managementType:"rec",
-          item:
-            recItemMap.get(key) ||
-            recItemMap.get(managedKey)
-        };
-      }
-
-      if (
         managedMasterItemMap.has(key) ||
         managedMasterItemMap.has(managedKey)
       ) {
@@ -4486,6 +4474,23 @@ function changePreviousSettings() {
               ? "simple"
               : "individual",
           item:item
+        };
+      }
+
+      /*
+       * REC管理ログはREC専用作業の参照用フォールバック。
+       * REC01-001等の通常作業は、個体状態または管理マスタを
+       * 優先して個体管理品として扱う。
+       */
+      if (
+        recItemMap.has(key) ||
+        recItemMap.has(managedKey)
+      ) {
+        return {
+          managementType:"rec",
+          item:
+            recItemMap.get(key) ||
+            recItemMap.get(managedKey)
         };
       }
 
