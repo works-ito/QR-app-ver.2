@@ -3,16 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>QR在庫管理 ver.3</title>
+  <title>QR在庫管理｜開発版</title>
   <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
-  <link rel="stylesheet" href="./styles.css?v=12">
+  <link rel="stylesheet" href="./styles.css?v=16">
 </head>
 <body>
 <main class="app">
     <header class="appHeader">
       <div class="brand">
         <div class="brandTitle">
-          QR在庫管理 ver.3
+          QR在庫管理・開発版
         </div>
 
         <div class="brandSub">
@@ -209,8 +209,19 @@
       </h1>
 
       <p class="questionHint">
-        今から行う作業を1つ選択します
+        今から行う作業を1つ選択します。長押しで説明を確認できます
       </p>
+
+      <div
+        id="modeDescriptionPopup"
+        class="modeDescriptionPopup"
+        role="status"
+        aria-live="polite"
+        hidden
+      >
+        <strong id="modeDescriptionTitle"></strong>
+        <span id="modeDescriptionText"></span>
+      </div>
 
       <div
         id="modeButtons"
@@ -399,6 +410,23 @@
             class="scannerQuantityInfo"
           ></div>
 
+          <div
+            id="scannerQuantityCheckoutBox"
+            class="scannerQuantityCheckoutBox"
+            hidden
+          >
+            <label for="scannerQuantityCheckoutSelect">
+              取消対象の出庫履歴
+            </label>
+
+            <select id="scannerQuantityCheckoutSelect"></select>
+
+            <div
+              id="scannerQuantityCheckoutStatus"
+              class="scannerQuantityCheckoutStatus"
+            ></div>
+          </div>
+
           <div class="scannerQuantityField">
             <input
               id="scannerQuantityValue"
@@ -568,41 +596,6 @@
       </p>
 
     </section>
-  </main>
-
-  <!--
-    現行処理との接続用フィールド。
-    既存の送信・状態判定処理はこれらのIDを参照するため、
-    ウィザードの選択結果をここへ同期する。
-  -->
-  <div id="legacySelectionBridge" hidden>
-    <select id="mode" aria-hidden="true"></select>
-
-    <select id="location" aria-hidden="true">
-      <option value="本社">本社</option>
-      <option value="三郷">三郷</option>
-      <option value="MF">MF</option>
-    </select>
-
-    <select id="user" aria-hidden="true">
-      <option value="奥">奥</option>
-      <option value="滝島">滝島</option>
-      <option value="上野">上野</option>
-      <option value="見﨑">見﨑</option>
-      <option value="田之岡">田之岡</option>
-      <option value="篠塚">篠塚</option>
-      <option value="その他">その他</option>
-    </select>
-
-    <select id="recTarget" aria-hidden="true">
-      <option value="騒音計">騒音計</option>
-      <option value="振動計">振動計</option>
-      <option value="内部USB">内部USB</option>
-    </select>
-
-    <input id="recDate" type="date" aria-hidden="true">
-  </div>
-
   <!-- 送信後の写真・REC追記フロー -->
   <section id="wizardPostSendArea" class="wizardPostSendArea" hidden>
     <div id="wizardIrregularArea" class="wizardPostCard" hidden>
@@ -665,9 +658,50 @@
       <button type="button" id="wizardConfirmPhotoTitleButton">このタイトルで保存</button>
       <button type="button" id="wizardBackToPhotosButton" class="secondaryButton">写真選択画面へ戻る</button>
     </div>
+
+    <button
+      id="wizardPostSendCancelButton"
+      class="wizardCancelSendButton"
+      type="button"
+    >
+      直前送信を取消（残り約5分）
+    </button>
+
   </section>
 
+  </main>
+
+  <div id="legacySelectionBridge" hidden>
+    <select id="mode" aria-hidden="true"></select>
+
+    <select id="location" aria-hidden="true">
+      <option value="本社">本社</option>
+      <option value="三郷">三郷</option>
+      <option value="MF">MF</option>
+    </select>
+
+    <select id="user" aria-hidden="true">
+      <option value="奥">奥</option>
+      <option value="滝島">滝島</option>
+      <option value="上野">上野</option>
+      <option value="見﨑">見﨑</option>
+      <option value="田之岡">田之岡</option>
+      <option value="篠塚">篠塚</option>
+      <option value="その他">その他</option>
+    </select>
+
+    <select id="recTarget" aria-hidden="true">
+      <option value="騒音計">騒音計</option>
+      <option value="振動計">振動計</option>
+      <option value="内部USB">内部USB</option>
+    </select>
+
+    <input id="recDate" type="date" aria-hidden="true">
+  </div>
+
   <div id="inventoryRuntime" hidden></div>
-  <script src="./app.js?v=19"></script>
+  <script src="./scanner-try-harder-dev.js?v=49"></script>
+  <script src="./app.js?v=66"></script>
+  <script src="./sales-stockin.js?v=96"></script>
 </body>
 </html>

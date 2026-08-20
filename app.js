@@ -26,12 +26,15 @@ const PREVIOUS_SETTINGS_STORAGE_KEY =
     let recItems = [];
     let quantityItems = [];
     let quantityInspectionBalances = [];
+    let quantityStockBalances = [];
     let managedMasterItems = [];
+    let managedMasterRevision = "";
 
     let individualItemMap = new Map();
     let simpleItemMap = new Map();
     let recItemMap = new Map();
     let quantityItemMap = new Map();
+    let quantityStockMap = new Map();
     let managedMasterItemMap = new Map();
 
     let scannerCodeReader = null;
@@ -41,6 +44,7 @@ const PREVIOUS_SETTINGS_STORAGE_KEY =
     let scannedEntries = [];
     let scannerStatusTimer = null;
     let pendingWizardQuantityRecord = null;
+    let pendingWizardQuantityCandidates = [];
     let resetAllArmed = false;
     let resetAllArmTimer = null;
     let wizardSendBusy = false;
@@ -85,6 +89,13 @@ const PREVIOUS_SETTINGS_STORAGE_KEY =
         clearInterval(timer);
         animatedDotsTimers.delete(elementId);
       }
+
+      const element =
+        document.getElementById(elementId);
+
+      if (element) {
+        element.classList.remove("isProcessing");
+      }
     }
 
     function startAnimatedDots(
@@ -97,6 +108,8 @@ const PREVIOUS_SETTINGS_STORAGE_KEY =
         document.getElementById(elementId);
 
       if (!element) return;
+
+      element.classList.add("isProcessing");
 
       let dots = 0;
 
@@ -118,51 +131,62 @@ const PREVIOUS_SETTINGS_STORAGE_KEY =
        const MODE_OPTIONS = [
       {
         value:"出庫",
-        label:"出庫"
+        label:"出庫",
+        description:"機械を出庫するときに使用します。登録後、選択した拠点の在庫から「出庫中」へ変更されます。"
       },
       {
         value:"返却",
-        label:"返却"
+        label:"返却",
+        description:"機械を返却するときに使用します。欠油の有無（ない場合も明記）・未入庫・破損状況などを追記へ入力します。"
       },
       {
         value:"完成機",
-        label:"完成機"
+        label:"完成機",
+        description:"点検・整備が完了し、出庫できる状態になった機械を完成機として登録します。"
       },
       {
         value:"修理中",
-        label:"修理"
+        label:"修理",
+        description:"修理が必要な機械を修理中として登録します。"
       },
       {
         value:"拠点移動",
-        label:"拠点移動"
+        label:"拠点移動",
+        description:"機械を受け入れた拠点の担当者が入力します。実施拠点には、受入先の拠点を選択してください。"
       },
       {
         value:"出庫取消",
-        label:"出庫取消"
+        label:"出庫取消",
+        description:"出庫登録の誤りや貸出キャンセル時に使用します。取消対象の機械だけを読み取ってください。案件全体は自動で取り消されません。"
       },
       {
         value:"校正中",
         label:"校正中",
+        description:"RECの騒音計または振動計を校正へ出したときに登録します。",
         kind:"special"
       },
       {
         value:"校正完了",
         label:"校正完了",
+        description:"校正から戻ったRECの騒音計または振動計を登録します。校正実施日も入力します。",
         kind:"special"
       },
       {
         value:"交換完了",
         label:"交換完了",
+        description:"RECの内部USB交換が完了したときに登録します。交換実施日も入力します。",
         kind:"special"
       },
       {
         value:"廃棄",
         label:"廃棄",
+        description:"重量コーンなど、管理番号がなく個数で管理する品目を、破損・全損により在庫から減らします。",
         kind:"danger"
       },
       {
         value:"検品",
         label:"検品",
+        description:"返却された重量コーンなどを、再使用できる数と廃棄する数に分けて登録します。QR読取は不要です。",
         kind:"special"
       }
     ];
@@ -262,7 +286,17 @@ const PREVIOUS_SETTINGS_STORAGE_KEY =
 
       button.addEventListener(
         "click",
-        function() {
+        function(event) {
+          if (
+            button.dataset.longPressHandled ===
+            "true"
+          ) {
+            button.dataset.longPressHandled =
+              "false";
+            event.preventDefault();
+            return;
+          }
+
           if (
             typeof data.onClick ===
             "function"
@@ -272,7 +306,105 @@ const PREVIOUS_SETTINGS_STORAGE_KEY =
         }
       );
 
+      if (data.description) {
+        attachModeDescriptionLongPress(
+          button,
+          data
+        );
+      }
+
       return button;
+    }
+
+    let modeDescriptionHideTimer = null;
+
+    function showModeDescription(data) {
+      const popup = document.getElementById(
+        "modeDescriptionPopup"
+      );
+      const title = document.getElementById(
+        "modeDescriptionTitle"
+      );
+      const text = document.getElementById(
+        "modeDescriptionText"
+      );
+
+      if (!popup || !title || !text) return;
+
+      title.innerText = data.label || data.value || "作業区分";
+      text.innerText = data.description || "";
+      popup.hidden = false;
+      popup.classList.add("isVisible");
+
+      if (modeDescriptionHideTimer) {
+        clearTimeout(modeDescriptionHideTimer);
+      }
+
+      modeDescriptionHideTimer = setTimeout(
+        function() {
+          popup.classList.remove("isVisible");
+          popup.hidden = true;
+        },
+        4000
+      );
+    }
+
+    function attachModeDescriptionLongPress(
+      button,
+      data
+    ) {
+      let pressTimer = null;
+
+      function cancelPress() {
+        if (pressTimer) {
+          clearTimeout(pressTimer);
+          pressTimer = null;
+        }
+        button.classList.remove("isLongPressing");
+      }
+
+      button.addEventListener(
+        "pointerdown",
+        function() {
+          cancelPress();
+          button.dataset.longPressHandled = "false";
+          button.classList.add("isLongPressing");
+
+          pressTimer = setTimeout(
+            function() {
+              pressTimer = null;
+              button.classList.remove("isLongPressing");
+              button.dataset.longPressHandled = "true";
+              showModeDescription(data);
+            },
+            500
+          );
+        }
+      );
+
+      ["pointerup", "pointercancel", "pointerleave"].forEach(
+        function(eventName) {
+          button.addEventListener(eventName, cancelPress);
+        }
+      );
+
+      button.addEventListener(
+        "contextmenu",
+        function(event) {
+          event.preventDefault();
+        }
+      );
+
+      ["selectstart", "dragstart"].forEach(
+        function(eventName) {
+          button.addEventListener(
+            eventName,
+            function(event) {
+              event.preventDefault();
+            }
+          );
+        }
+      );
     }
 
     function getWizardRecTargetOptions() {
@@ -353,6 +485,7 @@ const PREVIOUS_SETTINGS_STORAGE_KEY =
               label:item.label,
               value:item.value,
               kind:item.kind,
+              description:item.description,
 
               onClick:function() {
                 selectMode(item);
@@ -729,15 +862,25 @@ function changePreviousSettings() {
 }
     
    function selectMode(item) {
+  if (item.value === "廃棄") {
+    const proceed = window.confirm(
+      "重量コーンなど、管理番号がなく個数で管理する品目の廃棄です。\n\n" +
+      "破損・全損により使用できなくなった数量を、現在の在庫から減らします。\n\n" +
+      "返却品を検品して一部廃棄する場合は、作業区分の「検品」を選択してください。\n\n" +
+      "廃棄へ進みますか？"
+    );
+
+    if (!proceed) return;
+  }
+
   if (item.value === "検品") {
     if (wizardState.receptionType === "irregular") {
       alert("検品は通常受付から選択してください。QR読取は行いません。");
       return;
     }
     alert(
-      "数量管理品の検品です。\n\n" +
-      "QRは読み取りません。返却された未検品数のうち、" +
-      "完成機にする数と全損で廃棄する数を品目ごとに入力します。"
+      "返却された重量コーンなどの検品です。\n\n" +
+      "QRは読み取りません。再使用できる数と廃棄する数を、品目ごとに入力します。"
     );
   }
 
@@ -1002,8 +1145,9 @@ function changePreviousSettings() {
       if (settings.mode === "検品") {
         cameraPreview.classList.remove("isActive");
         inspectionArea.hidden = false;
+        connectionNote.hidden = false;
         connectionNote.innerText =
-          "数量管理品を一覧から選択して検品します。QR読取は行いません。";
+          "返却された品目を一覧から選び、再使用できる数と廃棄する数を入力します。QR読取は行いません。";
         prepareQuantityInspectionArea();
       } else if (
         settings.receptionType ===
@@ -1013,15 +1157,14 @@ function changePreviousSettings() {
         cameraPreview.classList.remove(
           "isActive"
         );
-
-        connectionNote.innerText =
-          "本番接続時はカメラを起動せず、番号入力／番号不明・追記・写真の画面へ進みます。";
+        connectionNote.hidden = true;
+        connectionNote.innerText = "";
       } else {
         inspectionArea.hidden = true;
         cameraPreview.classList.add(
           "isActive"
         );
-
+        connectionNote.hidden = false;
         connectionNote.innerText =
           "読み取った内容は、確認後にまとめて送信されます。";
       }
@@ -1541,11 +1684,125 @@ function changePreviousSettings() {
           data.quantity = record.quantity;
           data.unit = record.unit;
           data.category = record.category;
+          data.sourceQuantityLogId =
+            record.sourceQuantityLogId || "";
         }
 
         return data;
       });
     }
+
+    /*
+     * 「マスタから選ぶ」で作成したキューを、
+     * 通常QRと同じ一括送信経路へ引き渡す。
+     * GAS送信・在庫検証・送信後処理はsendWizardBatch()へ集約する。
+     */
+    window.sendIrregularMasterPickerBatch =
+      async function(records) {
+        if (!Array.isArray(records) || !records.length) {
+          alert("送信する品目がありません");
+          return false;
+        }
+
+        const imported = [];
+        const existingKeys = new Set(
+          scannedEntries.map(function(record) {
+            return record.key;
+          })
+        );
+
+        for (const selected of records) {
+          if (selected && selected.preview) {
+            alert("UI確認用データは送信できません");
+            return false;
+          }
+
+          const lookupCode =
+            selected.type === "machine"
+              ? selected.managedId
+              : selected.code;
+
+          const details =
+            getScannerItemDetails(lookupCode);
+
+          if (!details) {
+            alert(
+              (lookupCode || "対象品目") +
+              "を最新の初期データから確認できません。\n" +
+              "画面を再読み込みして、もう一度選択してください。"
+            );
+            return false;
+          }
+
+          if (!isScannerModeAllowed(
+            details.managementType,
+            wizardState.mode
+          )) {
+            alert(
+              details.displayName +
+              "は「" + wizardState.modeLabel +
+              "」では送信できません"
+            );
+            return false;
+          }
+
+          const record =
+            buildWizardScanRecord(details);
+
+          if (record.recordType === "quantity") {
+            const quantity = Number(
+              selected.quantity
+            );
+
+            if (
+              !Number.isInteger(quantity) ||
+              quantity < 1
+            ) {
+              alert("数量は1以上の整数で入力してください");
+              return false;
+            }
+
+            record.quantity = quantity;
+            record.sourceQuantityLogId =
+              String(selected.sourceQuantityLogId || "").trim();
+
+            if (
+              wizardState.mode === "出庫取消" &&
+              !record.sourceQuantityLogId
+            ) {
+              alert("取消対象の出庫履歴を選択してください");
+              return false;
+            }
+
+            if (record.sourceQuantityLogId) {
+              record.key += "__" + record.sourceQuantityLogId;
+            }
+          }
+
+          if (
+            existingKeys.has(record.key) ||
+            imported.some(function(item) {
+              return item.key === record.key;
+            })
+          ) {
+            alert(
+              record.displayName +
+              "はすでに追加済みです"
+            );
+            return false;
+          }
+
+          imported.push(record);
+        }
+
+        scannedEntries.push.apply(
+          scannedEntries,
+          imported
+        );
+        renderScannerResults();
+
+        return await sendWizardBatch();
+      };
 
     function isScannerModeAllowed(
       managementType,
@@ -1773,9 +2030,96 @@ function changePreviousSettings() {
       document.getElementById(
         "scannerQuantityValue"
       ).value = "";
+
+      const checkoutBox =
+        document.getElementById(
+          "scannerQuantityCheckoutBox"
+        );
+
+      if (checkoutBox) {
+        checkoutBox.hidden = true;
+      }
+
+      const checkoutSelect =
+        document.getElementById(
+          "scannerQuantityCheckoutSelect"
+        );
+
+      if (checkoutSelect) {
+        checkoutSelect.replaceChildren();
+      }
+
+      pendingWizardQuantityCandidates = [];
     }
 
-    function showWizardQuantityInput(record) {
+    function formatQuantityCheckoutDate(value) {
+      const date = new Date(value);
+
+      if (isNaN(date.getTime())) {
+        return String(value || "日時不明");
+      }
+
+      return new Intl.DateTimeFormat(
+        "ja-JP",
+        {
+          month:"2-digit",
+          day:"2-digit",
+          hour:"2-digit",
+          minute:"2-digit",
+          hour12:false
+        }
+      ).format(date);
+    }
+
+    function formatQuantityCheckoutCandidate(candidate) {
+      return (
+        formatQuantityCheckoutDate(candidate.timestamp) +
+        " ／ " +
+        (candidate.user || "担当者不明") +
+        " ／ 出庫" +
+        candidate.originalQuantity +
+        (candidate.unit || "個") +
+        " ／ 取消可能" +
+        candidate.remainingQuantity +
+        (candidate.unit || "個")
+      );
+    }
+
+    async function getQuantityCheckoutCandidates(
+      itemCode,
+      location
+    ) {
+      const response = await fetch(GAS_URL, {
+        method:"POST",
+        headers:{
+          "Content-Type":"text/plain"
+        },
+        body:JSON.stringify({
+          action:"getQuantityCheckoutCandidates",
+          itemCode:itemCode,
+          location:location
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result || result.ok !== true) {
+        throw new Error(
+          result && result.message
+            ? result.message
+            : "出庫履歴を取得できませんでした"
+        );
+      }
+
+      return Array.isArray(result.candidates)
+        ? result.candidates
+        : [];
+    }
+
+    window.getQuantityCheckoutCandidates =
+      getQuantityCheckoutCandidates;
+
+    async function showWizardQuantityInput(record) {
       pendingWizardQuantityRecord = record;
 
       document.getElementById(
@@ -1783,11 +2127,74 @@ function changePreviousSettings() {
       ).innerText =
         record.displayName || record.itemCode;
 
+      const stockLocation =
+        String(
+          record.location ||
+          wizardState.location ||
+          ""
+        ).trim();
+
+      const currentStock =
+        getQuantityCurrentStock(
+          record.itemCode,
+          stockLocation
+        );
+
+      const checkoutBox =
+        document.getElementById(
+          "scannerQuantityCheckoutBox"
+        );
+
+      const checkoutSelect =
+        document.getElementById(
+          "scannerQuantityCheckoutSelect"
+        );
+
+      const checkoutStatus =
+        document.getElementById(
+          "scannerQuantityCheckoutStatus"
+        );
+
+      const quantityInput =
+        document.getElementById(
+          "scannerQuantityValue"
+        );
+
+      const addButton =
+        document.getElementById(
+          "addQuantityButton"
+        );
+
+      const isCheckoutCancel =
+        wizardState.mode === "出庫取消";
+
+      if (checkoutBox) {
+        checkoutBox.hidden = !isCheckoutCancel;
+      }
+
+      if (checkoutSelect) {
+        checkoutSelect.replaceChildren();
+      }
+
+      pendingWizardQuantityCandidates = [];
+      record.sourceQuantityLogId = "";
+
       document.getElementById(
         "scannerQuantityInfo"
       ).innerText =
         "品目コード：" + record.itemCode +
-        "\n区分：" + (record.category || "未設定");
+        "\n区分：" + (record.category || "未設定") +
+        (
+          isCheckoutCancel
+            ? "\n処理拠点：" + (stockLocation || "拠点未設定")
+            : (
+                "\n現在庫（" +
+                (stockLocation || "拠点未設定") +
+                "）：" +
+                currentStock +
+                (record.unit || "")
+              )
+        );
 
       document.getElementById(
         "scannerQuantityUnit"
@@ -1799,22 +2206,200 @@ function changePreviousSettings() {
 
       area.classList.add("isVisible");
 
+      if (isCheckoutCancel) {
+        quantityInput.disabled = true;
+        addButton.disabled = true;
+
+        if (checkoutStatus) {
+          checkoutStatus.innerText =
+            "取消可能な出庫履歴を確認中...";
+        }
+
+        try {
+          const candidates =
+            await getQuantityCheckoutCandidates(
+              record.itemCode,
+              stockLocation
+            );
+
+          if (
+            pendingWizardQuantityRecord !== record
+          ) {
+            return;
+          }
+
+          pendingWizardQuantityCandidates =
+            candidates;
+
+          if (!candidates.length) {
+            if (checkoutStatus) {
+              checkoutStatus.innerText =
+                "この品目・拠点には取消可能な出庫履歴がありません。";
+            }
+            quantityInput.value = "";
+            return;
+          }
+
+          const placeholder =
+            document.createElement("option");
+
+          placeholder.value = "";
+          placeholder.textContent =
+            "取消対象の出庫履歴を選択";
+          checkoutSelect.appendChild(placeholder);
+
+          candidates.forEach(function(candidate) {
+            const option =
+              document.createElement("option");
+
+            option.value = candidate.logId;
+            option.textContent =
+              formatQuantityCheckoutCandidate(candidate);
+
+            checkoutSelect.appendChild(option);
+          });
+
+          if (checkoutStatus) {
+            checkoutStatus.innerText =
+              "どの出庫分を取り消すか選択してください。";
+          }
+
+          checkoutSelect.onchange = function() {
+            const selected =
+              pendingWizardQuantityCandidates.find(
+                function(candidate) {
+                  return candidate.logId ===
+                    checkoutSelect.value;
+                }
+              );
+
+            record.sourceQuantityLogId =
+              selected ? selected.logId : "";
+
+            quantityInput.value = "";
+            quantityInput.disabled = !selected;
+            addButton.disabled = !selected;
+
+            if (selected) {
+              quantityInput.max =
+                String(selected.remainingQuantity);
+
+              quantityInput.placeholder =
+                "最大" + selected.remainingQuantity;
+
+              if (checkoutStatus) {
+                checkoutStatus.innerText =
+                  formatQuantityCheckoutCandidate(selected);
+              }
+
+              quantityInput.focus();
+            }
+          };
+        } catch (error) {
+          if (checkoutStatus) {
+            checkoutStatus.innerText =
+              "出庫履歴取得失敗：" +
+              (error.message || String(error));
+          }
+        }
+      } else {
+        quantityInput.disabled = false;
+        quantityInput.removeAttribute("max");
+        quantityInput.placeholder = "数量";
+        addButton.disabled = false;
+      }
+
       document.getElementById(
         "scannerStatus"
       ).innerText =
-        "数量を入力してください\n" +
-        (record.displayName || record.itemCode);
+        isCheckoutCancel
+          ? "取消対象の出庫履歴を選んでください\n" +
+            (record.displayName || record.itemCode)
+          : "数量を入力してください\n" +
+            (record.displayName || record.itemCode);
 
       area.scrollIntoView({
         behavior:"smooth",
         block:"center"
       });
 
-      setTimeout(function() {
+      if (!isCheckoutCancel) {
+        setTimeout(function() {
+          quantityInput.focus();
+        }, 250);
+      }
+    }
+
+    function addWizardQuantityItem() {
+      if (!pendingWizardQuantityRecord) return;
+
+      const quantity = Number(
         document.getElementById(
           "scannerQuantityValue"
-        ).focus();
-      }, 250);
+        ).value
+      );
+
+      if (
+        !Number.isInteger(quantity) ||
+        quantity <= 0
+      ) {
+        alert("数量を1以上の整数で入力してください");
+        return;
+      }
+
+      const record = pendingWizardQuantityRecord;
+
+      if (wizardState.mode === "出庫取消") {
+        const selected =
+          pendingWizardQuantityCandidates.find(
+            function(candidate) {
+              return candidate.logId ===
+                record.sourceQuantityLogId;
+            }
+          );
+
+        if (!selected) {
+          alert("取消対象の出庫履歴を選択してください");
+          return;
+        }
+
+        if (quantity > selected.remainingQuantity) {
+          alert(
+            "取消可能数は" +
+            selected.remainingQuantity +
+            (selected.unit || record.unit || "個") +
+            "です"
+          );
+          return;
+        }
+
+        record.key += "__" + selected.logId;
+      }
+
+      record.quantity = quantity;
+      record.displayText =
+        (record.displayName || record.itemCode) +
+        " × " +
+        quantity +
+        (record.unit || "");
+
+      pendingWizardQuantityRecord = null;
+      hideWizardQuantityInput();
+      commitWizardScanRecord(record);
+    }
+
+    function cancelWizardQuantityInput() {
+      pendingWizardQuantityRecord = null;
+      hideWizardQuantityInput();
+
+      setTemporaryScannerStatus(
+        "数量入力を取り消しました\nQRは再読取できます",
+        900
+      );
+
+      setTimeout(function() {
+        scannerBusy = false;
+      }, 500);
     }
 
     function playWizardScanBeep(type) {
@@ -2109,6 +2694,8 @@ function changePreviousSettings() {
         data.quantity = record.quantity;
         data.unit = record.unit;
         data.category = record.category;
+        data.sourceQuantityLogId =
+          record.sourceQuantityLogId || "";
       }
 
       return data;
@@ -2302,7 +2889,16 @@ function changePreviousSettings() {
       const indexes = [];
 
       results.forEach(function(item, position) {
-        if (!item || !item.ok) return;
+        const itemSucceeded =
+          Boolean(
+            item &&
+            (
+              item.ok === true ||
+              item.success === true
+            )
+          );
+
+        if (!itemSucceeded) return;
         const suppliedIndex = Number(item.index);
         const index = Number.isInteger(suppliedIndex)
           ? suppliedIndex
@@ -2310,7 +2906,39 @@ function changePreviousSettings() {
         if (index >= 0 && index < recordCount) indexes.push(index);
       });
 
-      return Array.from(new Set(indexes));
+      const uniqueIndexes =
+        Array.from(new Set(indexes));
+
+      /*
+       * 数量管理の一括処理では、GASが全体成功を返しても
+       * results明細を返さない場合がある。
+       *
+       * 全体ok・失敗0件・成功件数が送信件数と一致する場合だけ、
+       * 全件成功として補完する。
+       * 部分失敗や結果不明では補完しない。
+       */
+      if (
+        uniqueIndexes.length === 0 &&
+        result &&
+        result.ok === true &&
+        Number(result.failedCount || 0) === 0 &&
+        (
+          Number(result.successCount || 0) === recordCount ||
+          (
+            results.length === 0 &&
+            Number(result.successCount || 0) === 0
+          )
+        )
+      ) {
+        return Array.from(
+          {length:recordCount},
+          function(_, index) {
+            return index;
+          }
+        );
+      }
+
+      return uniqueIndexes;
     }
 
     function captureLocalState(record) {
@@ -2385,6 +3013,7 @@ function changePreviousSettings() {
     function renderCancelSendButton() {
       const buttons = [
         document.getElementById("wizardCancelSendButton"),
+        document.getElementById("wizardPostSendCancelButton"),
         document.getElementById("quantityInspectionCancelSendButton")
       ].filter(Boolean);
       if (buttons.length === 0) return;
@@ -2393,11 +3022,64 @@ function changePreviousSettings() {
       const remaining = lastSuccessfulSend
         ? Number(lastSuccessfulSend.expiresAt || 0) - Date.now()
         : 0;
+      const remainingMinutes =
+        Math.max(
+          1,
+          Math.ceil(remaining / 60000)
+        );
+
       buttons.forEach(function(button) {
         button.classList.toggle("isVisible", remaining > 0);
         button.disabled =
           wizardSendBusy || quantityInspectionBusy || !appInitialDataLoaded;
+
+        if (remaining > 0) {
+          button.innerText =
+            remainingMinutes >= 5
+              ? "直前送信を取消（5分間有効）"
+              : (
+                  remaining < 60000
+                    ? "直前送信を取消（有効時間：1分未満）"
+                    : (
+                        "直前送信を取消（有効時間：約" +
+                        remainingMinutes +
+                        "分）"
+                      )
+                );
+        } else {
+          button.innerText =
+            "直前送信を取消（期限切れ）";
+        }
       });
+
+      const postSendArea =
+        document.getElementById("wizardPostSendArea");
+
+      /*
+       * 写真・追記フローが終わった後は取消ボタンだけを残し、
+       * 期限切れになった時点で空のpost-send領域も閉じる。
+       */
+      const hasVisiblePostSendCard = [
+        "wizardIrregularArea",
+        "wizardRecMemoArea",
+        "wizardPhotoArea",
+        "wizardPhotoTitleArea"
+      ].some(function(id) {
+        const element = document.getElementById(id);
+        return Boolean(element && element.hidden === false);
+      });
+
+      /*
+       * マスタ選択・写真・追記を操作中は、在庫データ更新完了時の
+       * 取消ボタン再描画で親領域を閉じない。
+       */
+      if (
+        postSendArea &&
+        !wizardPostSendContext &&
+        !hasVisiblePostSendCard
+      ) {
+        postSendArea.hidden = remaining <= 0;
+      }
 
       if (remaining > 0) {
         cancelSendExpiryTimer = setTimeout(function() {
@@ -2462,8 +3144,11 @@ function changePreviousSettings() {
         return;
       }
       if (!confirm(
-        "直前に送信した" + lastSuccessfulSend.successCount +
-        "件を取り消します。よろしいですか？"
+        "直前の送信1回分を取り消します。\n\n" +
+        "対象：この端末から最後に送信した" +
+        lastSuccessfulSend.successCount + "件\n" +
+        "今日のその他の登録は取り消されません。\n\n" +
+        "取り消しますか？"
       )) return;
 
       wizardSendBusy = true;
@@ -2520,11 +3205,14 @@ function changePreviousSettings() {
         const cancelMessage =
           "直前送信を取消しました ✔\n" +
           result.cancelCount + "件\n送信ID：" + result.sendId;
-        if (
-          wizardPostSendContext &&
-          String(wizardPostSendContext.sendId || "") ===
-            String(lastSuccessfulSend.sendId || "")
-        ) {
+        const cancelledActivePostSend =
+          Boolean(
+            wizardPostSendContext &&
+            String(wizardPostSendContext.sendId || "") ===
+              String(lastSuccessfulSend.sendId || "")
+          );
+
+        if (cancelledActivePostSend) {
           wizardPostSendContext = null;
           wizardSelectedPhotos = [];
           wizardCurrentSlipInfo = null;
@@ -2551,6 +3239,12 @@ function changePreviousSettings() {
             1400
           );
           void refreshInventoryInBackground();
+
+          if (cancelledActivePostSend) {
+            await resumeWizardContinuousScan(
+              "取消完了 ✔\n同じQRを再読取できます"
+            );
+          }
         }
       } catch (error) {
         const sendId = String(lastSuccessfulSend?.sendId || "");
@@ -2857,9 +3551,28 @@ function changePreviousSettings() {
           document.getElementById("wizardIrregularQuantityUnit");
         const enteredQuantity = Number(quantityInput.value);
 
+        const stockLocation =
+          String(
+            base.location ||
+            wizardState.location ||
+            ""
+          ).trim();
+
+        const currentStock =
+          getQuantityCurrentStock(
+            itemCode,
+            stockLocation
+          );
+
         quantityBox.hidden = false;
         quantityUnit.innerText =
-          displayName + (unit ? " ／ 単位：" + unit : "");
+          displayName +
+          (unit ? " ／ 単位：" + unit : "") +
+          " ／ 現在庫（" +
+          (stockLocation || "拠点未設定") +
+          "）：" +
+          currentStock +
+          unit;
 
         if (
           !Number.isInteger(enteredQuantity) ||
@@ -2948,7 +3661,15 @@ function changePreviousSettings() {
       wizardSelectedPhotos = [];
       wizardCurrentSlipInfo = null;
       wizardPendingPhotoSave = null;
-      document.getElementById("wizardPostSendArea").hidden = true;
+      /*
+       * 写真・追記の完了後も、直前送信の取消期限内は
+       * post-send領域を取消ボタンの置き場として残す。
+       */
+      const cancelStillValid =
+        Boolean(lastSuccessfulSend) &&
+        Number(lastSuccessfulSend.expiresAt || 0) > Date.now();
+      document.getElementById("wizardPostSendArea").hidden =
+        !cancelStillValid;
       document.getElementById("wizardRecMemoArea").hidden = true;
       document.getElementById("wizardPhotoArea").hidden = true;
       document.getElementById("wizardPhotoTitleArea").hidden = true;
@@ -2989,11 +3710,24 @@ function changePreviousSettings() {
       };
     }
 
+    function hideWizardPostSendCards() {
+      [
+        "wizardIrregularArea",
+        "wizardRecMemoArea",
+        "wizardPhotoArea",
+        "wizardPhotoTitleArea"
+      ].forEach(function(id) {
+        const element = document.getElementById(id);
+        if (element) element.hidden = true;
+      });
+    }
+
     async function beginWizardPostSendFlow(context) {
       if (!context || !context.records.length) return;
       wizardPostSendContext = context;
       await stopReadOnlyScanner();
       scannerBusy = true;
+      hideWizardPostSendCards();
       document.getElementById("wizardPostSendArea").hidden = false;
 
       if (["校正中", "校正完了", "交換完了"].includes(context.mode)) {
@@ -3583,15 +4317,20 @@ function changePreviousSettings() {
       }
     }
 
-    async function sendWizardBatch() {
-      if (wizardSendBusy) return;
+    async function sendWizardBatch(options) {
+      const sendOptions =
+        options && typeof options === "object"
+          ? options
+          : {};
+
+      if (wizardSendBusy) return false;
 
       const records =
         getWizardPreparedBatchRecords();
 
       if (!records.length) {
         alert("送信するQRがありません");
-        return;
+        return false;
       }
 
       const invalidQuantity = records.some(
@@ -3608,11 +4347,11 @@ function changePreviousSettings() {
 
       if (invalidQuantity) {
         alert("数量が未入力の品目があります");
-        return;
+        return false;
       }
 
       if (!validateWizardRecSettings()) {
-        return;
+        return false;
       }
 
       if (
@@ -3620,7 +4359,7 @@ function changePreviousSettings() {
         !wizardReturnMemoConfirmed
       ) {
         openWizardReturnMemoArea();
-        return;
+        return false;
       }
 
       if (!confirm(
@@ -3628,7 +4367,14 @@ function changePreviousSettings() {
         records.length +
         "件まとめて送信します。よろしいですか？"
       )) {
-        return;
+        return false;
+      }
+
+      if (
+        typeof sendOptions.onAccepted ===
+        "function"
+      ) {
+        sendOptions.onAccepted();
       }
 
       wizardSendBusy = true;
@@ -3759,7 +4505,7 @@ function changePreviousSettings() {
           if (successfulIndexes.length > 0) {
             await beginWizardPostSendFlow(postSendContext);
           }
-          return;
+          return true;
         }
 
         setWizardSendStatus(
@@ -3808,6 +4554,8 @@ function changePreviousSettings() {
                 : "読取分をまとめて送信"
             );
       }
+
+      return true;
     }
 
     async function handleReadOnlyDecoded(text) {
@@ -4418,6 +5166,11 @@ function changePreviousSettings() {
         ]
       );
 
+      quantityStockMap =
+        createQuantityStockMap(
+          quantityStockBalances
+        );
+
       managedMasterItemMap =
         createManagedItemMap(
           managedMasterItems
@@ -4565,6 +5318,96 @@ function changePreviousSettings() {
       return quantityItemMap.get(key) || null;
     }
 
+    function makeQuantityStockKeyLocal(
+      itemCode,
+      location
+    ) {
+      return (
+        normalizeLookupKey(itemCode) +
+        "||" +
+        String(location || "").trim()
+      );
+    }
+
+    function createQuantityStockMap(items) {
+      const map = new Map();
+      const stockByLocation = {};
+
+      (Array.isArray(items) ? items : [])
+        .forEach(function(item) {
+          const itemCode =
+            String(
+              item.itemCode || ""
+            ).trim();
+
+          const location =
+            String(
+              item.location || ""
+            ).trim();
+
+          if (!itemCode || !location) {
+            return;
+          }
+
+          const currentStock =
+            Number(
+              item.currentStock || 0
+            );
+
+          map.set(
+            makeQuantityStockKeyLocal(
+              itemCode,
+              location
+            ),
+            currentStock
+          );
+
+          const normalizedCode =
+            normalizeLookupKey(
+              itemCode
+            );
+
+          if (!stockByLocation[normalizedCode]) {
+            stockByLocation[normalizedCode] = {};
+          }
+
+          stockByLocation[normalizedCode][location] =
+            currentStock;
+        });
+
+      /*
+       * マスタから選ぶ画面の既存モジュールへ、
+       * 品目コード×拠点別現在庫を公開する。
+       */
+      window.quantityStockByLocation =
+        stockByLocation;
+
+      if (
+        typeof window
+          .refreshIrregularQuantityStockInfo ===
+          "function"
+      ) {
+        window
+          .refreshIrregularQuantityStockInfo();
+      }
+
+      return map;
+    }
+
+    function getQuantityCurrentStock(
+      itemCode,
+      location
+    ) {
+      return Number(
+        quantityStockMap.get(
+          makeQuantityStockKeyLocal(
+            itemCode,
+            location
+          )
+        ) || 0
+      );
+    }
+
     function openInventoryDb() {
       return new Promise(
         function(resolve, reject) {
@@ -4613,7 +5456,9 @@ function changePreviousSettings() {
         recItems:recItems,
         quantityItems:quantityItems,
         quantityInspectionBalances:quantityInspectionBalances,
-        managedMasterItems:managedMasterItems
+        quantityStockBalances:quantityStockBalances,
+        managedMasterItems:managedMasterItems,
+        managedMasterRevision:managedMasterRevision
       };
 
       return new Promise(
@@ -4701,9 +5546,21 @@ function changePreviousSettings() {
           cache.quantityInspectionBalances
         ) ? cache.quantityInspectionBalances : [];
 
+        quantityStockBalances = Array.isArray(
+          cache.quantityStockBalances
+        ) ? cache.quantityStockBalances : [];
+
         managedMasterItems = Array.isArray(
           cache.managedMasterItems
         ) ? cache.managedMasterItems : [];
+
+        managedMasterRevision =
+          managedMasterItems.length > 0
+            ? String(
+                cache.managedMasterRevision ||
+                ""
+              ).trim()
+            : "";
 
         buildAppInitialDataMaps();
         appInitialDataLoaded = true;
@@ -4758,7 +5615,17 @@ function changePreviousSettings() {
               cache:"no-store",
               body:JSON.stringify({
                 action:"getAppInitialData",
-                initialDataVersion:"status-light-v2"
+                initialDataVersion:"status-light-v2",
+
+                /*
+                 * 索引と一緒に保存したrevisionを送る。
+                 * 索引がない場合は空文字を送り、
+                 * GASから最新索引を受け取る。
+                 */
+                clientManagedMasterRevision:
+                  managedMasterItems.length > 0
+                    ? managedMasterRevision
+                    : ""
               })
             }
           );
@@ -4815,9 +5682,54 @@ function changePreviousSettings() {
           result.quantityInspectionBalances
         ) ? result.quantityInspectionBalances : [];
 
-        managedMasterItems = Array.isArray(
-          result.managedMasterItems
-        ) ? result.managedMasterItems : [];
+        quantityStockBalances = Array.isArray(
+          result.quantityStockBalances
+        ) ? result.quantityStockBalances : [];
+
+        const responseManagedMasterRevision =
+          String(
+            result.managedMasterRevision ||
+            ""
+          ).trim();
+
+        /*
+         * revision不一致でGASが索引を返した場合だけ、
+         * 索引とrevisionを同時に更新する。
+         *
+         * revision一致で索引が省略された場合は、
+         * IndexedDBから復元した索引を維持する。
+         */
+        if (
+          result.managedMasterIncluded !== false
+        ) {
+          const returnedManagedMasterItems =
+            Array.isArray(
+              result.managedMasterItems
+            )
+              ? result.managedMasterItems
+              : [];
+
+          if (
+            returnedManagedMasterItems.length === 0
+          ) {
+            throw new Error(
+              "最新の索引が空です"
+            );
+          }
+
+          managedMasterItems =
+            returnedManagedMasterItems;
+
+          managedMasterRevision =
+            responseManagedMasterRevision;
+
+        } else if (
+          responseManagedMasterRevision &&
+          managedMasterItems.length > 0
+        ) {
+          managedMasterRevision =
+            responseManagedMasterRevision;
+        }
 
         buildAppInitialDataMaps();
         appInitialDataLoaded = true;
@@ -5325,6 +6237,10 @@ document
 
 document
   .getElementById("wizardCancelSendButton")
+  .addEventListener("click", cancelLastSuccessfulSend);
+
+document
+  .getElementById("wizardPostSendCancelButton")
   .addEventListener("click", cancelLastSuccessfulSend);
 
 document.getElementById("quantityInspectionAddButton")

@@ -303,6 +303,22 @@
       font-weight:900;
 
       box-shadow:0 2px 0 rgba(30, 87, 148, 0.08);
+      -webkit-touch-callout:none;
+      -webkit-user-select:none;
+      user-select:none;
+    }
+
+    .choiceButton *,
+    #modeButtons,
+    #modeButtons * {
+      -webkit-touch-callout:none;
+      -webkit-user-select:none;
+      user-select:none;
+    }
+
+    .choiceButton.isLongPressing {
+      transform:scale(0.98);
+      filter:brightness(0.96);
     }
 
     .choiceButton:active {
@@ -320,6 +336,46 @@
       border-color:#e6c98e;
       background:#fffaf0;
       color:#865700;
+    }
+
+    .modeDescriptionPopup {
+      position:fixed;
+      left:50%;
+      bottom:max(22px, env(safe-area-inset-bottom));
+      z-index:1000;
+      width:min(calc(100% - 32px), 398px);
+      padding:16px 18px;
+      border:2px solid var(--blue);
+      border-radius:16px;
+      background:rgba(23, 32, 51, 0.96);
+      color:#fff;
+      box-shadow:0 12px 36px rgba(0, 0, 0, 0.28);
+      opacity:0;
+      transform:translate(-50%, 12px);
+      transition:opacity 0.16s ease, transform 0.16s ease;
+      pointer-events:none;
+    }
+
+    .modeDescriptionPopup.isVisible {
+      opacity:1;
+      transform:translate(-50%, 0);
+    }
+
+    .modeDescriptionPopup strong,
+    .modeDescriptionPopup span {
+      display:block;
+    }
+
+    .modeDescriptionPopup strong {
+      margin-bottom:6px;
+      color:#8fc4ff;
+      font-size:18px;
+    }
+
+    .modeDescriptionPopup span {
+      font-size:15px;
+      font-weight:700;
+      line-height:1.6;
     }
 
     .singleColumn {
@@ -985,6 +1041,42 @@
   white-space:pre-wrap;
 }
 
+.scannerQuantityCheckoutBox {
+  margin-top:12px;
+  padding:10px;
+  border:1px solid #99c5ff;
+  border-radius:10px;
+  background:#fff;
+}
+
+.scannerQuantityCheckoutBox label {
+  display:block;
+  margin-bottom:6px;
+  color:var(--ink);
+  font-size:13px;
+  font-weight:900;
+}
+
+.scannerQuantityCheckoutBox select {
+  width:100%;
+  min-height:48px;
+  padding:8px 10px;
+  border:1px solid var(--line);
+  border-radius:9px;
+  background:#fff;
+  color:var(--ink);
+  font-size:16px;
+}
+
+.scannerQuantityCheckoutStatus {
+  margin-top:7px;
+  color:var(--muted);
+  font-size:12px;
+  font-weight:700;
+  line-height:1.5;
+  white-space:pre-wrap;
+}
+
 .scannerQuantityField {
   display:grid;
   grid-template-columns:1fr auto;
@@ -1125,6 +1217,10 @@
     .wizardPostCard button { width:100%; margin-top:9px; min-height:54px; }
     .wizardPostCard .secondaryButton { background:#fff; color:var(--ink); border:1px solid var(--line); }
     .wizardPostSummary { margin:10px 0; white-space:pre-wrap; line-height:1.5; color:var(--muted); }
+
+    .isProcessing {
+      color:var(--blue-dark) !important;
+    }
     .wizardTitleCandidate {
       padding:14px; margin:10px 0; border:2px solid var(--ink); border-radius:10px;
       background:#fff; text-align:center; font-size:22px; font-weight:700; word-break:break-word;
