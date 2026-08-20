@@ -24,9 +24,7 @@ jobs:
       - name: Replace production contents
         run: |
           find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
-          cp -a /tmp/QR-app-development/. .
-          rm -rf .git
-          git checkout -- .git 2>/dev/null || true
+          rsync -a --exclude='.git' /tmp/QR-app-development/ ./
 
       - name: Commit and push synchronized contents
         run: |
