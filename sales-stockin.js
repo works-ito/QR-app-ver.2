@@ -20,7 +20,7 @@
     .then(function() { return loadScript("./compact-scanner-dev.js?v=53"); })
     .then(function() { return loadScript("./irregular-master-picker-dev.js?v=70"); })
     .then(function() { return loadScript("./irregular-entry-simplify-dev.js?v=72"); })
-    .then(function() { return loadScript("./irregular-category-ui-tuning-dev.js?v=63"); })
+    .then(function() { return loadScript("./irregular-category-ui-tuning-dev.js?v=64"); })
     .then(function() { return loadScript("./irregular-simple-id-alias-dev.js?v=42"); })
     .then(function() { return loadScript("./irregular-master-layout-dev.js?v=40"); })
     .then(function() { return loadScript("./irregular-registration-guard-dev.js?v=43"); })
