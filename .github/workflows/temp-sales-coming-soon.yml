@@ -1,0 +1,47 @@
+name: Temporary sales coming soon patch
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/temp-sales-coming-soon.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Patch sales stock-in button
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          index = Path('index.html')
+          text = index.read_text()
+          old = '''        <button\n          id="salesStockInEntryButton"\n          class="choiceButton"\n          type="button"\n        >'''
+          new = '''        <button\n          id="salesStockInEntryButton"\n          class="choiceButton salesComingSoon"\n          type="button"\n          disabled\n          aria-disabled="true"\n        >'''
+          if old not in text:
+              raise SystemExit('salesStockInEntryButton block not found')
+          text = text.replace(old, new, 1)
+          text = text.replace('./styles.css?v=20', './styles.css?v=21', 1)
+          index.write_text(text)
+
+          css = Path('styles.css')
+          c = css.read_text()
+          marker = '/* ===== 販売品入庫受付：実装準備中オーバーレイ ===== */'
+          if marker not in c:
+              c += '''\n\n/* ===== 販売品入庫受付：実装準備中オーバーレイ ===== */\n#salesStockInEntryButton.salesComingSoon {\n  position: relative;\n  overflow: hidden;\n  cursor: not-allowed;\n}\n\n#salesStockInEntryButton.salesComingSoon::after {\n  content: "※ ただいま実装準備中";\n  position: absolute;\n  inset: 0;\n  z-index: 2;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  padding: 8px 12px;\n  border-radius: inherit;\n  background: rgba(42, 48, 58, 0.68);\n  color: #fff;\n  font-size: 17px;\n  line-height: 1.25;\n  font-weight: 900;\n  letter-spacing: .01em;\n  text-shadow: 0 1px 2px rgba(0,0,0,.35);\n  pointer-events: none;\n}\n\n#salesStockInEntryButton.salesComingSoon:disabled {\n  opacity: 1;\n}\n'''
+          css.write_text(c)
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html styles.css
+          git commit -m "Disable sales stock-in entry until implementation" || exit 0
+          git push origin main
