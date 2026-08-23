@@ -1,0 +1,445 @@
+name: Temporary inventory status refactor
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/inventory-status-refactor-trigger.txt'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Refactor inventory status ownership
+        shell: python
+        run: |
+          from pathlib import Path
+
+          app = Path('app.js')
+          text = app.read_text(encoding='utf-8')
+
+          old_helpers = '''    function setInventoryDataStatus(
+      message,
+      state
+    ) {
+      stopAnimatedDots("inventoryDataStatus");
+
+      const status =
+        document.getElementById(
+          "inventoryDataStatus"
+        );
+
+      if (!status) return;
+
+      status.innerText = message;
+      status.className =
+        "inventoryDataStatus" +
+        (state ? " " + state : "");
+    }
+
+    function startInventoryDataStatusAnimation(
+      message
+    ) {
+      const status =
+        document.getElementById(
+          "inventoryDataStatus"
+        );
+
+      if (!status) return;
+
+      status.className =
+        "inventoryDataStatus isLoading";
+
+      startAnimatedDots(
+        "inventoryDataStatus",
+        message
+      );
+    }
+
+    function formatInventoryUpdatedAt(value) {
+      const date = value
+        ? new Date(value)
+        : null;
+
+      if (
+        !date ||
+        Number.isNaN(date.getTime())
+      ) {
+        return "更新時刻不明";
+      }
+
+      return new Intl.DateTimeFormat(
+        "ja-JP",
+        {
+          month:"2-digit",
+          day:"2-digit",
+          hour:"2-digit",
+          minute:"2-digit",
+          hour12:false
+        }
+      ).format(date);
+    }
+'''
+
+          new_helper = '''    function emitInventoryDataStatusEvent(type, detail) {
+      window.dispatchEvent(
+        new CustomEvent(
+          "inventorydata:" + type,
+          {
+            detail:detail || {}
+          }
+        )
+      );
+    }
+'''
+
+          if old_helpers not in text:
+              raise SystemExit('inventory status helper block not found')
+          text = text.replace(old_helpers, new_helper, 1)
+
+          old_loading = '''      if (showLoading) {
+        startInventoryDataStatusAnimation(
+          "在庫データ：最新データ取得中"
+        );
+      }
+'''
+          new_loading = '''      if (showLoading) {
+        emitInventoryDataStatusEvent("loading");
+      }
+'''
+          if old_loading not in text:
+              raise SystemExit('showLoading block not found')
+          text = text.replace(old_loading, new_loading, 1)
+
+          old_success = '''        const cache =
+          await saveInventoryCache();
+
+        return true;
+'''
+          new_success = '''        const cache =
+          await saveInventoryCache();
+
+        emitInventoryDataStatusEvent(
+          "ready",
+          {updatedAt:cache.updatedAt}
+        );
+
+        return true;
+'''
+          if old_success not in text:
+              raise SystemExit('inventory success block not found')
+          text = text.replace(old_success, new_success, 1)
+
+          old_catch = '''        console.error(
+          "在庫データ取得失敗",
+          error
+        );
+
+        return false;
+'''
+          new_catch = '''        console.error(
+          "在庫データ取得失敗",
+          error
+        );
+
+        emitInventoryDataStatusEvent(
+          "error",
+          {
+            message:appInitialDataError,
+            hasCachedData:appInitialDataLoaded
+          }
+        );
+
+        return false;
+'''
+          if old_catch not in text:
+              raise SystemExit('inventory catch block not found')
+          text = text.replace(old_catch, new_catch, 1)
+
+          old_init = '''      if (cache) {
+        startInventoryDataStatusAnimation(
+          "在庫データ：前回データ確認済み " +
+            formatInventoryUpdatedAt(
+              cache.updatedAt
+            ) +
+            "／最新データへ更新中"
+        );
+
+        const success =
+          await loadAppInitialData(false);
+
+        if (!success) {
+          setInventoryDataStatus(
+            "在庫データ：更新失敗・前回データを使用 " +
+              formatInventoryUpdatedAt(
+                cache.updatedAt
+              ),
+            "isError"
+          );
+        }
+
+        startScannerAfterInventoryReady();
+
+        return;
+      }
+
+      const success =
+        await loadAppInitialData(true);
+
+      if (!success) {
+        setInventoryDataStatus(
+          "在庫データ：取得失敗 " +
+            appInitialDataError,
+          "isError"
+        );
+      }
+
+      startScannerAfterInventoryReady();
+'''
+
+          new_init = '''      if (cache) {
+        emitInventoryDataStatusEvent("loading");
+
+        await loadAppInitialData(false);
+        startScannerAfterInventoryReady();
+
+        return;
+      }
+
+      await loadAppInitialData(true);
+      startScannerAfterInventoryReady();
+'''
+
+          if old_init not in text:
+              raise SystemExit('inventory initialize block not found')
+          text = text.replace(old_init, new_init, 1)
+
+          forbidden = [
+            'setInventoryDataStatus(',
+            'startInventoryDataStatusAnimation(',
+            'formatInventoryUpdatedAt(',
+            'document.getElementById(\n          "inventoryDataStatus"'
+          ]
+          for needle in forbidden:
+              if needle in text:
+                  raise SystemExit('old inventory status ownership still remains: ' + needle)
+
+          app.write_text(text, encoding='utf-8')
+
+          manual = Path('manual-refresh-ui-dev.js')
+          manual.write_text('''/*
+ * 手動更新UI v100
+ *
+ * 責務：
+ * - index.html に固定配置された在庫データ表示と［更新］ボタンへ動作を接続する。
+ * - inventorydata:* イベントを受け、更新中・成功・失敗の表示を一元管理する。
+ * - 通常時は在庫キャッシュの updatedAt を yyyy/MM/dd HH:mm 形式で表示する。
+ * - 更新ボタンはホーム画面追加版でも使えるよう、ページ全体を
+ *   キャッシュバスター付きURLで再読込する。
+ *
+ * DOM生成・style生成は行わない。
+ * 固定UIは index.html、見た目は styles.css を正とする。
+ */
+(function() {
+  "use strict";
+
+  const STATUS_ID = "inventoryDataStatus";
+  const BUTTON_ID = "manualAppRefreshButtonDev";
+  const DOT_INTERVAL_MS = 400;
+
+  let renderingFromCache = false;
+  let dotsTimer = null;
+
+  function pad2(value) {
+    return String(value).padStart(2, "0");
+  }
+
+  function formatAbsoluteMinute(value) {
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return "";
+
+    return (
+      date.getFullYear() + "/" +
+      pad2(date.getMonth() + 1) + "/" +
+      pad2(date.getDate()) + " " +
+      pad2(date.getHours()) + ":" +
+      pad2(date.getMinutes())
+    );
+  }
+
+  function getStatus() {
+    return document.getElementById(STATUS_ID);
+  }
+
+  function stopLoadingAnimation() {
+    if (dotsTimer) {
+      clearInterval(dotsTimer);
+      dotsTimer = null;
+    }
+  }
+
+  function showLoadingStatus() {
+    const status = getStatus();
+    if (!status) return;
+
+    stopLoadingAnimation();
+    status.className = "inventoryDataStatus isLoading";
+
+    let dots = 0;
+    const update = function() {
+      status.textContent =
+        "在庫データ：更新中" + ".".repeat(dots);
+      dots = (dots + 1) % 4;
+    };
+
+    update();
+    dotsTimer = setInterval(update, DOT_INTERVAL_MS);
+  }
+
+  function showReadyStatus(updatedAt) {
+    const status = getStatus();
+    if (!status) return false;
+
+    const formatted = formatAbsoluteMinute(updatedAt);
+    if (!formatted) return false;
+
+    stopLoadingAnimation();
+    status.className = "inventoryDataStatus isReady";
+    status.textContent = "在庫データ：" + formatted;
+    return true;
+  }
+
+  async function renderLatestCacheTimestamp() {
+    const status = getStatus();
+    if (!status || renderingFromCache) return;
+    if (typeof loadInventoryCache !== "function") return;
+
+    renderingFromCache = true;
+
+    try {
+      const cache = await loadInventoryCache();
+      if (cache && cache.updatedAt) {
+        showReadyStatus(cache.updatedAt);
+      }
+    } catch (error) {
+      console.warn("在庫データ更新時刻の表示に失敗しました", error);
+    } finally {
+      renderingFromCache = false;
+    }
+  }
+
+  function showErrorStatus(detail) {
+    const status = getStatus();
+    if (!status) return;
+
+    stopLoadingAnimation();
+
+    const info = detail || {};
+    const prefix = info.hasCachedData
+      ? "在庫データ：更新失敗・前回データを使用"
+      : "在庫データ：取得失敗";
+    const message = String(info.message || "").trim();
+
+    status.className = "inventoryDataStatus isError";
+    status.textContent = message
+      ? prefix + " " + message
+      : prefix;
+  }
+
+  function runFullRefresh(button) {
+    if (button.disabled) return;
+
+    button.disabled = true;
+    button.textContent = "更新中…";
+    showLoadingStatus();
+
+    const url = new URL(window.location.href);
+    url.search = "";
+    url.searchParams.set("appRefresh", String(Date.now()));
+    window.location.replace(url.toString());
+  }
+
+  function install() {
+    const status = getStatus();
+    const button = document.getElementById(BUTTON_ID);
+
+    if (!status || !button) {
+      console.warn("手動更新UI：固定DOMが見つかりません");
+      return;
+    }
+
+    if (button.dataset.manualRefreshBound !== "true") {
+      button.dataset.manualRefreshBound = "true";
+      button.addEventListener("click", function() {
+        runFullRefresh(button);
+      });
+    }
+
+    window.addEventListener("inventorydata:loading", function() {
+      showLoadingStatus();
+    });
+
+    window.addEventListener("inventorydata:ready", function(event) {
+      const updatedAt = event && event.detail
+        ? event.detail.updatedAt
+        : "";
+
+      if (!showReadyStatus(updatedAt)) {
+        void renderLatestCacheTimestamp();
+      }
+    });
+
+    window.addEventListener("inventorydata:error", function(event) {
+      showErrorStatus(event ? event.detail : null);
+    });
+
+    if (
+      typeof appInitialDataLoading !== "undefined" &&
+      appInitialDataLoading
+    ) {
+      showLoadingStatus();
+    } else {
+      void renderLatestCacheTimestamp();
+    }
+
+    console.info("開発版：手動更新UI v100 読込完了");
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", install, {once:true});
+  } else {
+    install();
+  }
+})();
+''', encoding='utf-8')
+
+          loader = Path('sales-stockin.js')
+          loader_text = loader.read_text(encoding='utf-8')
+          loader_text = loader_text.replace(
+            '/* 販売品入庫受付 v128 bootstrap */',
+            '/* 販売品入庫受付 v129 bootstrap */',
+            1
+          )
+          if './manual-refresh-ui-dev.js?v=99' not in loader_text:
+              raise SystemExit('manual refresh loader v99 not found')
+          loader_text = loader_text.replace(
+            './manual-refresh-ui-dev.js?v=99',
+            './manual-refresh-ui-dev.js?v=100',
+            1
+          )
+          loader.write_text(loader_text, encoding='utf-8')
+
+      - name: Commit refactor
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.js manual-refresh-ui-dev.js sales-stockin.js
+          git commit -m "Centralize inventory status UI ownership"
+          git push origin main
