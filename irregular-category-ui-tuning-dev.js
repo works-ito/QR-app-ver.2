@@ -1,9 +1,9 @@
-/* 開発版 v63：イレギュラー受付 大分類UIの可読性・横幅調整 */
+/* 開発版 v62：イレギュラー受付 大分類UIの可読性調整 */
 (function() {
   "use strict";
 
   const ROOT_ID = "irregularMasterPickerDev";
-  const STYLE_ID = "irregularCategoryUiTuningV63";
+  const STYLE_ID = "irregularCategoryUiTuningV55";
 
   const DISPLAY_LABELS = {
     "ハウス関連商品": "ハウス関連",
@@ -27,19 +27,7 @@
         margin-bottom: 0 !important;
       }
 
-      /*
-       * 大分類だけカード内の左右余白を少し使い、
-       * 長い分類名ができるだけ1行で収まる幅を確保する。
-       * 高さ・文字サイズは維持する。
-       */
-      #${ROOT_ID} .irregularMasterCategoryGrid {
-        margin-left: -6px !important;
-        margin-right: -6px !important;
-        column-gap: 2px !important;
-      }
       #${ROOT_ID} .irregularMasterCategoryGrid .irregularMasterChoice {
-        padding-left: 2px !important;
-        padding-right: 2px !important;
         font-size: 14px !important;
         font-weight: 800 !important;
         line-height: 1.28 !important;
@@ -84,5 +72,5 @@
     subtree: true
   });
 
-  console.info("開発版 v63：大分類名短縮 + 分類名文字サイズ維持 + 横幅拡張 有効");
+  console.info("開発版 v62：大分類名短縮 + 分類名文字サイズ拡大 有効");
 })();
