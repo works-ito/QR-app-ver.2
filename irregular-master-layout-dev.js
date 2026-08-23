@@ -1,4 +1,4 @@
-/* 開発版 v41：イレギュラー受付マスタ選択の一覧密度・画面遷移位置調整 */
+/* 開発版 v42：イレギュラー受付マスタ選択の一覧密度・画面遷移位置調整 */
 (function() {
   const STYLE_ID = "irregularMasterLayoutDevStyle";
   const ROOT_ID = "irregularMasterPickerDev";
@@ -13,7 +13,7 @@
         display:grid;
         grid-template-columns:repeat(2, minmax(0, 1fr));
         column-gap:8px;
-        row-gap:5px;
+        row-gap:3px;
       }
 
       #${ROOT_ID} .irregularMasterIdGrid .irregularMasterChoice {
@@ -25,11 +25,11 @@
         overflow-wrap:anywhere;
       }
 
-      /* 6.1インチ級でも縦間隔だけ少し詰め、列数は2列のまま */
+      /* 6.1インチ級でも縦間隔だけ詰め、列数は2列のまま */
       @media (min-width:400px) {
         #${ROOT_ID} .irregularMasterIdGrid {
           column-gap:9px;
-          row-gap:6px;
+          row-gap:3px;
         }
         #${ROOT_ID} .irregularMasterIdGrid .irregularMasterChoice {
           min-height:50px;
@@ -42,7 +42,7 @@
       @media (max-width:390px) {
         #${ROOT_ID} .irregularMasterIdGrid {
           column-gap:7px;
-          row-gap:4px;
+          row-gap:2px;
         }
         #${ROOT_ID} .irregularMasterIdGrid .irregularMasterChoice {
           min-height:46px;
