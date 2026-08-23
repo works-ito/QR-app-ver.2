@@ -1,5 +1,5 @@
 /*
- * イレギュラー受付：マスタ選択UI（開発版 v65）
+ * イレギュラー受付：マスタ選択UI（開発版 v68）
  *
  * GAS・既存送信処理は変更しない。
  * 管理番号候補は「簡易個体 → 個体 → REC → 軽量マスタ」の順で現在状態を優先し、
@@ -174,78 +174,6 @@
     return rows;
   }
 
-  function injectStyle() {
-    if (document.getElementById(STYLE_ID)) return;
-    const style = document.createElement("style");
-    style.id = STYLE_ID;
-    style.textContent = `
-      #${ROOT_ID}{margin:12px 0 18px;padding:0}
-      #${ROOT_ID} .irregularMasterLead{margin:0 0 10px;font-size:13px;line-height:1.55;color:#64748b}
-      #${ROOT_ID} .irregularMasterOpen{width:100%;min-height:58px;font-weight:800}
-      #${ROOT_ID} .irregularMasterOpen small{display:block;margin-top:3px;font-size:12px;font-weight:600;opacity:.72}
-      #${ROOT_ID} .irregularMasterPanel[hidden],#${ROOT_ID} .irregularMasterStep[hidden],#${ROOT_ID} .irregularMasterPending[hidden],#${ROOT_ID} .irregularMasterQueue[hidden]{display:none!important}
-      #${ROOT_ID} .irregularMasterPanel{margin-top:12px;padding:12px;border:1px solid #d8dee6;border-radius:14px;background:#f8fafc}
-      #${ROOT_ID} .irregularMasterTopline{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px}
-      #${ROOT_ID} .irregularMasterStepTitle{margin:0;font-size:16px;font-weight:800;color:#0f172a}
-      #${ROOT_ID} .irregularMasterSelectedCategory{display:inline-flex;align-items:center;max-width:70%;min-height:28px;padding:5px 9px;border-radius:999px;background:#eaf2ff;color:#1d4ed8;font-size:12px;font-weight:800;line-height:1.2}
-      #${ROOT_ID} .irregularMasterSelectedCategory:empty{display:none}
-      #${ROOT_ID} .irregularMasterHint{margin:0 0 10px;font-size:12px;line-height:1.5;color:#64748b}
-      #${ROOT_ID} .irregularMasterCategoryGrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:2px}
-      #${ROOT_ID} .irregularMasterItemGrid{display:grid;grid-template-columns:1fr;gap:2px}
-      #${ROOT_ID} .irregularMasterIdGrid{display:grid;grid-template-columns:1fr;gap:8px}
-      #${ROOT_ID} [data-master-step="category"] .irregularMasterHint,#${ROOT_ID} [data-master-step="item"] .irregularMasterHint{margin-bottom:7px}
-      #${ROOT_ID} .irregularMasterChoice{width:100%;min-height:52px;padding:10px 11px;text-align:left;border:1px solid #cbd5e1;border-radius:11px;background:#fff;color:#0f172a;font-size:14px;font-weight:750;line-height:1.3}
-      #${ROOT_ID} .irregularMasterCategoryGrid .irregularMasterChoice{min-height:43px;padding:4px 6px;text-align:center;font-size:13px}
-      #${ROOT_ID} .irregularMasterItemGrid .irregularMasterChoice{min-height:43px;padding:6px 8px;font-size:14px}
-      #${ROOT_ID} .irregularMasterChoice small{display:block;margin-top:3px;color:#64748b;font-size:11px;font-weight:600;line-height:1.35}
-      #${ROOT_ID} .irregularMasterChoice.isSelected{border-color:#2563eb;background:#eff6ff;color:#1d4ed8;box-shadow:inset 0 0 0 1px #2563eb}
-      #${ROOT_ID} .irregularMasterBack{width:100%;margin-top:10px}
-      #${ROOT_ID} .irregularMasterPager{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:8px;margin:10px 0}
-      #${ROOT_ID} .irregularMasterPager[hidden]{display:none!important}
-      #${ROOT_ID} .irregularMasterPagerButton{min-height:42px;padding:8px 10px;border:1px solid #93c5fd;border-radius:10px;background:#eff6ff;color:#1d4ed8;font-size:13px;font-weight:800}
-      #${ROOT_ID} .irregularMasterPagerButton:disabled{border-color:#dbe3ee;background:#f8fafc;color:#94a3b8;opacity:1}
-      #${ROOT_ID} .irregularMasterPagerInfo{min-width:78px;text-align:center;color:#64748b;font-size:11px;font-weight:700;line-height:1.35}
-      #${ROOT_ID} .irregularMasterPagerInfo strong{display:block;color:#0f172a;font-size:12px}
-      #${ROOT_ID} .irregularMasterNotice{margin:10px 0;padding:10px 11px;border-radius:10px;background:#fff7ed;color:#9a3412;font-size:12px;line-height:1.55}
-      #${ROOT_ID} .irregularMasterPreviewBox{margin-top:10px;padding:10px;border:1px dashed #94a3b8;border-radius:11px;background:#fff}
-      #${ROOT_ID} .irregularMasterPreviewBox strong{display:block;margin-bottom:5px;font-size:13px}
-      #${ROOT_ID} .irregularMasterPreviewActions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
-      #${ROOT_ID} .irregularMasterPreviewButton{min-height:48px;padding:8px;font-size:12px}
-      #${ROOT_ID} .irregularMasterPending{margin-top:10px;padding:11px;border-radius:11px;background:#fff;border:1px solid #dbe3ee}
-      #${ROOT_ID} .irregularMasterPendingTitle{margin:0 0 6px;font-size:13px;font-weight:800}
-      #${ROOT_ID} .irregularMasterPendingMain{font-size:15px;font-weight:800;line-height:1.4}
-      #${ROOT_ID} .irregularMasterPendingSub{margin-top:3px;font-size:12px;color:#64748b}
-      #${ROOT_ID} .irregularMasterQuantityCheckout{margin-top:10px;padding:9px;border:1px solid #bfdbfe;border-radius:10px;background:#eff6ff}
-      #${ROOT_ID} .irregularMasterQuantityCheckout label{display:block;margin:0 0 5px;font-size:12px;font-weight:800}
-      #${ROOT_ID} .irregularMasterQuantityCheckout select{width:100%;min-height:46px;padding:7px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-size:14px}
-      #${ROOT_ID} .irregularMasterQuantityCheckoutStatus{margin-top:6px;font-size:11px;line-height:1.45;color:#64748b}
-      #${ROOT_ID} .irregularMasterQuantityField{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;margin-top:10px}
-      #${ROOT_ID} .irregularMasterQuantityField input{min-width:0;width:100%;min-height:48px;font-size:16px!important}
-      #${ROOT_ID} .irregularMasterQuantityUnit{min-width:34px;text-align:left;font-weight:800}
-      #${ROOT_ID} .irregularMasterAddButton{width:100%;min-height:52px;margin-top:10px;font-weight:800}
-      #${ROOT_ID} .irregularMasterQueue{margin-top:14px;padding-top:12px;border-top:1px solid #d8dee6}
-      #${ROOT_ID} .irregularMasterQueueHeader{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
-      #${ROOT_ID} .irregularMasterQueueTitle{margin:0;font-size:15px;font-weight:800}
-      #${ROOT_ID} .irregularMasterQueueCount{font-size:12px;font-weight:800;color:#2563eb}
-      #${ROOT_ID} .irregularMasterQueueList{display:grid;gap:7px}
-      #${ROOT_ID} .irregularMasterQueueRow{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;padding:9px 10px;border:1px solid #dbe3ee;border-radius:10px;background:#fff}
-      #${ROOT_ID} .irregularMasterQueueMain{min-width:0;font-size:13px;font-weight:800;line-height:1.35}
-      #${ROOT_ID} .irregularMasterQueueSub{margin-top:2px;font-size:11px;color:#64748b}
-      #${ROOT_ID} .irregularMasterRemove{min-width:46px;min-height:38px;padding:6px 8px;font-size:12px}
-      #${ROOT_ID} .irregularMasterQueueActions{display:grid;grid-template-columns:1fr;gap:8px;margin-top:10px}
-      #${ROOT_ID} .irregularMasterNextItem,#${ROOT_ID} .irregularMasterBatchSend{width:100%;min-height:52px}
-      #${ROOT_ID} .irregularMasterUiOnly{margin-top:7px;font-size:11px;line-height:1.45;color:#64748b;text-align:center}
-      @media(max-width:390px){
-        #${ROOT_ID} .irregularMasterPanel{padding:10px}
-        #${ROOT_ID} .irregularMasterCategoryGrid{gap:2px}
-        #${ROOT_ID} .irregularMasterCategoryGrid .irregularMasterChoice{min-height:42px;font-size:12px}
-        #${ROOT_ID} .irregularMasterPager{gap:6px}
-        #${ROOT_ID} .irregularMasterPagerButton{min-height:40px;padding:7px 8px;font-size:12px}
-        #${ROOT_ID} .irregularMasterPagerInfo{min-width:70px;font-size:10px}
-      }
-    `;
-    document.head.appendChild(style);
-  }
 
   function root(){return document.getElementById(ROOT_ID)}
   function panel(){return document.getElementById("irregularMasterPickerPanel")}
@@ -973,68 +901,14 @@
   }
 
   function injectUi() {
-    if (root()) return;
-    const irregularArea = document.getElementById("wizardIrregularArea");
-    if (!irregularArea) return;
+  const irregularArea =
+    document.getElementById("wizardIrregularArea");
 
-    const container = document.createElement("div");
-    container.id = ROOT_ID;
-    container.innerHTML = `
-      <p class="irregularMasterLead">QRがない・読めない場合は、マスタから対象を選べます。既存の直接入力・番号不明もそのまま使用できます。</p>
-      <button type="button" id="irregularMasterPickerOpenButton" class="choiceButton irregularMasterOpen">マスタから選ぶ<small>大分類 → 機種・品目 → 管理番号／数量</small></button>
-      <div id="irregularMasterPickerPanel" class="irregularMasterPanel" hidden>
-        <div class="irregularMasterTopline"><h4 class="irregularMasterStepTitle">マスタから選ぶ</h4><span id="irregularMasterSelectedCategory" class="irregularMasterSelectedCategory"></span></div>
-        <div id="irregularMasterNotice" class="irregularMasterNotice" hidden></div>
-        <section class="irregularMasterStep" data-master-step="category">
-          <p class="irregularMasterHint">大分類を選んでください</p><div id="irregularMasterCategoryGrid" class="irregularMasterCategoryGrid"></div>
-        </section>
-        <section class="irregularMasterStep" data-master-step="item" hidden>
-          <p class="irregularMasterHint">機種／品目を選んでください</p><div id="irregularMasterItemGrid" class="irregularMasterItemGrid"></div>
-          <button type="button" id="irregularMasterBackToCategory" class="secondaryButton irregularMasterBack">← 大分類へ戻る</button>
-        </section>
-        <section class="irregularMasterStep" data-master-step="managedId" hidden>
-          <p class="irregularMasterHint">管理番号を選んでください（複数選択可）</p>
-          <div id="irregularMasterManagedTitle" class="irregularMasterPendingMain"></div>
-          <div id="irregularMasterPagerTop" class="irregularMasterPager" hidden></div>
-          <div id="irregularMasterIdGrid" class="irregularMasterIdGrid"></div>
-          <div id="irregularMasterPagerBottom" class="irregularMasterPager" hidden></div>
-          <div id="irregularMasterPending" class="irregularMasterPending" hidden>
-            <div class="irregularMasterPendingTitle">選択中</div>
-            <div id="irregularMasterPendingMain" class="irregularMasterPendingMain"></div>
-            <div id="irregularMasterPendingSub" class="irregularMasterPendingSub"></div>
-            <button type="button" id="irregularMasterAddMachine" class="nextButton irregularMasterAddButton" data-managed-ids="[]">追加</button>
-          </div>
-          <button type="button" id="irregularMasterBackToItemFromId" class="secondaryButton irregularMasterBack">← 機種一覧へ戻る</button>
-        </section>
-        <section class="irregularMasterStep" data-master-step="quantity" hidden>
-          <p class="irregularMasterHint">数量を入力してください</p>
-          <div class="irregularMasterPending">
-            <div id="irregularMasterQuantityName" class="irregularMasterPendingMain"></div>
-            <div id="irregularMasterQuantitySub" class="irregularMasterPendingSub"></div>
-            <div id="irregularMasterQuantityCheckout" class="irregularMasterQuantityCheckout" hidden>
-              <label for="irregularMasterQuantityCheckoutSelect">取消対象の出庫履歴</label>
-              <select id="irregularMasterQuantityCheckoutSelect"></select>
-              <div id="irregularMasterQuantityCheckoutStatus" class="irregularMasterQuantityCheckoutStatus"></div>
-            </div>
-            <div class="irregularMasterQuantityField"><input id="irregularMasterQuantityValue" type="number" inputmode="numeric" min="1" step="1" placeholder="数量"><span id="irregularMasterQuantityUnit" class="irregularMasterQuantityUnit">個</span></div>
-            <button type="button" id="irregularMasterAddQuantity" class="nextButton irregularMasterAddButton">追加</button>
-          </div>
-          <button type="button" id="irregularMasterBackToItemFromQuantity" class="secondaryButton irregularMasterBack">← 品目一覧へ戻る</button>
-        </section>
-        <section id="irregularMasterQueue" class="irregularMasterQueue" hidden>
-          <div class="irregularMasterQueueHeader"><h4 class="irregularMasterQueueTitle">追加済み一覧</h4><span id="irregularMasterQueueCount" class="irregularMasterQueueCount">0件</span></div>
-          <div id="irregularMasterQueueList" class="irregularMasterQueueList"></div>
-          <div class="irregularMasterQueueActions"><button type="button" id="irregularMasterNextItem" class="secondaryButton irregularMasterNextItem">次の商品を追加</button><button type="button" id="irregularMasterBatchSend" class="nextButton irregularMasterBatchSend">まとめて送信</button></div>
-          <div class="irregularMasterUiOnly">通常QRと同じ送信・在庫確認・写真工程で処理します</div>
-        </section>
-        <button type="button" id="irregularMasterPickerCloseButton" class="secondaryButton irregularMasterBack">マスタ選択を閉じる</button>
-      </div>`;
+  if (!irregularArea) return;
 
-    const heading = irregularArea.querySelector("h3");
-    if (heading && heading.nextSibling) irregularArea.insertBefore(container,heading.nextSibling);
-    else irregularArea.prepend(container);
-
-    document.getElementById("irregularMasterPickerOpenButton").addEventListener("click",openPicker);
+  document
+    .getElementById("irregularMasterPickerOpenButton")
+    .addEventListener("click", openPicker);
     document.getElementById("irregularMasterPickerCloseButton").addEventListener("click",closePicker);
     document.getElementById("irregularMasterBackToCategory").addEventListener("click",renderCategories);
     document.getElementById("irregularMasterBackToItemFromId").addEventListener("click",function(){renderItems(pickerState.category)});
@@ -1055,7 +929,7 @@
     observer.observe(irregularArea,{attributes:true,attributeFilter:["hidden"]});
   }
 
-  function init(){injectStyle();injectUi();watchIrregularArea()}
+  function init(){injectUi();watchIrregularArea()}
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded",init,{once:true});
   else init();
 })();

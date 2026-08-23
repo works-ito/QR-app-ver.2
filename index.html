@@ -3,16 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>QR在庫管理｜開発版</title>
+  <title>QR在庫管理｜ver.2.2</title>
   <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
-  <link rel="stylesheet" href="./styles.css?v=16">
+  <link rel="stylesheet" href="./styles.css?v=20">
 </head>
 <body>
 <main class="app">
     <header class="appHeader">
       <div class="brand">
         <div class="brandTitle">
-          QR在庫管理 ver.2.1
+          QR在庫管理 ver.2.2
         </div>
 
         <div class="brandSub">
@@ -40,12 +40,25 @@
     </header>
 
     <div
-      id="inventoryDataStatus"
-      class="inventoryDataStatus isLoading"
-      aria-live="polite"
-    >
-      在庫データ：確認中
-    </div>
+  id="inventoryRefreshRowDev"
+  class="inventoryRefreshRowDev"
+>
+  <div
+    id="inventoryDataStatus"
+    class="inventoryDataStatus isLoading"
+    aria-live="polite"
+  >
+    在庫データ：確認中
+  </div>
+
+  <button
+    id="manualAppRefreshButtonDev"
+    class="manualAppRefreshButtonDev"
+    type="button"
+  >
+    更新
+  </button>
+</div>
 
     <div
       id="progress"
@@ -109,6 +122,235 @@
           <span class="choiceSubText">
             管理QRなし・破損・読取不可
           </span>
+        </button>
+        <button
+          id="salesStockInEntryButton"
+          class="choiceButton"
+          type="button"
+        >
+          販売品入庫受付
+
+          <span class="choiceSubText">
+            仕入れた販売品の在庫を増やす
+          </span>
+        </button>
+      </div>
+
+      <button
+        id="receptionLastSendCancelButton"
+        class="wizardCancelSendButton"
+        type="button"
+      >
+        直前送信を取消（5分間有効）
+      </button>
+    </section>
+        <!-- 販売品入庫受付 -->
+    <section
+      id="salesStockInPanel"
+      class="panel"
+    >
+      <div class="stepHeader">
+        <div class="stepLabel">販売品入庫</div>
+
+        <div
+          class="receptionStatus"
+          style="background:#e8f5e9;color:#1b5e20;border-color:#a5d6a7;"
+        >
+          販売品入庫受付
+        </div>
+      </div>
+
+      <div
+        id="salesStockInTopStatus"
+        class="salesTopStatus"
+      ></div>
+
+      <div
+        class="salesStep"
+        data-sales-step="location"
+      >
+        <h1 class="question">
+          実施拠点を選んでください
+        </h1>
+
+        <p class="questionHint">
+          販売品を入庫する拠点を選択します
+        </p>
+
+        <div
+          id="salesStockInLocations"
+          class="buttonGrid singleColumn"
+        ></div>
+      </div>
+
+      <div
+        class="salesStep"
+        data-sales-step="user"
+      >
+        <h1 class="question">
+          担当者を選んでください
+        </h1>
+
+        <p class="questionHint">
+          今回の販売品入庫を登録する担当者を選択します
+        </p>
+
+        <div
+          id="salesStockInUsers"
+          class="buttonGrid"
+        ></div>
+      </div>
+
+      <div
+        class="salesStep"
+        data-sales-step="items"
+      >
+        <h1 class="question">
+          入庫する販売品を追加してください
+        </h1>
+
+        <p class="questionHint">
+          一覧またはQRから選び、数量を入力します。複数品目を続けて追加できます。
+        </p>
+
+        <div class="salesSectionCard">
+          <h2>一覧から追加</h2>
+
+          <p>
+            数量管理品マスタの「区分＝販売品」だけ表示します。
+          </p>
+
+          <select id="salesStockInItemSelect"></select>
+
+          <div class="salesInlineField">
+            <input
+              id="salesStockInQuantity"
+              type="number"
+              inputmode="numeric"
+              min="1"
+              step="1"
+              placeholder="数量"
+            >
+
+            <button
+              id="salesStockInAddButton"
+              type="button"
+            >
+              追加
+            </button>
+          </div>
+        </div>
+
+        <div class="salesSectionCard">
+          <h2>QRから追加</h2>
+
+          <p>
+            棚などの販売品QRを読んで品目を指定することもできます。
+          </p>
+
+          <button
+            id="salesStockInQrStartButton"
+            type="button"
+          >
+            販売品QRを読み取る
+          </button>
+
+          <div
+            id="salesStockInQrStatus"
+            class="wizardPostSummary"
+          >
+            QR読取は任意です
+          </div>
+
+          <div id="salesStockInQrViewport">
+            <video
+              id="salesStockInQrVideo"
+              playsinline
+              muted
+            ></video>
+          </div>
+
+          <div
+            id="salesStockInQrDetected"
+            class="wizardPostSummary"
+          ></div>
+
+          <div class="salesInlineField">
+            <input
+              id="salesStockInQrQuantity"
+              type="number"
+              inputmode="numeric"
+              min="1"
+              step="1"
+              placeholder="数量"
+            >
+
+            <button
+              id="salesStockInQrAddButton"
+              type="button"
+            >
+              追加
+            </button>
+          </div>
+        </div>
+
+        <div class="salesSectionCard">
+          <h2>追加済み</h2>
+
+          <div
+            id="salesStockInRows"
+            class="quantityInspectionRows"
+          ></div>
+        </div>
+
+        <button
+          id="salesStockInProceedButton"
+          class="nextButton"
+          type="button"
+          disabled
+        >
+          入庫確定へ進む
+        </button>
+      </div>
+
+      <div
+        class="salesStep"
+        data-sales-step="confirm"
+      >
+        <h1 class="question">
+          入庫内容を最終確認してください
+        </h1>
+
+        <p class="questionHint">
+          確定後は指定拠点の販売品在庫へ加算します。
+        </p>
+
+        <div
+          id="salesStockInConfirmSummary"
+          class="wizardPostSummary"
+        ></div>
+
+        <div id="salesStockInConfirmList"></div>
+
+        <button
+          id="salesStockInFinalButton"
+          class="wizardSendButton"
+          type="button"
+          disabled
+        >
+          この内容で入庫する
+        </button>
+
+        <div class="connectionNote">
+          開発版：GASの仕入入庫処理を接続後、このボタンを有効化します。
+        </div>
+
+        <button
+          id="salesStockInConfirmBackButton"
+          class="backButton salesBackButton"
+          type="button"
+        >
+          販売品追加へ戻る
         </button>
       </div>
     </section>
@@ -257,7 +499,6 @@
       <p class="questionHint">
         作業を実施している拠点を選択します
       </p>
-
       <div
         id="locationButtons"
         class="buttonGrid singleColumn"
@@ -525,6 +766,7 @@
           <button
             id="wizardConfirmReturnMemoButton"
             type="button"
+            hidden
           >
             この内容で返却を送信
           </button>
@@ -533,6 +775,7 @@
             id="wizardCancelReturnMemoButton"
             class="secondaryButton"
             type="button"
+            hidden
           >
             戻る
           </button>
@@ -542,6 +785,19 @@
           id="wizardSendBatchButton"
           class="wizardSendButton"
           type="button"
+          onclick="
+            var returnMemoArea = document.getElementById('wizardReturnMemoArea');
+            if (returnMemoArea && !returnMemoArea.hidden) {
+              document.getElementById('wizardConfirmReturnMemoButton').click();
+              event.stopImmediatePropagation();
+              return false;
+            }
+            setTimeout(function() {
+              if (returnMemoArea && !returnMemoArea.hidden) {
+                document.getElementById('wizardSendBatchButton').innerText = 'この内容で返却を送信';
+              }
+            }, 0);
+          "
         >
           読取分をまとめて送信
         </button>
@@ -553,14 +809,7 @@
           aria-live="polite"
         ></div>
 
-        <button
-          id="wizardCancelSendButton"
-          class="wizardCancelSendButton"
-          type="button"
-        >
-          直前送信を取消（5分間有効）
-        </button>
-
+        
       </div>
 
       <div id="quantityInspectionArea" class="quantityInspectionArea" hidden>
@@ -600,6 +849,279 @@
   <section id="wizardPostSendArea" class="wizardPostSendArea" hidden>
     <div id="wizardIrregularArea" class="wizardPostCard" hidden>
       <h3>イレギュラー受付内容</h3>
+            <!-- イレギュラー受付：マスタ選択 -->
+      <div id="irregularMasterPickerDev">
+        <p class="irregularMasterLead">
+          QRがない・読めない場合は、マスタから対象を選べます。既存の直接入力・番号不明もそのまま使用できます。
+        </p>
+
+        <button
+          type="button"
+          id="irregularMasterPickerOpenButton"
+          class="choiceButton irregularMasterOpen"
+        >
+          マスタから選ぶ
+          <small>
+            大分類 → 機種・品目 → 管理番号／数量
+          </small>
+        </button>
+
+        <div
+          id="irregularMasterPickerPanel"
+          class="irregularMasterPanel"
+          hidden
+        >
+          <div class="irregularMasterTopline">
+            <h4 class="irregularMasterStepTitle">
+              マスタから選ぶ
+            </h4>
+
+            <span
+              id="irregularMasterSelectedCategory"
+              class="irregularMasterSelectedCategory"
+            ></span>
+          </div>
+
+          <div
+            id="irregularMasterNotice"
+            class="irregularMasterNotice"
+            hidden
+          ></div>
+
+          <section
+            class="irregularMasterStep"
+            data-master-step="category"
+          >
+            <p class="irregularMasterHint">
+              大分類を選んでください
+            </p>
+
+            <div
+              id="irregularMasterCategoryGrid"
+              class="irregularMasterCategoryGrid"
+            ></div>
+          </section>
+
+          <section
+            class="irregularMasterStep"
+            data-master-step="item"
+            hidden
+          >
+            <p class="irregularMasterHint">
+              機種／品目を選んでください
+            </p>
+
+            <div
+              id="irregularMasterItemGrid"
+              class="irregularMasterItemGrid"
+            ></div>
+
+            <button
+              type="button"
+              id="irregularMasterBackToCategory"
+              class="secondaryButton irregularMasterBack"
+            >
+              ← 大分類へ戻る
+            </button>
+          </section>
+
+          <section
+            class="irregularMasterStep"
+            data-master-step="managedId"
+            hidden
+          >
+            <p class="irregularMasterHint">
+              管理番号を選んでください（複数選択可）
+            </p>
+
+            <div
+              id="irregularMasterManagedTitle"
+              class="irregularMasterPendingMain"
+            ></div>
+
+            <div
+              id="irregularMasterPagerTop"
+              class="irregularMasterPager"
+              hidden
+            ></div>
+
+            <div
+              id="irregularMasterIdGrid"
+              class="irregularMasterIdGrid"
+            ></div>
+
+            <div
+              id="irregularMasterPagerBottom"
+              class="irregularMasterPager"
+              hidden
+            ></div>
+
+            <div
+              id="irregularMasterPending"
+              class="irregularMasterPending"
+              hidden
+            >
+              <div class="irregularMasterPendingTitle">
+                選択中
+              </div>
+
+              <div
+                id="irregularMasterPendingMain"
+                class="irregularMasterPendingMain"
+              ></div>
+
+              <div
+                id="irregularMasterPendingSub"
+                class="irregularMasterPendingSub"
+              ></div>
+
+              <button
+                type="button"
+                id="irregularMasterAddMachine"
+                class="nextButton irregularMasterAddButton"
+                data-managed-ids="[]"
+              >
+                追加
+              </button>
+            </div>
+
+            <button
+              type="button"
+              id="irregularMasterBackToItemFromId"
+              class="secondaryButton irregularMasterBack"
+            >
+              ← 機種一覧へ戻る
+            </button>
+          </section>
+
+          <section
+            class="irregularMasterStep"
+            data-master-step="quantity"
+            hidden
+          >
+            <p class="irregularMasterHint">
+              数量を入力してください
+            </p>
+
+            <div class="irregularMasterPending">
+              <div
+                id="irregularMasterQuantityName"
+                class="irregularMasterPendingMain"
+              ></div>
+
+              <div
+                id="irregularMasterQuantitySub"
+                class="irregularMasterPendingSub"
+              ></div>
+
+              <div
+                id="irregularMasterQuantityCheckout"
+                class="irregularMasterQuantityCheckout"
+                hidden
+              >
+                <label for="irregularMasterQuantityCheckoutSelect">
+                  取消対象の出庫履歴
+                </label>
+
+                <select id="irregularMasterQuantityCheckoutSelect"></select>
+
+                <div
+                  id="irregularMasterQuantityCheckoutStatus"
+                  class="irregularMasterQuantityCheckoutStatus"
+                ></div>
+              </div>
+
+              <div class="irregularMasterQuantityField">
+                <input
+                  id="irregularMasterQuantityValue"
+                  type="number"
+                  inputmode="numeric"
+                  min="1"
+                  step="1"
+                  placeholder="数量"
+                >
+
+                <span
+                  id="irregularMasterQuantityUnit"
+                  class="irregularMasterQuantityUnit"
+                >
+                  個
+                </span>
+              </div>
+
+              <button
+                type="button"
+                id="irregularMasterAddQuantity"
+                class="nextButton irregularMasterAddButton"
+              >
+                追加
+              </button>
+            </div>
+
+            <button
+              type="button"
+              id="irregularMasterBackToItemFromQuantity"
+              class="secondaryButton irregularMasterBack"
+            >
+              ← 品目一覧へ戻る
+            </button>
+          </section>
+
+          <section
+            id="irregularMasterQueue"
+            class="irregularMasterQueue"
+            hidden
+          >
+            <div class="irregularMasterQueueHeader">
+              <h4 class="irregularMasterQueueTitle">
+                追加済み一覧
+              </h4>
+
+              <span
+                id="irregularMasterQueueCount"
+                class="irregularMasterQueueCount"
+              >
+                0件
+              </span>
+            </div>
+
+            <div
+              id="irregularMasterQueueList"
+              class="irregularMasterQueueList"
+            ></div>
+
+            <div class="irregularMasterQueueActions">
+              <button
+                type="button"
+                id="irregularMasterNextItem"
+                class="secondaryButton irregularMasterNextItem"
+              >
+                次の商品を追加
+              </button>
+
+              <button
+                type="button"
+                id="irregularMasterBatchSend"
+                class="nextButton irregularMasterBatchSend"
+              >
+                まとめて送信
+              </button>
+            </div>
+
+            <div class="irregularMasterUiOnly">
+              通常QRと同じ送信・在庫確認・写真工程で処理します
+            </div>
+          </section>
+
+          <button
+            type="button"
+            id="irregularMasterPickerCloseButton"
+            class="secondaryButton irregularMasterBack"
+          >
+            マスタ選択を閉じる
+          </button>
+        </div>
+      </div>
       <div class="wizardRadioGrid">
         <label><input type="radio" name="wizardIrregularNumberType" value="入力" checked>番号を入力する</label>
         <label><input type="radio" name="wizardIrregularNumberType" value="番号不明">番号が読めない</label>
@@ -702,6 +1224,6 @@
   <div id="inventoryRuntime" hidden></div>
   <script src="./scanner-try-harder-dev.js?v=49"></script>
   <script src="./app.js?v=66"></script>
-  <script src="./sales-stockin.js?v=97"></script>
+  <script src="./sales-stockin.js?v=117"></script>
 </body>
 </html>

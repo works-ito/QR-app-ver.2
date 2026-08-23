@@ -1,18 +1,14 @@
 /*
- * イレギュラー受付：マスタ選択 → 共通送信ブリッジ補強 v85
+ * イレギュラー受付：マスタ選択 → 共通送信ブリッジ補強 v88
  *
- * 目的：
+ * 責務：
  * - マスタ選択キューを通常QRと同じ scannedEntries / sendWizardBatch() へ渡す。
- * - 返却時、追記確認へ遷移した時点でキュー側は受け渡し完了とする。
- * - マスタ選択後に旧「番号入力」画面へ戻らず、返却追記へそのまま進める。
- * - 出庫などの実送信では、送信受理直後にイレギュラー受付カードを先に閉じない。
- *   共通の beginWizardPostSendFlow() が次画面を開く直前に既存処理で閉じる。
- * - イレギュラー返却の追記画面だけを post-send 領域へ一時移動し、
- *   QRカメラ領域や通常側の取消ボタンを誤表示しない。
+ * - 返却時、追記確認へ遷移した時点では送信完了扱いにしない。
  * - 同一レコードが既に staged 済みなら、同内容に限って再利用する。
  * - 数量・出庫取消は sourceQuantityLogId まで含めて同一性を判定する。
  * - 数量管理品の拠点移動は sourceLocation を共通送信レコードへ保持する。
  *
+ * 返却追記UIの配置管理は wizard-return-memo-host-dev.js に委譲する。
  * GASは変更しない。
  */
 (function() {
@@ -43,93 +39,6 @@
       normalize(existing.managementType) === normalize(candidate.managementType)
     );
   }
-
-  function restoreReturnMemoHost() {
-    const memoArea =
-      document.getElementById("wizardReturnMemoArea");
-    const cameraArea =
-      document.getElementById("cameraPreview");
-
-    if (
-      memoArea &&
-      cameraArea &&
-      memoArea.parentElement !== cameraArea
-    ) {
-      const sendButton =
-        document.getElementById("wizardSendBatchButton");
-
-      if (sendButton && sendButton.parentElement === cameraArea) {
-        cameraArea.insertBefore(memoArea, sendButton);
-      } else {
-        cameraArea.appendChild(memoArea);
-      }
-    }
-  }
-
-  function prepareReturnMemoHost() {
-    const irregularArea =
-      document.getElementById("wizardIrregularArea");
-    const postSendArea =
-      document.getElementById("wizardPostSendArea");
-    const memoArea =
-      document.getElementById("wizardReturnMemoArea");
-    const cameraArea =
-      document.getElementById("cameraPreview");
-
-    if (irregularArea) {
-      irregularArea.hidden = true;
-    }
-
-    if (cameraArea) {
-      cameraArea.classList.remove("isActive");
-    }
-
-    if (postSendArea) {
-      postSendArea.hidden = false;
-    }
-
-    if (
-      memoArea &&
-      postSendArea &&
-      memoArea.parentElement !== postSendArea
-    ) {
-      const postSendCancel =
-        document.getElementById("wizardPostSendCancelButton");
-
-      if (
-        postSendCancel &&
-        postSendCancel.parentElement === postSendArea
-      ) {
-        postSendArea.insertBefore(memoArea, postSendCancel);
-      } else {
-        postSendArea.appendChild(memoArea);
-      }
-    }
-  }
-
-  function installReturnMemoRestoreObserver() {
-    const memoArea =
-      document.getElementById("wizardReturnMemoArea");
-
-    if (!memoArea || memoArea.dataset.masterBridgeObserved === "true") {
-      return;
-    }
-
-    memoArea.dataset.masterBridgeObserved = "true";
-
-    const observer = new MutationObserver(function() {
-      if (memoArea.hidden) {
-        restoreReturnMemoHost();
-      }
-    });
-
-    observer.observe(memoArea, {
-      attributes:true,
-      attributeFilter:["hidden"]
-    });
-  }
-
-  installReturnMemoRestoreObserver();
 
   window.sendIrregularMasterPickerBatch = async function(records) {
     if (!Array.isArray(records) || !records.length) {
@@ -249,21 +158,24 @@
       !wizardReturnMemoConfirmed;
 
     if (isReturnMemoStage) {
-      prepareReturnMemoHost();
+      if (
+        !window.wizardReturnMemoHost ||
+        typeof window.wizardReturnMemoHost.prepare !== "function"
+      ) {
+        console.error("返却追記UIホスト管理が読み込まれていません");
+        alert("返却画面の準備に失敗しました。画面を再読み込みしてください。");
+        return false;
+      }
+
+      window.wizardReturnMemoHost.prepare();
       await sendWizardBatch();
-      return true;
+      return false;
     }
 
-    /*
-     * v81で入れた onAccepted 即時非表示は使わない。
-     * 送信中は現在のカードを維持し、
-     * beginWizardPostSendFlow() が写真・追記画面を開く直前に
-     * 既存 hideWizardPostSendCards() で切り替える。
-     */
     return await sendWizardBatch();
   };
 
   console.info(
-    "開発版：イレギュラーマスタ送信ブリッジ v85 読込完了"
+    "開発版：イレギュラーマスタ送信ブリッジ v88 読込完了"
   );
 })();

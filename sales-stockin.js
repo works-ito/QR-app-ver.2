@@ -1,4 +1,4 @@
-/* 販売品入庫受付 v100 bootstrap */
+/* 販売品入庫受付 v125 bootstrap */
 (function() {
   function loadScript(src) {
     return new Promise(function(resolve, reject) {
@@ -18,22 +18,24 @@
     .then(function() { return loadScript("./sales-stockin-scan-enhancements.js?v=33"); })
     .then(function() { return loadScript("./sales-stockin-guards.js?v=33"); })
     .then(function() { return loadScript("./compact-scanner-dev.js?v=53"); })
-    .then(function() { return loadScript("./irregular-master-picker-dev.js?v=65"); })
+    .then(function() { return loadScript("./irregular-master-picker-dev.js?v=64"); })
     .then(function() { return loadScript("./irregular-entry-simplify-dev.js?v=72"); })
-    .then(function() { return loadScript("./irregular-category-ui-tuning-dev.js?v=63"); })
+    .then(function() { return loadScript("./irregular-category-ui-tuning-dev.js?v=62"); })
     .then(function() { return loadScript("./irregular-simple-id-alias-dev.js?v=42"); })
-    .then(function() { return loadScript("./irregular-master-layout-dev.js?v=42"); })
+    .then(function() { return loadScript("./irregular-master-layout-dev.js?v=40"); })
     .then(function() { return loadScript("./irregular-registration-guard-dev.js?v=43"); })
     .then(function() { return loadScript("./irregular-quantity-flow-dev.js?v=55"); })
-    .then(function() { return loadScript("./irregular-master-send-bridge-dev.js?v=85"); })
-    .then(function() { return loadScript("./irregular-master-shipment-photo-dev.js?v=82"); })
+    .then(function() { return loadScript("./wizard-send-status-host-dev.js?v=1"); })
+    .then(function() { return loadScript("./wizard-photo-flow-dev.js?v=1"); })
+    .then(function() { return loadScript("./wizard-return-memo-host-dev.js?v=2"); })
+    .then(function() { return loadScript("./irregular-master-send-bridge-dev.js?v=88"); })
     .then(function() { return loadScript("./quantity-transfer-dev.js?v=96"); })
     .then(function() { return loadScript("./gemini-timing-dev.js?v=77"); })
     .then(function() { return loadScript("./gemini-whole-image-dev.js?v=80"); })
     .then(function() { return loadScript("./mode-description-hint-dev.js?v=37"); })
-    .then(function() { return loadScript("./wizard-session-finish-dev.js?v=88"); })
+    .then(function() { return loadScript("./wizard-session-finish-dev.js?v=104"); })
     .then(function() { return loadScript("./inventory-refresh-control-dev.js?v=93"); })
-    .then(function() { return loadScript("./manual-refresh-ui-dev.js?v=95"); })
+    .then(function() { return loadScript("./manual-refresh-ui-dev.js?v=98"); })
     .catch(function(error) {
       console.error("開発版追加処理の初期化に失敗しました", error);
     });

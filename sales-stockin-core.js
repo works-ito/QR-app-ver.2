@@ -1,5 +1,5 @@
 /*
- * 販売品入庫受付（開発版 v30）
+ * 販売品入庫受付（開発版 v33）
  * GAS側の「仕入入庫」と販売品出庫取消履歴選択は未接続。
  * このファイルでは販売品入庫UIと販売品作業制限のみ先行実装する。
  */
@@ -45,59 +45,7 @@
       .filter(function(item) { return Boolean(item.itemCode); });
   }
 
-  function injectStyle() {
-    if (document.getElementById("salesStockInStyle")) return;
-    const style = document.createElement("style");
-    style.id = "salesStockInStyle";
-    style.textContent = `
-      #salesStockInEntryButton {
-        border-color:#2e7d32 !important;
-        background:#e8f5e9 !important;
-        color:#1b5e20 !important;
-      }
-      #salesStockInEntryButton .choiceSubText { color:#2e7d32 !important; }
-      #salesStockInPanel .salesStep { display:none; }
-      #salesStockInPanel .salesStep.isActive { display:block; }
-      #salesStockInPanel .salesTopStatus {
-        display:flex; gap:8px; flex-wrap:wrap; margin:0 0 14px;
-      }
-      #salesStockInPanel .salesChip {
-        display:inline-flex; align-items:center; min-height:30px; padding:4px 10px;
-        border-radius:999px; background:#e8f5e9; color:#1b5e20; font-size:13px; font-weight:700;
-      }
-      #salesStockInPanel .salesSectionCard {
-        margin-top:16px; padding:14px; border:1px solid #d7e3d8; border-radius:12px; background:#fff;
-      }
-      #salesStockInPanel .salesSectionCard h2 { margin:0 0 6px; font-size:17px; }
-      #salesStockInPanel .salesSectionCard p { margin:0 0 12px; font-size:13px; color:#666; line-height:1.55; }
-      #salesStockInItemSelect {
-        width:100%; min-height:52px; padding:0 12px; border:1px solid #bbb; border-radius:10px;
-        background:#fff; color:#111; font-size:16px;
-      }
-      #salesStockInPanel .salesInlineField { display:flex; gap:8px; margin-top:10px; align-items:stretch; }
-      #salesStockInPanel .salesInlineField input {
-        flex:1; min-width:0; min-height:48px; padding:0 12px; border:1px solid #bbb; border-radius:10px; font-size:18px;
-      }
-      #salesStockInPanel .salesInlineField button { min-width:120px; }
-      #salesStockInQrViewport {
-        display:none; margin-top:12px; border-radius:12px; overflow:hidden; background:#000;
-        aspect-ratio:4/3;
-      }
-      #salesStockInQrViewport.isVisible { display:block; }
-      #salesStockInQrVideo { width:100%; height:100%; object-fit:cover; display:block; }
-      #salesStockInRows { margin-top:14px; }
-      #salesStockInRows:empty::before {
-        content:"まだ販売品は追加されていません。"; display:block; padding:14px; text-align:center;
-        color:#777; border:1px dashed #c7c7c7; border-radius:10px;
-      }
-      #salesStockInConfirmList { margin-top:12px; }
-      #salesStockInConfirmList .quantityInspectionRow { margin-bottom:8px; }
-      #salesStockInProceedButton, #salesStockInFinalButton { width:100%; margin-top:18px; }
-      #salesStockInFinalButton:disabled { opacity:.55; }
-      #salesStockInPanel .salesBackButton { width:100%; margin-top:10px; }
-    `;
-    document.head.appendChild(style);
-  }
+  
 
   function hideBaseWizardPanels() {
     Object.keys(STEP_IDS).forEach(function(name) {
@@ -480,89 +428,35 @@
   }
 
   function injectUi() {
-    injectStyle();
-    const receptionGrid = document.querySelector("#receptionStep .buttonGrid");
-    if (!receptionGrid || document.getElementById("salesStockInEntryButton")) return;
+  const receptionGrid =
+    document.querySelector("#receptionStep .buttonGrid");
 
-    const entryButton = document.createElement("button");
+  if (!receptionGrid) return;
+
+  let entryButton =
+    document.getElementById("salesStockInEntryButton");
+
+  /*
+   * 移行期間中は、固定HTMLがまだ無い場合だけ
+   * 従来どおり入口ボタンを補完する。
+   * 固定HTML化後は既存ボタンへ動作だけ接続する。
+   */
+  if (!entryButton) {
+    entryButton = document.createElement("button");
     entryButton.id = "salesStockInEntryButton";
     entryButton.className = "choiceButton";
     entryButton.type = "button";
     entryButton.innerHTML =
       "販売品入庫受付" +
       '<span class="choiceSubText">仕入れた販売品の在庫を増やす</span>';
-    entryButton.addEventListener("click", openSalesEntry);
+
     receptionGrid.appendChild(entryButton);
+  }
 
-    const panel = document.createElement("section");
-    panel.id = "salesStockInPanel";
-    panel.className = "panel";
-    panel.innerHTML = `
-      <div class="stepHeader">
-        <div class="stepLabel">販売品入庫</div>
-        <div class="receptionStatus" style="background:#e8f5e9;color:#1b5e20;border-color:#a5d6a7;">販売品入庫受付</div>
-      </div>
-      <div id="salesStockInTopStatus" class="salesTopStatus"></div>
-
-      <div class="salesStep" data-sales-step="location">
-        <h1 class="question">実施拠点を選んでください</h1>
-        <p class="questionHint">販売品を入庫する拠点を選択します</p>
-        <div id="salesStockInLocations" class="buttonGrid singleColumn"></div>
-      </div>
-
-      <div class="salesStep" data-sales-step="user">
-        <h1 class="question">担当者を選んでください</h1>
-        <p class="questionHint">今回の販売品入庫を登録する担当者を選択します</p>
-        <div id="salesStockInUsers" class="buttonGrid"></div>
-      </div>
-
-      <div class="salesStep" data-sales-step="items">
-        <h1 class="question">入庫する販売品を追加してください</h1>
-        <p class="questionHint">一覧またはQRから選び、数量を入力します。複数品目を続けて追加できます。</p>
-
-        <div class="salesSectionCard">
-          <h2>一覧から追加</h2>
-          <p>数量管理品マスタの「区分＝販売品」だけ表示します。</p>
-          <select id="salesStockInItemSelect"></select>
-          <div class="salesInlineField">
-            <input id="salesStockInQuantity" type="number" inputmode="numeric" min="1" step="1" placeholder="数量">
-            <button id="salesStockInAddButton" type="button">追加</button>
-          </div>
-        </div>
-
-        <div class="salesSectionCard">
-          <h2>QRから追加</h2>
-          <p>棚などの販売品QRを読んで品目を指定することもできます。</p>
-          <button id="salesStockInQrStartButton" type="button">販売品QRを読み取る</button>
-          <div id="salesStockInQrStatus" class="wizardPostSummary">QR読取は任意です</div>
-          <div id="salesStockInQrViewport"><video id="salesStockInQrVideo" playsinline muted></video></div>
-          <div id="salesStockInQrDetected" class="wizardPostSummary"></div>
-          <div class="salesInlineField">
-            <input id="salesStockInQrQuantity" type="number" inputmode="numeric" min="1" step="1" placeholder="数量">
-            <button id="salesStockInQrAddButton" type="button">追加</button>
-          </div>
-        </div>
-
-        <div class="salesSectionCard">
-          <h2>追加済み</h2>
-          <div id="salesStockInRows" class="quantityInspectionRows"></div>
-        </div>
-
-        <button id="salesStockInProceedButton" class="nextButton" type="button" disabled>入庫確定へ進む</button>
-      </div>
-
-      <div class="salesStep" data-sales-step="confirm">
-        <h1 class="question">入庫内容を最終確認してください</h1>
-        <p class="questionHint">確定後は指定拠点の販売品在庫へ加算します。</p>
-        <div id="salesStockInConfirmSummary" class="wizardPostSummary"></div>
-        <div id="salesStockInConfirmList"></div>
-        <button id="salesStockInFinalButton" class="wizardSendButton" type="button" disabled>この内容で入庫する</button>
-        <div class="connectionNote">開発版：GASの仕入入庫処理を接続後、このボタンを有効化します。</div>
-        <button id="salesStockInConfirmBackButton" class="backButton salesBackButton" type="button">販売品追加へ戻る</button>
-      </div>
-    `;
-
-    document.getElementById("receptionStep").insertAdjacentElement("afterend", panel);
+  if (entryButton.dataset.salesStockInBound !== "true") {
+    entryButton.dataset.salesStockInBound = "true";
+    entryButton.addEventListener("click", openSalesEntry);
+  }
 
     document.getElementById("salesStockInAddButton").addEventListener("click", addFromList);
     document.getElementById("salesStockInQrStartButton").addEventListener("click", startSalesQrScanner);

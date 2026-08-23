@@ -3012,7 +3012,6 @@ function changePreviousSettings() {
 
     function renderCancelSendButton() {
       const buttons = [
-        document.getElementById("wizardCancelSendButton"),
         document.getElementById("wizardPostSendCancelButton"),
         document.getElementById("quantityInspectionCancelSendButton")
       ].filter(Boolean);
@@ -4459,21 +4458,26 @@ function changePreviousSettings() {
         });
 
         if (successfulIndexes.length > 0) {
-          await saveInventoryCache();
-          saveLastSuccessfulSend({
-            sendId:result.sendId || lastPendingSendId,
-            sentAt:sentAt,
-            expiresAt:Date.now() + CANCEL_SEND_VALID_MS,
-            successCount:successfulIndexes.length,
-            logIds:resultItems
-              .filter(function(item) { return item.ok && item.logId; })
-              .map(function(item) { return item.logId; }),
-            snapshots:successfulIndexes
-              .map(function(index) { return snapshots[index]; })
-              .filter(Boolean),
-            recentWorkKeys:recentWorkKeys
-          });
-        }
+  await saveInventoryCache();
+
+  if (wizardState.mode === "出庫取消") {
+    clearLastSuccessfulSend();
+  } else {
+    saveLastSuccessfulSend({
+      sendId:result.sendId || lastPendingSendId,
+      sentAt:sentAt,
+      expiresAt:Date.now() + CANCEL_SEND_VALID_MS,
+      successCount:successfulIndexes.length,
+      logIds:resultItems
+        .filter(function(item) { return item.ok && item.logId; })
+        .map(function(item) { return item.logId; }),
+      snapshots:successfulIndexes
+        .map(function(index) { return snapshots[index]; })
+        .filter(Boolean),
+      recentWorkKeys:recentWorkKeys
+    });
+  }
+}
 
         scannedEntries = sourceEntries.filter(function(entry, index) {
           return !successfulSet.has(index);
@@ -6021,7 +6025,7 @@ function changePreviousSettings() {
   wizardSelectedPhotos = [];
   wizardCurrentSlipInfo = null;
   wizardPendingPhotoSave = null;
-  document.getElementById("wizardPostSendArea").hidden = true;
+  
   document.getElementById("wizardIrregularArea").hidden = true;
   document.getElementById("wizardRecMemoArea").hidden = true;
   document.getElementById("wizardPhotoArea").hidden = true;
@@ -6234,10 +6238,6 @@ document
     "click",
     sendWizardBatch
   );
-
-document
-  .getElementById("wizardCancelSendButton")
-  .addEventListener("click", cancelLastSuccessfulSend);
 
 document
   .getElementById("wizardPostSendCancelButton")
