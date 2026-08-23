@@ -1,4 +1,4 @@
-/* 開発版 v62：イレギュラー受付 大分類UIの可読性調整 */
+/* 開発版 v63：イレギュラー受付 大分類UIの可読性調整 */
 (function() {
   "use strict";
 
@@ -21,6 +21,13 @@
         row-gap: 3px !important;
         column-gap: 4px !important;
       }
+
+      /* 大分類だけカード内の左右余白を少し使い、長い分類名を収めやすくする */
+      #${ROOT_ID} .irregularMasterCategoryGrid {
+        margin-left: -6px;
+        margin-right: -6px;
+      }
+
       #${ROOT_ID} .irregularMasterCategoryGrid .irregularMasterChoice,
       #${ROOT_ID} .irregularMasterItemGrid .irregularMasterChoice {
         margin-top: 0 !important;
@@ -38,6 +45,10 @@
         line-height: 1.3 !important;
       }
       @media (max-width:390px) {
+        #${ROOT_ID} .irregularMasterCategoryGrid {
+          margin-left: -7px;
+          margin-right: -7px;
+        }
         #${ROOT_ID} .irregularMasterCategoryGrid .irregularMasterChoice {
           font-size: 13px !important;
         }
@@ -72,5 +83,5 @@
     subtree: true
   });
 
-  console.info("開発版 v62：大分類名短縮 + 分類名文字サイズ拡大 有効");
+  console.info("開発版 v63：大分類名短縮 + 分類名文字サイズ拡大 + 横幅調整 有効");
 })();
