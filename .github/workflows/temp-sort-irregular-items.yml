@@ -1,0 +1,58 @@
+name: Temporary irregular item sort patch
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/temp-sort-irregular-items.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Patch item sorting and cache versions
+        shell: python
+        run: |
+          from pathlib import Path
+
+          picker = Path('irregular-master-picker-dev.js')
+          text = picker.read_text(encoding='utf-8')
+          old_sort = '''    const choices = allChoices().filter(function(item){return item.category === category}).sort(function(a,b){
+      return a.order-b.order || a.name.localeCompare(b.name,"ja",{numeric:true});
+    });'''
+          new_sort = '''    const choices = allChoices().filter(function(item){return item.category === category}).sort(function(a,b){
+      return a.code.localeCompare(b.code,"ja",{numeric:true});
+    });'''
+          if old_sort not in text:
+              raise SystemExit('target sort block not found')
+          text = text.replace(old_sort, new_sort, 1)
+          text = text.replace('イレギュラー受付：マスタ選択UI（開発版 v68）', 'イレギュラー受付：マスタ選択UI（開発版 v69）', 1)
+          picker.write_text(text, encoding='utf-8')
+
+          loader = Path('sales-stockin.js')
+          text = loader.read_text(encoding='utf-8')
+          if './irregular-master-picker-dev.js?v=64' not in text:
+              raise SystemExit('picker loader version target not found')
+          text = text.replace('./irregular-master-picker-dev.js?v=64', './irregular-master-picker-dev.js?v=69', 1)
+          text = text.replace('販売品入庫受付 v125 bootstrap', '販売品入庫受付 v126 bootstrap', 1)
+          loader.write_text(text, encoding='utf-8')
+
+          index = Path('index.html')
+          text = index.read_text(encoding='utf-8')
+          if './sales-stockin.js?v=117' not in text:
+              raise SystemExit('sales-stockin cache target not found')
+          text = text.replace('./sales-stockin.js?v=117', './sales-stockin.js?v=118', 1)
+          index.write_text(text, encoding='utf-8')
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add irregular-master-picker-dev.js sales-stockin.js index.html
+          git commit -m "Sort irregular item list by machine code"
+          git push origin main
