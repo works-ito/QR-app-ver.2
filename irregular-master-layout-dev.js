@@ -1,4 +1,4 @@
-/* 開発版 v42：イレギュラー受付マスタ選択の一覧密度・画面遷移位置調整 */
+/* 開発版 v40：イレギュラー受付マスタ選択の一覧密度・画面遷移位置調整 */
 (function() {
   const STYLE_ID = "irregularMasterLayoutDevStyle";
   const ROOT_ID = "irregularMasterPickerDev";
@@ -12,8 +12,7 @@
       #${ROOT_ID} .irregularMasterIdGrid {
         display:grid;
         grid-template-columns:repeat(2, minmax(0, 1fr));
-        column-gap:8px;
-        row-gap:3px;
+        gap:8px;
       }
 
       #${ROOT_ID} .irregularMasterIdGrid .irregularMasterChoice {
@@ -25,11 +24,10 @@
         overflow-wrap:anywhere;
       }
 
-      /* 6.1インチ級でも縦間隔だけ詰め、列数は2列のまま */
+      /* 6.1インチ級では余白を少し広げるが、列数は2列のまま */
       @media (min-width:400px) {
         #${ROOT_ID} .irregularMasterIdGrid {
-          column-gap:9px;
-          row-gap:3px;
+          gap:9px;
         }
         #${ROOT_ID} .irregularMasterIdGrid .irregularMasterChoice {
           min-height:50px;
@@ -41,8 +39,7 @@
       /* SE最優先。押しやすさを残したまま縦方向を圧縮 */
       @media (max-width:390px) {
         #${ROOT_ID} .irregularMasterIdGrid {
-          column-gap:7px;
-          row-gap:2px;
+          gap:7px;
         }
         #${ROOT_ID} .irregularMasterIdGrid .irregularMasterChoice {
           min-height:46px;
