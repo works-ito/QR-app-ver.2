@@ -1,5 +1,5 @@
 /*
- * イレギュラー受付：マスタ選択UI（開発版 v68）
+ * イレギュラー受付：マスタ選択UI（開発版 v70）
  *
  * GAS・既存送信処理は変更しない。
  * 管理番号候補は「簡易個体 → 個体 → REC → 軽量マスタ」の順で現在状態を優先し、
@@ -10,6 +10,7 @@
   const STYLE_ID = "irregularMasterPickerDevStyle";
   const ROOT_ID = "irregularMasterPickerDev";
   const MANAGED_PAGE_SIZE = 40;
+  const ITEM_PAGE_SIZE = 20;
 
   const CATEGORY_ORDER = [
     "解体機械","発電機","溶接機","照明系","散水機","高圧洗浄機",
@@ -21,6 +22,8 @@
   let pickerState = {
     category:"",
     item:null,
+    itemRows:[],
+    itemPage:0,
     pending:null,
     selectedManaged:new Map(),
     managedRows:[],
@@ -274,26 +277,97 @@
 
     const target = document.getElementById("irregularMasterItemGrid");
     if (!target) return;
-    target.replaceChildren();
 
     const choices = allChoices().filter(function(item){
-    return item.category === category}).sort(function(a,b){
-    return a.code.localeCompare(b.code,"ja",{numeric:true});
-　　});
+      return item.category === category;
+    }).sort(function(a,b){
+      return a.code.localeCompare(b.code,"ja",{numeric:true});
+    });
+
+    pickerState.itemRows = choices;
+    pickerState.itemPage = 0;
 
     if (!choices.length) {
+      target.replaceChildren();
       notice("「"+category+"」の機種／品目データはまだ届いていません。");
       renderPreviewActions(target, category);
+      buildItemPager("irregularMasterItemPagerTop", 0, 1, 0, 0);
+      buildItemPager("irregularMasterItemPagerBottom", 0, 1, 0, 0);
       return;
     }
 
-    choices.forEach(function(item) {
+    renderItemPage(false);
+  }
+
+  function buildItemPager(containerId, totalRows, totalPages, startIndex, endIndex) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.replaceChildren();
+    container.hidden = totalPages <= 1;
+    if (totalPages <= 1) return;
+
+    const back = document.createElement("button");
+    back.type = "button";
+    back.className = "irregularMasterPagerButton";
+    back.textContent = "← 戻る";
+    back.disabled = pickerState.itemPage <= 0;
+    back.addEventListener("click", function(){
+      if (pickerState.itemPage <= 0) return;
+      pickerState.itemPage -= 1;
+      renderItemPage(true);
+    });
+
+    const info = document.createElement("div");
+    info.className = "irregularMasterPagerInfo";
+    const strong = document.createElement("strong");
+    strong.textContent = (pickerState.itemPage + 1) + " / " + totalPages + "ページ";
+    const range = document.createElement("span");
+    range.textContent = totalRows + "件中 " + (startIndex + 1) + "〜" + endIndex + "件";
+    info.append(strong, range);
+
+    const next = document.createElement("button");
+    next.type = "button";
+    next.className = "irregularMasterPagerButton";
+    next.textContent = "次へ →";
+    next.disabled = pickerState.itemPage >= totalPages - 1;
+    next.addEventListener("click", function(){
+      if (pickerState.itemPage >= totalPages - 1) return;
+      pickerState.itemPage += 1;
+      renderItemPage(true);
+    });
+
+    container.append(back, info, next);
+  }
+
+  function renderItemPage(scrollToTop) {
+    const target = document.getElementById("irregularMasterItemGrid");
+    if (!target) return;
+
+    const rows = Array.isArray(pickerState.itemRows) ? pickerState.itemRows : [];
+    const totalPages = Math.max(1, Math.ceil(rows.length / ITEM_PAGE_SIZE));
+    if (pickerState.itemPage < 0) pickerState.itemPage = 0;
+    if (pickerState.itemPage >= totalPages) pickerState.itemPage = totalPages - 1;
+
+    const startIndex = pickerState.itemPage * ITEM_PAGE_SIZE;
+    const endIndex = Math.min(startIndex + ITEM_PAGE_SIZE, rows.length);
+    const pageRows = rows.slice(startIndex, endIndex);
+
+    target.replaceChildren();
+    pageRows.forEach(function(item) {
       target.appendChild(makeChoice(
         item.name,
         item.code + (item.type === "quantity" ? " ／ 数量管理" : " ／ 個体管理"),
         function(){item.type === "quantity" ? renderQuantity(item) : renderManagedIds(item)}
       ));
     });
+
+    buildItemPager("irregularMasterItemPagerTop", rows.length, totalPages, startIndex, endIndex);
+    buildItemPager("irregularMasterItemPagerBottom", rows.length, totalPages, startIndex, endIndex);
+
+    if (scrollToTop) {
+      const top = document.getElementById("irregularMasterItemPagerTop");
+      if (top) top.scrollIntoView({behavior:"smooth", block:"start"});
+    }
   }
 
   function renderPreviewActions(target, category) {
