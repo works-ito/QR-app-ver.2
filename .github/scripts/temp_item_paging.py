@@ -1,0 +1,175 @@
+from pathlib import Path
+
+picker = Path('irregular-master-picker-dev.js')
+text = picker.read_text(encoding='utf-8')
+
+text = text.replace('イレギュラー受付：マスタ選択UI（開発版 v68）', 'イレギュラー受付：マスタ選択UI（開発版 v70）', 1)
+text = text.replace('  const MANAGED_PAGE_SIZE = 40;\n', '  const MANAGED_PAGE_SIZE = 40;\n  const ITEM_PAGE_SIZE = 20;\n', 1)
+text = text.replace('    category:"",\n    item:null,\n', '    category:"",\n    item:null,\n    itemRows:[],\n    itemPage:0,\n', 1)
+
+old_block = '''    const target = document.getElementById("irregularMasterItemGrid");
+    if (!target) return;
+    target.replaceChildren();
+
+    const choices = allChoices().filter(function(item){
+    return item.category === category}).sort(function(a,b){
+    return a.code.localeCompare(b.code,"ja",{numeric:true});
+　　});
+
+    if (!choices.length) {
+      notice("「"+category+"」の機種／品目データはまだ届いていません。");
+      renderPreviewActions(target, category);
+      return;
+    }
+
+    choices.forEach(function(item) {
+      target.appendChild(makeChoice(
+        item.name,
+        item.code + (item.type === "quantity" ? " ／ 数量管理" : " ／ 個体管理"),
+        function(){item.type === "quantity" ? renderQuantity(item) : renderManagedIds(item)}
+      ));
+    });
+'''
+
+new_block = '''    const target = document.getElementById("irregularMasterItemGrid");
+    if (!target) return;
+
+    const choices = allChoices().filter(function(item){
+      return item.category === category;
+    }).sort(function(a,b){
+      return a.code.localeCompare(b.code,"ja",{numeric:true});
+    });
+
+    pickerState.itemRows = choices;
+    pickerState.itemPage = 0;
+
+    if (!choices.length) {
+      target.replaceChildren();
+      notice("「"+category+"」の機種／品目データはまだ届いていません。");
+      renderPreviewActions(target, category);
+      buildItemPager("irregularMasterItemPagerTop", 0, 1, 0, 0);
+      buildItemPager("irregularMasterItemPagerBottom", 0, 1, 0, 0);
+      return;
+    }
+
+    renderItemPage(false);
+'''
+
+if old_block not in text:
+    raise SystemExit('renderItems target block not found')
+text = text.replace(old_block, new_block, 1)
+
+anchor = '  function renderPreviewActions(target, category) {\n'
+if anchor not in text:
+    raise SystemExit('preview anchor not found')
+
+paging_code = '''  function buildItemPager(containerId, totalRows, totalPages, startIndex, endIndex) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.replaceChildren();
+    container.hidden = totalPages <= 1;
+    if (totalPages <= 1) return;
+
+    const back = document.createElement("button");
+    back.type = "button";
+    back.className = "irregularMasterPagerButton";
+    back.textContent = "← 戻る";
+    back.disabled = pickerState.itemPage <= 0;
+    back.addEventListener("click", function(){
+      if (pickerState.itemPage <= 0) return;
+      pickerState.itemPage -= 1;
+      renderItemPage(true);
+    });
+
+    const info = document.createElement("div");
+    info.className = "irregularMasterPagerInfo";
+    const strong = document.createElement("strong");
+    strong.textContent = (pickerState.itemPage + 1) + " / " + totalPages + "ページ";
+    const range = document.createElement("span");
+    range.textContent = totalRows + "件中 " + (startIndex + 1) + "〜" + endIndex + "件";
+    info.append(strong, range);
+
+    const next = document.createElement("button");
+    next.type = "button";
+    next.className = "irregularMasterPagerButton";
+    next.textContent = "次へ →";
+    next.disabled = pickerState.itemPage >= totalPages - 1;
+    next.addEventListener("click", function(){
+      if (pickerState.itemPage >= totalPages - 1) return;
+      pickerState.itemPage += 1;
+      renderItemPage(true);
+    });
+
+    container.append(back, info, next);
+  }
+
+  function renderItemPage(scrollToTop) {
+    const target = document.getElementById("irregularMasterItemGrid");
+    if (!target) return;
+
+    const rows = Array.isArray(pickerState.itemRows) ? pickerState.itemRows : [];
+    const totalPages = Math.max(1, Math.ceil(rows.length / ITEM_PAGE_SIZE));
+    if (pickerState.itemPage < 0) pickerState.itemPage = 0;
+    if (pickerState.itemPage >= totalPages) pickerState.itemPage = totalPages - 1;
+
+    const startIndex = pickerState.itemPage * ITEM_PAGE_SIZE;
+    const endIndex = Math.min(startIndex + ITEM_PAGE_SIZE, rows.length);
+    const pageRows = rows.slice(startIndex, endIndex);
+
+    target.replaceChildren();
+    pageRows.forEach(function(item) {
+      target.appendChild(makeChoice(
+        item.name,
+        item.code + (item.type === "quantity" ? " ／ 数量管理" : " ／ 個体管理"),
+        function(){item.type === "quantity" ? renderQuantity(item) : renderManagedIds(item)}
+      ));
+    });
+
+    buildItemPager("irregularMasterItemPagerTop", rows.length, totalPages, startIndex, endIndex);
+    buildItemPager("irregularMasterItemPagerBottom", rows.length, totalPages, startIndex, endIndex);
+
+    if (scrollToTop) {
+      const top = document.getElementById("irregularMasterItemPagerTop");
+      if (top) top.scrollIntoView({behavior:"smooth", block:"start"});
+    }
+  }
+
+'''
+text = text.replace(anchor, paging_code + anchor, 1)
+picker.write_text(text, encoding='utf-8')
+
+index = Path('index.html')
+text = index.read_text(encoding='utf-8')
+old_html = '''            <div
+              id="irregularMasterItemGrid"
+              class="irregularMasterItemGrid"
+            ></div>
+'''
+new_html = '''            <div
+              id="irregularMasterItemPagerTop"
+              class="irregularMasterPager"
+              hidden
+            ></div>
+
+            <div
+              id="irregularMasterItemGrid"
+              class="irregularMasterItemGrid"
+            ></div>
+
+            <div
+              id="irregularMasterItemPagerBottom"
+              class="irregularMasterPager"
+              hidden
+            ></div>
+'''
+if old_html not in text:
+    raise SystemExit('item grid html target not found')
+text = text.replace(old_html, new_html, 1)
+text = text.replace('./sales-stockin.js?v=117', './sales-stockin.js?v=119', 1)
+index.write_text(text, encoding='utf-8')
+
+loader = Path('sales-stockin.js')
+text = loader.read_text(encoding='utf-8')
+text = text.replace('販売品入庫受付 v125 bootstrap', '販売品入庫受付 v127 bootstrap', 1)
+text = text.replace('./irregular-master-picker-dev.js?v=64', './irregular-master-picker-dev.js?v=70', 1)
+loader.write_text(text, encoding='utf-8')
