@@ -56,3 +56,5 @@ jobs:
           git add irregular-master-picker-dev.js sales-stockin.js index.html
           git commit -m "Sort irregular item list by machine code"
           git push origin main
+
+# trigger 2
