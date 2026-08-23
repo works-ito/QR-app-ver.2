@@ -1,5 +1,5 @@
 /*
- * 手動更新UI v98
+ * 手動更新UI v99
  *
  * 責務：
  * - index.html に固定配置された在庫データ表示と［更新］ボタンへ動作を接続する。
@@ -16,8 +16,10 @@
 
   const STATUS_ID = "inventoryDataStatus";
   const BUTTON_ID = "manualAppRefreshButtonDev";
+  const IDLE_CHECK_MS = 250;
 
   let renderingFromCache = false;
+  let idleCheckTimer = null;
 
   function pad2(value) {
     return String(value).padStart(2, "0");
@@ -36,24 +38,24 @@
     );
   }
 
+  function isInventoryLoading() {
+    return (
+      typeof appInitialDataLoading !== "undefined" &&
+      appInitialDataLoading === true
+    );
+  }
+
   async function renderLatestCacheTimestamp(status) {
     if (!status || renderingFromCache) return;
-    if (typeof restoreInventoryCache !== "function") return;
+    if (typeof loadInventoryCache !== "function") return;
 
     const text = String(status.textContent || "").trim();
-
-    if (
-      text.indexOf("確認中") >= 0 ||
-      text.indexOf("更新中") >= 0 ||
-      text.indexOf("更新失敗") >= 0
-    ) {
-      return;
-    }
+    if (text.indexOf("更新失敗") >= 0) return;
 
     renderingFromCache = true;
 
     try {
-      const cache = await restoreInventoryCache();
+      const cache = await loadInventoryCache();
       const updatedAt = cache && cache.updatedAt
         ? formatAbsoluteMinute(cache.updatedAt)
         : "";
@@ -69,6 +71,22 @@
     } finally {
       renderingFromCache = false;
     }
+  }
+
+  function waitForInventoryIdle(status) {
+    if (idleCheckTimer) {
+      clearTimeout(idleCheckTimer);
+      idleCheckTimer = null;
+    }
+
+    if (isInventoryLoading()) {
+      idleCheckTimer = setTimeout(function() {
+        waitForInventoryIdle(status);
+      }, IDLE_CHECK_MS);
+      return;
+    }
+
+    void renderLatestCacheTimestamp(status);
   }
 
   function runFullRefresh(button, status) {
@@ -103,12 +121,12 @@
       });
     }
 
-    void renderLatestCacheTimestamp(status);
+    waitForInventoryIdle(status);
 
     if (status.dataset.manualRefreshObserved !== "true") {
       status.dataset.manualRefreshObserved = "true";
       const observer = new MutationObserver(function() {
-        void renderLatestCacheTimestamp(status);
+        waitForInventoryIdle(status);
       });
       observer.observe(status, {
         childList:true,
@@ -117,7 +135,7 @@
       });
     }
 
-    console.info("開発版：手動更新UI v98 読込完了");
+    console.info("開発版：手動更新UI v99 読込完了");
   }
 
   if (document.readyState === "loading") {
