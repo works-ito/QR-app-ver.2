@@ -809,15 +809,16 @@
           nextQuantity > record.maxCancelableQuantity
         ) {
           alert(
-            "この出庫履歴の取消可能数は"+
-            record.maxCancelableQuantity+
-            (record.unit || "個")+
+            "この出庫履歴の取消可能数は" +
+            record.maxCancelableQuantity +
+            (record.unit || "個") +
             "です"
           );
           return;
         }
 
-        pickerState.queue[existingIndex].quantity = nextQuantity;
+        pickerState.queue[existingIndex].quantity =
+          nextQuantity;
       } else {
         alert("この管理番号はすでに追加済みです");
         return;
@@ -860,7 +861,12 @@
       main.textContent = record.type === "machine" ? record.managedId : record.name+" × "+record.quantity+(record.unit || "個");
       const sub = document.createElement("div");
       sub.className = "irregularMasterQueueSub";
-      sub.textContent = record.category+" ／ "+record.name+(record.preview ? " ／ UI確認用" : "");
+      sub.textContent =
+        record.category + " ／ " + record.name +
+        (record.checkoutLabel
+          ? " ／ " + record.checkoutLabel
+          : "") +
+        (record.preview ? " ／ UI確認用" : "");
       body.append(main,sub);
 
       const remove = document.createElement("button");
@@ -905,38 +911,60 @@
       return;
     }
 
-    if (typeof window.sendIrregularMasterPickerBatch !== "function") {
-      alert("送信機能の読み込みが完了していません。画面を再読み込みしてください。");
+    if (
+      typeof window.sendIrregularMasterPickerBatch !==
+      "function"
+    ) {
+      alert(
+        "送信機能の読み込みが完了していません。画面を再読み込みしてください。"
+      );
       return;
     }
 
-    const button = document.getElementById("irregularMasterBatchSend");
+    const button =
+      document.getElementById(
+        "irregularMasterBatchSend"
+      );
+
     let sendingTimer = null;
 
     if (button) {
       button.disabled = true;
       let dots = 0;
       const updateSendingText = function() {
-        button.textContent = "送信中" + ".".repeat(dots);
+        button.textContent =
+          "送信中" + ".".repeat(dots);
         dots = (dots + 1) % 4;
       };
       updateSendingText();
-      sendingTimer = setInterval(updateSendingText, 400);
+      sendingTimer =
+        setInterval(updateSendingText, 400);
     }
 
     try {
-      const accepted = await window.sendIrregularMasterPickerBatch(
-        pickerState.queue.map(function(record) { return Object.assign({}, record); })
-      );
+      const accepted =
+        await window.sendIrregularMasterPickerBatch(
+          pickerState.queue.map(function(record) {
+            return Object.assign({}, record);
+          })
+        );
+
       if (accepted) {
         pickerState.queue = [];
         renderQueue();
         closePicker();
       }
     } catch (error) {
-      alert("送信処理を開始できませんでした\n"+(error && error.message ? error.message : String(error)));
+      alert(
+        "送信処理を開始できませんでした\n" +
+        (error && error.message
+          ? error.message
+          : String(error))
+      );
     } finally {
-      if (sendingTimer) clearInterval(sendingTimer);
+      if (sendingTimer) {
+        clearInterval(sendingTimer);
+      }
       if (button) {
         button.disabled = false;
         button.textContent = "まとめて送信";
