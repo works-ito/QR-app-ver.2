@@ -1,4 +1,4 @@
-/* 開発版 v63：イレギュラー受付 大分類UIの可読性調整 */
+/* 開発版 v64：イレギュラー受付 大分類UIの可読性調整 */
 (function() {
   "use strict";
 
@@ -50,6 +50,8 @@
           margin-right: -7px;
         }
         #${ROOT_ID} .irregularMasterCategoryGrid .irregularMasterChoice {
+          padding-left: 3px !important;
+          padding-right: 3px !important;
           font-size: 13px !important;
         }
       }
@@ -83,5 +85,5 @@
     subtree: true
   });
 
-  console.info("開発版 v63：大分類名短縮 + 分類名文字サイズ拡大 + 横幅調整 有効");
+  console.info("開発版 v64：大分類名短縮 + 分類名文字サイズ拡大 + 横幅・左右padding調整 有効");
 })();
