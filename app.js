@@ -4894,66 +4894,15 @@ function changePreviousSettings() {
       scannerRunning = false;
     }
 
-    function setInventoryDataStatus(
-      message,
-      state
-    ) {
-      stopAnimatedDots("inventoryDataStatus");
-
-      const status =
-        document.getElementById(
-          "inventoryDataStatus"
-        );
-
-      if (!status) return;
-
-      status.innerText = message;
-      status.className =
-        "inventoryDataStatus" +
-        (state ? " " + state : "");
-    }
-
-    function startInventoryDataStatusAnimation(
-      message
-    ) {
-      const status =
-        document.getElementById(
-          "inventoryDataStatus"
-        );
-
-      if (!status) return;
-
-      status.className =
-        "inventoryDataStatus isLoading";
-
-      startAnimatedDots(
-        "inventoryDataStatus",
-        message
+    function emitInventoryDataStatusEvent(type, detail) {
+      window.dispatchEvent(
+        new CustomEvent(
+          "inventorydata:" + type,
+          {
+            detail:detail || {}
+          }
+        )
       );
-    }
-
-    function formatInventoryUpdatedAt(value) {
-      const date = value
-        ? new Date(value)
-        : null;
-
-      if (
-        !date ||
-        Number.isNaN(date.getTime())
-      ) {
-        return "更新時刻不明";
-      }
-
-      return new Intl.DateTimeFormat(
-        "ja-JP",
-        {
-          month:"2-digit",
-          day:"2-digit",
-          hour:"2-digit",
-          minute:"2-digit",
-          hour12:false
-        }
-      ).format(date);
     }
 
     function normalizeLookupKey(value) {
@@ -5593,9 +5542,7 @@ function changePreviousSettings() {
       appInitialDataError = "";
 
       if (showLoading) {
-        startInventoryDataStatusAnimation(
-          "在庫データ：最新データ取得中"
-        );
+        emitInventoryDataStatusEvent("loading");
       }
 
       try {
@@ -5742,6 +5689,11 @@ function changePreviousSettings() {
         const cache =
           await saveInventoryCache();
 
+        emitInventoryDataStatusEvent(
+          "ready",
+          {updatedAt:cache.updatedAt}
+        );
+
         return true;
 
       } catch (error) {
@@ -5753,6 +5705,14 @@ function changePreviousSettings() {
         console.error(
           "在庫データ取得失敗",
           error
+        );
+
+        emitInventoryDataStatusEvent(
+          "error",
+          {
+            message:appInitialDataError,
+            hasCachedData:appInitialDataLoaded
+          }
         );
 
         return false;
@@ -5767,43 +5727,15 @@ function changePreviousSettings() {
         await restoreInventoryCache();
 
       if (cache) {
-        startInventoryDataStatusAnimation(
-          "在庫データ：前回データ確認済み " +
-            formatInventoryUpdatedAt(
-              cache.updatedAt
-            ) +
-            "／最新データへ更新中"
-        );
+        emitInventoryDataStatusEvent("loading");
 
-        const success =
-          await loadAppInitialData(false);
-
-        if (!success) {
-          setInventoryDataStatus(
-            "在庫データ：更新失敗・前回データを使用 " +
-              formatInventoryUpdatedAt(
-                cache.updatedAt
-              ),
-            "isError"
-          );
-        }
-
+        await loadAppInitialData(false);
         startScannerAfterInventoryReady();
 
         return;
       }
 
-      const success =
-        await loadAppInitialData(true);
-
-      if (!success) {
-        setInventoryDataStatus(
-          "在庫データ：取得失敗 " +
-            appInitialDataError,
-          "isError"
-        );
-      }
-
+      await loadAppInitialData(true);
       startScannerAfterInventoryReady();
     }
 

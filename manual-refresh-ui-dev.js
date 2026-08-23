@@ -1,10 +1,10 @@
 /*
- * 手動更新UI v99
+ * 手動更新UI v100
  *
  * 責務：
  * - index.html に固定配置された在庫データ表示と［更新］ボタンへ動作を接続する。
- * - 通常時の件数表示は隠し、在庫キャッシュの updatedAt を
- *   yyyy/MM/dd HH:mm 形式で表示する。
+ * - inventorydata:* イベントを受け、更新中・成功・失敗の表示を一元管理する。
+ * - 通常時は在庫キャッシュの updatedAt を yyyy/MM/dd HH:mm 形式で表示する。
  * - 更新ボタンはホーム画面追加版でも使えるよう、ページ全体を
  *   キャッシュバスター付きURLで再読込する。
  *
@@ -16,10 +16,10 @@
 
   const STATUS_ID = "inventoryDataStatus";
   const BUTTON_ID = "manualAppRefreshButtonDev";
-  const IDLE_CHECK_MS = 250;
+  const DOT_INTERVAL_MS = 400;
 
   let renderingFromCache = false;
-  let idleCheckTimer = null;
+  let dotsTimer = null;
 
   function pad2(value) {
     return String(value).padStart(2, "0");
@@ -38,33 +38,59 @@
     );
   }
 
-  function isInventoryLoading() {
-    return (
-      typeof appInitialDataLoading !== "undefined" &&
-      appInitialDataLoading === true
-    );
+  function getStatus() {
+    return document.getElementById(STATUS_ID);
   }
 
-  async function renderLatestCacheTimestamp(status) {
+  function stopLoadingAnimation() {
+    if (dotsTimer) {
+      clearInterval(dotsTimer);
+      dotsTimer = null;
+    }
+  }
+
+  function showLoadingStatus() {
+    const status = getStatus();
+    if (!status) return;
+
+    stopLoadingAnimation();
+    status.className = "inventoryDataStatus isLoading";
+
+    let dots = 0;
+    const update = function() {
+      status.textContent =
+        "在庫データ：更新中" + ".".repeat(dots);
+      dots = (dots + 1) % 4;
+    };
+
+    update();
+    dotsTimer = setInterval(update, DOT_INTERVAL_MS);
+  }
+
+  function showReadyStatus(updatedAt) {
+    const status = getStatus();
+    if (!status) return false;
+
+    const formatted = formatAbsoluteMinute(updatedAt);
+    if (!formatted) return false;
+
+    stopLoadingAnimation();
+    status.className = "inventoryDataStatus isReady";
+    status.textContent = "在庫データ：" + formatted;
+    return true;
+  }
+
+  async function renderLatestCacheTimestamp() {
+    const status = getStatus();
     if (!status || renderingFromCache) return;
     if (typeof loadInventoryCache !== "function") return;
-
-    const text = String(status.textContent || "").trim();
-    if (text.indexOf("更新失敗") >= 0) return;
 
     renderingFromCache = true;
 
     try {
       const cache = await loadInventoryCache();
-      const updatedAt = cache && cache.updatedAt
-        ? formatAbsoluteMinute(cache.updatedAt)
-        : "";
-
-      if (updatedAt) {
-        const nextText = "在庫データ：" + updatedAt;
-        if (status.textContent !== nextText) {
-          status.textContent = nextText;
-        }
+      if (cache && cache.updatedAt) {
+        showReadyStatus(cache.updatedAt);
       }
     } catch (error) {
       console.warn("在庫データ更新時刻の表示に失敗しました", error);
@@ -73,31 +99,30 @@
     }
   }
 
-  function waitForInventoryIdle(status) {
-    if (idleCheckTimer) {
-      clearTimeout(idleCheckTimer);
-      idleCheckTimer = null;
-    }
+  function showErrorStatus(detail) {
+    const status = getStatus();
+    if (!status) return;
 
-    if (isInventoryLoading()) {
-      idleCheckTimer = setTimeout(function() {
-        waitForInventoryIdle(status);
-      }, IDLE_CHECK_MS);
-      return;
-    }
+    stopLoadingAnimation();
 
-    void renderLatestCacheTimestamp(status);
+    const info = detail || {};
+    const prefix = info.hasCachedData
+      ? "在庫データ：更新失敗・前回データを使用"
+      : "在庫データ：取得失敗";
+    const message = String(info.message || "").trim();
+
+    status.className = "inventoryDataStatus isError";
+    status.textContent = message
+      ? prefix + " " + message
+      : prefix;
   }
 
-  function runFullRefresh(button, status) {
+  function runFullRefresh(button) {
     if (button.disabled) return;
 
     button.disabled = true;
     button.textContent = "更新中…";
-
-    if (status) {
-      status.textContent = "在庫データ：更新中…";
-    }
+    showLoadingStatus();
 
     const url = new URL(window.location.href);
     url.search = "";
@@ -106,7 +131,7 @@
   }
 
   function install() {
-    const status = document.getElementById(STATUS_ID);
+    const status = getStatus();
     const button = document.getElementById(BUTTON_ID);
 
     if (!status || !button) {
@@ -117,25 +142,38 @@
     if (button.dataset.manualRefreshBound !== "true") {
       button.dataset.manualRefreshBound = "true";
       button.addEventListener("click", function() {
-        runFullRefresh(button, status);
+        runFullRefresh(button);
       });
     }
 
-    waitForInventoryIdle(status);
+    window.addEventListener("inventorydata:loading", function() {
+      showLoadingStatus();
+    });
 
-    if (status.dataset.manualRefreshObserved !== "true") {
-      status.dataset.manualRefreshObserved = "true";
-      const observer = new MutationObserver(function() {
-        waitForInventoryIdle(status);
-      });
-      observer.observe(status, {
-        childList:true,
-        characterData:true,
-        subtree:true
-      });
+    window.addEventListener("inventorydata:ready", function(event) {
+      const updatedAt = event && event.detail
+        ? event.detail.updatedAt
+        : "";
+
+      if (!showReadyStatus(updatedAt)) {
+        void renderLatestCacheTimestamp();
+      }
+    });
+
+    window.addEventListener("inventorydata:error", function(event) {
+      showErrorStatus(event ? event.detail : null);
+    });
+
+    if (
+      typeof appInitialDataLoading !== "undefined" &&
+      appInitialDataLoading
+    ) {
+      showLoadingStatus();
+    } else {
+      void renderLatestCacheTimestamp();
     }
 
-    console.info("開発版：手動更新UI v99 読込完了");
+    console.info("開発版：手動更新UI v100 読込完了");
   }
 
   if (document.readyState === "loading") {
