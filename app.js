@@ -5743,23 +5743,12 @@ function changePreviousSettings() {
           await saveInventoryCache();
 
         setInventoryDataStatus(
-          "在庫データ：更新完了 " +
-            formatInventoryUpdatedAt(
-              cache.updatedAt
-            ) +
-            "（個体 " +
-            individualItems.length +
-            "／簡易 " +
-            simpleItems.length +
-            "／REC " +
-            recItems.length +
-            "／数量 " +
-            quantityItems.length +
-            "／索引 " +
-            managedMasterItems.length +
-            "）",
-          "isReady"
-        );
+  "在庫データ：更新完了 " +
+    formatInventoryUpdatedAt(
+      cache.updatedAt
+    ),
+  "isReady"
+);
 
         return true;
 
