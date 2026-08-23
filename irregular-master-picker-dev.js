@@ -276,9 +276,10 @@
     if (!target) return;
     target.replaceChildren();
 
-    const choices = allChoices().filter(function(item){return item.category === category}).sort(function(a,b){
-      return a.order-b.order || a.name.localeCompare(b.name,"ja",{numeric:true});
-    });
+    const choices = allChoices().filter(function(item){
+    return item.category === category}).sort(function(a,b){
+    return a.code.localeCompare(b.code,"ja",{numeric:true});
+　　});
 
     if (!choices.length) {
       notice("「"+category+"」の機種／品目データはまだ届いていません。");
