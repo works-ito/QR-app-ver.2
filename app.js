@@ -5742,14 +5742,6 @@ function changePreviousSettings() {
         const cache =
           await saveInventoryCache();
 
-        setInventoryDataStatus(
-  "在庫データ：更新完了 " +
-    formatInventoryUpdatedAt(
-      cache.updatedAt
-    ),
-  "isReady"
-);
-
         return true;
 
       } catch (error) {
