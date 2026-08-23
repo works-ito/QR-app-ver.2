@@ -1,0 +1,60 @@
+name: Temporary remove inventory count status
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/temp-remove-inventory-count-status.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Remove temporary inventory count status text
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('app.js')
+          text = p.read_text(encoding='utf-8')
+          old = '''        setInventoryDataStatus(
+          "在庫データ：更新完了 " +
+            formatInventoryUpdatedAt(
+              cache.updatedAt
+            ) +
+            "（個体 " +
+            individualItems.length +
+            "／簡易 " +
+            simpleItems.length +
+            "／REC " +
+            recItems.length +
+            "／数量 " +
+            quantityItems.length +
+            "／索引 " +
+            managedMasterItems.length +
+            "）",
+          "isReady"
+        );'''
+          new = '''        setInventoryDataStatus(
+          "在庫データ：更新完了 " +
+            formatInventoryUpdatedAt(
+              cache.updatedAt
+            ),
+          "isReady"
+        );'''
+          if old not in text:
+              raise SystemExit('inventory count status block not found')
+          text = text.replace(old, new, 1)
+          p.write_text(text, encoding='utf-8')
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.js
+          git commit -m "Remove temporary inventory count status text"
+          git push origin main
