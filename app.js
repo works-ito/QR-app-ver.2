@@ -5419,6 +5419,7 @@ shipmentDestinationItemMap =
         quantityInspectionBalances:quantityInspectionBalances,
         quantityStockBalances:quantityStockBalances,
         managedMasterItems:managedMasterItems,
+        shipmentDestinationItems:shipmentDestinationItems,
         managedMasterRevision:managedMasterRevision
       };
 
@@ -5514,6 +5515,10 @@ shipmentDestinationItemMap =
         managedMasterItems = Array.isArray(
           cache.managedMasterItems
         ) ? cache.managedMasterItems : [];
+
+        shipmentDestinationItems = Array.isArray(
+          cache.shipmentDestinationItems
+        ) ? cache.shipmentDestinationItems : [];
 
         managedMasterRevision =
           managedMasterItems.length > 0
@@ -5644,6 +5649,10 @@ shipmentDestinationItemMap =
         quantityStockBalances = Array.isArray(
           result.quantityStockBalances
         ) ? result.quantityStockBalances : [];
+
+        shipmentDestinationItems = Array.isArray(
+          result.shipmentDestinationItems
+        ) ? result.shipmentDestinationItems : [];
 
         const responseManagedMasterRevision =
           String(
