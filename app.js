@@ -1865,6 +1865,30 @@ function changePreviousSettings() {
 
         body.appendChild(name);
         body.appendChild(meta);
+
+        if (
+          wizardState.mode === "返却" &&
+          details.recordType !== "quantity"
+        ) {
+          const destinationInfo =
+            getShipmentDestinationDisplay(
+              details.qrText
+            );
+
+          const destination =
+            document.createElement(
+              "div"
+            );
+
+          destination.className =
+            "scannerResultDestination";
+
+          destination.innerText =
+            destinationInfo.text;
+
+          body.appendChild(destination);
+        }
+
         item.appendChild(number);
         item.appendChild(body);
         list.appendChild(item);
@@ -5128,15 +5152,97 @@ function changePreviousSettings() {
         );
 
       managedMasterItemMap =
-  createManagedItemMap(
-    managedMasterItems
-  );
+        createManagedItemMap(
+          managedMasterItems
+        );
 
-shipmentDestinationItemMap =
-  createManagedItemMap(
-    shipmentDestinationItems
-  );
-}
+      shipmentDestinationItemMap =
+        createManagedItemMap(
+          shipmentDestinationItems
+        );
+    }
+
+    function getShipmentDestinationDisplay(
+      managementId
+    ) {
+      const key =
+        normalizeLookupKey(
+          managementId
+        );
+
+      const managedKey =
+        normalizeManagedIdKey(
+          managementId
+        );
+
+      const item =
+        shipmentDestinationItemMap.get(key) ||
+        shipmentDestinationItemMap.get(
+          managedKey
+        ) ||
+        null;
+
+      if (!item) {
+        return {
+          hasDestination:false,
+          customerName:"",
+          siteName:"",
+          text:"出庫先データがありません"
+        };
+      }
+
+      const customerName =
+        String(
+          item.customerName || ""
+        ).trim();
+
+      const siteName =
+        String(
+          item.siteName || ""
+        ).trim();
+
+      const hasDestination =
+        item.hasDestination === true ||
+        Boolean(
+          customerName ||
+          siteName
+        );
+
+      if (!hasDestination) {
+        return {
+          hasDestination:false,
+          customerName:"",
+          siteName:"",
+          text:"出庫先データがありません"
+        };
+      }
+
+      const lines = [];
+
+      if (customerName) {
+        lines.push(
+          "客先名：" +
+          customerName
+        );
+      }
+
+      if (siteName) {
+        lines.push(
+          "現場名：" +
+          siteName
+        );
+      }
+
+      return {
+        hasDestination:true,
+        customerName:customerName,
+        siteName:siteName,
+        text:lines.join("\n")
+      };
+    }
+
+    window.getShipmentDestinationDisplay =
+      getShipmentDestinationDisplay;
 
     function findManagedItemLocal(qrText) {
       const key =
