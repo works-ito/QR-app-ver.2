@@ -1,4 +1,4 @@
-/* 開発版 v40：イレギュラー受付マスタ選択の一覧密度・画面遷移位置調整 */
+/* 開発版 v41：イレギュラー受付マスタ選択の一覧密度・画面遷移位置調整 */
 (function() {
   const STYLE_ID = "irregularMasterLayoutDevStyle";
   const ROOT_ID = "irregularMasterPickerDev";
@@ -22,6 +22,11 @@
         text-align:center;
         font-size:13px;
         overflow-wrap:anywhere;
+      }
+
+      /* 追加済み一覧の客先名・現場名は少しだけ読みやすくする */
+      #${ROOT_ID} .irregularMasterQueueDestination {
+        font-size:12px;
       }
 
       /* 6.1インチ級では余白を少し広げるが、列数は2列のまま */
