@@ -1,4 +1,4 @@
-/* 販売品入庫受付 v129 bootstrap */
+/* 販売品入庫受付 v130 bootstrap */
 (function() {
   function loadScript(src) {
     return new Promise(function(resolve, reject) {
@@ -18,7 +18,7 @@
     .then(function() { return loadScript("./sales-stockin-scan-enhancements.js?v=33"); })
     .then(function() { return loadScript("./sales-stockin-guards.js?v=33"); })
     .then(function() { return loadScript("./compact-scanner-dev.js?v=53"); })
-    .then(function() { return loadScript("./irregular-master-picker-dev.js?v=70"); })
+    .then(function() { return loadScript("./irregular-master-picker-dev.js?v=71"); })
     .then(function() { return loadScript("./irregular-entry-simplify-dev.js?v=72"); })
     .then(function() { return loadScript("./irregular-category-ui-tuning-dev.js?v=64"); })
     .then(function() { return loadScript("./irregular-simple-id-alias-dev.js?v=42"); })
