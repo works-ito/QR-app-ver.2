@@ -1,5 +1,5 @@
 /*
- * イレギュラー受付：マスタ選択UI（開発版 v70）
+ * イレギュラー受付：マスタ選択UI（開発版 v71）
  *
  * GAS・既存送信処理は変更しない。
  * 管理番号候補は「簡易個体 → 個体 → REC → 軽量マスタ」の順で現在状態を優先し、
@@ -871,6 +871,30 @@
           : "") +
         (record.preview ? " ／ UI確認用" : "");
       body.append(main,sub);
+
+      if (
+        record.type === "machine" &&
+        typeof wizardState !== "undefined" &&
+        wizardState.mode === "返却" &&
+        typeof window.getShipmentDestinationDisplay ===
+          "function"
+      ) {
+        const destinationInfo =
+          window.getShipmentDestinationDisplay(
+            record.managedId
+          );
+
+        const destination =
+          document.createElement("div");
+
+        destination.className =
+          "irregularMasterQueueDestination";
+
+        destination.textContent =
+          destinationInfo.text;
+
+        body.appendChild(destination);
+      }
 
       const remove = document.createElement("button");
       remove.type = "button";
