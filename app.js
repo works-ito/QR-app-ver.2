@@ -28,6 +28,7 @@ const PREVIOUS_SETTINGS_STORAGE_KEY =
     let quantityInspectionBalances = [];
     let quantityStockBalances = [];
     let managedMasterItems = [];
+    let shipmentDestinationItems = [];
     let managedMasterRevision = "";
 
     let individualItemMap = new Map();
@@ -36,6 +37,7 @@ const PREVIOUS_SETTINGS_STORAGE_KEY =
     let quantityItemMap = new Map();
     let quantityStockMap = new Map();
     let managedMasterItemMap = new Map();
+    let shipmentDestinationItemMap = new Map();
 
     let scannerCodeReader = null;
     let scannerStream = null;
@@ -5017,6 +5019,7 @@ function changePreviousSettings() {
             "管理番号",
             "QR",
             "qr",
+            "managementId",
             "id"
           ]
         );
@@ -5125,10 +5128,15 @@ function changePreviousSettings() {
         );
 
       managedMasterItemMap =
-        createManagedItemMap(
-          managedMasterItems
-        );
-    }
+  createManagedItemMap(
+    managedMasterItems
+  );
+
+shipmentDestinationItemMap =
+  createManagedItemMap(
+    shipmentDestinationItems
+  );
+}
 
     function findManagedItemLocal(qrText) {
       const key =
