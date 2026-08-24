@@ -1,5 +1,5 @@
 /*
- * 手動更新UI v100
+ * 手動更新UI v101
  *
  * 責務：
  * - index.html に固定配置された在庫データ表示と［更新］ボタンへ動作を接続する。
@@ -176,7 +176,12 @@
     console.info("開発版：手動更新UI v100 読込完了");
   }
 
-  if (document.readyState === "loading") {
+  if (
+    document.getElementById(STATUS_ID) &&
+    document.getElementById(BUTTON_ID)
+  ) {
+    install();
+  } else if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", install, {once:true});
   } else {
     install();
