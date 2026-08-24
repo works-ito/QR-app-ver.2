@@ -1,4 +1,4 @@
-/* 開発版 v42：イレギュラー受付マスタ選択の一覧密度・画面遷移位置調整 */
+/* 開発版 v43：イレギュラー受付マスタ選択の一覧密度・画面遷移位置調整 */
 (function() {
   const STYLE_ID = "irregularMasterLayoutDevStyle";
   const ROOT_ID = "irregularMasterPickerDev";
@@ -38,6 +38,9 @@
           min-height:50px;
           padding:10px 9px;
           font-size:13.5px;
+        }
+        #${ROOT_ID} .irregularMasterQueueDestination {
+          font-size:15px;
         }
       }
 
