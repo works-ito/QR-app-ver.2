@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>QR在庫管理｜ver.2.2</title>
   <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
-  <link rel="stylesheet" href="./styles.css?v=22">
+  <link rel="stylesheet" href="./styles.css?v=23">
 </head>
 <body>
 <main class="app">
@@ -45,9 +45,11 @@
 >
   <div
     id="inventoryDataStatus"
-    class="inventoryDataStatus"
+    class="inventoryDataStatus isLoading"
     aria-live="polite"
-  ></div>
+  >
+    在庫データ：更新中
+  </div>
 
   <button
     id="manualAppRefreshButtonDev"
