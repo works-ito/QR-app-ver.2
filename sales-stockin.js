@@ -22,7 +22,7 @@
     .then(function() { return loadScript("./irregular-entry-simplify-dev.js?v=72"); })
     .then(function() { return loadScript("./irregular-category-ui-tuning-dev.js?v=64"); })
     .then(function() { return loadScript("./irregular-simple-id-alias-dev.js?v=42"); })
-    .then(function() { return loadScript("./irregular-master-layout-dev.js?v=40"); })
+    .then(function() { return loadScript("./irregular-master-layout-dev.js?v=41"); })
     .then(function() { return loadScript("./irregular-registration-guard-dev.js?v=43"); })
     .then(function() { return loadScript("./irregular-quantity-flow-dev.js?v=55"); })
     .then(function() { return loadScript("./wizard-send-status-host-dev.js?v=1"); })
