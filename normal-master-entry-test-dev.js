@@ -1,11 +1,12 @@
 /*
- * マスタ選択受付入口テスト v2
+ * マスタ選択受付入口テスト v3
  *
- * START画面に「マスタ選択受付」を追加する。
- * 内部処理は通常受付として進め、設定完了後だけカメラを止めて
- * 既存マスタ選択UIを表示する。
+ * START画面の「マスタ選択受付」は、app.js が受付ボタンへ
+ * イベントを束ねる前に同じグリッドへ配置される。
+ * 内部処理は通常受付として進めるが、マスタ選択受付では
+ * QRカメラを最初から起動しない。
  *
- * GAS / app.js / sendWizardBatch() は変更しない。
+ * GAS / sendWizardBatch() は変更しない。
  * 通常受付・イレギュラー受付の既存ルートも残す。
  */
 (function() {
@@ -16,7 +17,24 @@
   const MASTER_HOST_ID = "normalMasterEntryTestHost";
   const MASTER_ENTRY_BUTTON_ID = "masterSelectionReceptionButton";
 
-  let masterSelectionReception = false;
+  const originalStartReadOnlyScanner =
+    typeof window.startReadOnlyScanner === "function"
+      ? window.startReadOnlyScanner
+      : null;
+
+  function isMasterReception() {
+    return window.__masterSelectionReception === true;
+  }
+
+  if (originalStartReadOnlyScanner) {
+    window.startReadOnlyScanner = function() {
+      if (isMasterReception()) {
+        return Promise.resolve();
+      }
+
+      return originalStartReadOnlyScanner.apply(this, arguments);
+    };
+  }
 
   function picker() {
     return document.getElementById(PICKER_ID);
@@ -36,43 +54,6 @@
 
   function scannerViewport() {
     return document.getElementById("scannerViewport");
-  }
-
-  function ensureMasterEntryButton() {
-    if (document.getElementById(MASTER_ENTRY_BUTTON_ID)) return;
-
-    const normalButton = document.querySelector(
-      '#receptionStep [data-reception-type="normal"]'
-    );
-
-    const irregularButton = document.querySelector(
-      '#receptionStep [data-reception-type="irregular"]'
-    );
-
-    if (!normalButton || !irregularButton || !irregularButton.parentElement) {
-      return;
-    }
-
-    const button = document.createElement("button");
-    button.id = MASTER_ENTRY_BUTTON_ID;
-    button.className = "choiceButton";
-    button.type = "button";
-    button.innerHTML =
-      'マスタ選択受付' +
-      '<span class="choiceSubText">QRを使わずマスタから対象を選ぶ</span>';
-
-    button.addEventListener("click", function() {
-      masterSelectionReception = true;
-
-      if (typeof window.selectReceptionType !== "function") {
-        alert("受付画面の準備が完了していません。画面を再読み込みしてください。");
-        return;
-      }
-
-      window.selectReceptionType("normal");
-    });
-
-    irregularButton.parentElement.insertBefore(button, irregularButton);
   }
 
   function ensureMasterHost() {
@@ -107,11 +88,16 @@
     const root = picker();
     const status = scannerStatus();
     const viewport = scannerViewport();
+    const area = scannerArea();
 
     if (!target || !root) return;
 
     if (typeof window.stopReadOnlyScanner === "function") {
       window.stopReadOnlyScanner();
+    }
+
+    if (area) {
+      area.classList.remove("isActive");
     }
 
     if (status) status.hidden = true;
@@ -153,34 +139,36 @@
     }
   }
 
-  function markExistingReceptionButtons() {
+  function bindReceptionButtons() {
+    const masterButton = document.getElementById(MASTER_ENTRY_BUTTON_ID);
     const normalButton = document.querySelector(
-      '#receptionStep [data-reception-type="normal"]'
+      '#receptionStep [data-reception-type="normal"]:not(#' + MASTER_ENTRY_BUTTON_ID + ')'
     );
     const irregularButton = document.querySelector(
       '#receptionStep [data-reception-type="irregular"]'
     );
 
-    if (normalButton) {
-      normalButton.addEventListener(
-        "click",
-        function() {
-          masterSelectionReception = false;
-          restoreScannerVisuals();
-        },
-        true
-      );
+    if (masterButton && masterButton.dataset.masterReceptionBound !== "true") {
+      masterButton.dataset.masterReceptionBound = "true";
+      masterButton.addEventListener("click", function() {
+        window.__masterSelectionReception = true;
+      }, true);
     }
 
-    if (irregularButton) {
-      irregularButton.addEventListener(
-        "click",
-        function() {
-          masterSelectionReception = false;
-          movePickerToIrregular();
-        },
-        true
-      );
+    if (normalButton && normalButton.dataset.masterReceptionResetBound !== "true") {
+      normalButton.dataset.masterReceptionResetBound = "true";
+      normalButton.addEventListener("click", function() {
+        window.__masterSelectionReception = false;
+        restoreScannerVisuals();
+      }, true);
+    }
+
+    if (irregularButton && irregularButton.dataset.masterReceptionResetBound !== "true") {
+      irregularButton.dataset.masterReceptionResetBound = "true";
+      irregularButton.addEventListener("click", function() {
+        window.__masterSelectionReception = false;
+        movePickerToIrregular();
+      }, true);
     }
   }
 
@@ -190,11 +178,11 @@
     if (!settings) return;
 
     if (
-      masterSelectionReception &&
+      isMasterReception() &&
       settings.receptionType === "normal" &&
       settings.mode !== "検品"
     ) {
-      setTimeout(movePickerToMasterReception, 0);
+      movePickerToMasterReception();
       return;
     }
 
@@ -207,8 +195,7 @@
   });
 
   ensureMasterHost();
-  ensureMasterEntryButton();
-  markExistingReceptionButtons();
+  bindReceptionButtons();
 
-  console.info("開発版：マスタ選択受付入口テスト v2 読込完了");
+  console.info("開発版：マスタ選択受付入口テスト v3 読込完了");
 })();
