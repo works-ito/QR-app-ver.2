@@ -1,4 +1,4 @@
-/* 販売品入庫受付 v137 bootstrap */
+/* 販売品入庫受付 v138 bootstrap */
 (function() {
   function loadScript(src) {
     return new Promise(function(resolve, reject) {
@@ -29,7 +29,7 @@
     .then(function() { return loadScript("./wizard-photo-flow-dev.js?v=1"); })
     .then(function() { return loadScript("./wizard-return-memo-host-dev.js?v=2"); })
     .then(function() { return loadScript("./irregular-master-send-bridge-dev.js?v=88"); })
-    .then(function() { return loadScript("./normal-master-entry-test-dev.js?v=6"); })
+    .then(function() { return loadScript("./normal-master-entry-test-dev.js?v=7"); })
     .then(function() { return loadScript("./quantity-transfer-dev.js?v=96"); })
     .then(function() { return loadScript("./gemini-timing-dev.js?v=77"); })
     .then(function() { return loadScript("./gemini-whole-image-dev.js?v=80"); })
