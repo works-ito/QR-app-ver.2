@@ -1,10 +1,13 @@
 /*
- * マスタ選択受付入口テスト v4
+ * マスタ選択受付入口テスト v5
  *
  * START画面の「マスタ選択受付」は receptionType=master として進める。
- * app.js 側では normal ではないため QRカメラは起動しない。
- * 設定完了後、既存のイレギュラーマスタ選択UIだけを
- * マスタ受付用ホストへ移し、通常送信ブリッジへ接続する。
+ * QRカメラは起動しない。
+ * 設定完了後、既存のマスタ選択UIを completeStep 直下の専用ホストへ移し、
+ * 通常送信ブリッジへ接続する。
+ *
+ * 重要：専用ホストは cameraPreview の外に置く。
+ * cameraPreview を非表示にしてもマスタ選択UIまで消えない構造にする。
  *
  * GAS / sendWizardBatch() は変更しない。
  */
@@ -35,53 +38,67 @@
     return document.getElementById("scannerViewport");
   }
 
+  function connectionNote() {
+    return document.getElementById("connectionNote");
+  }
+
   function ensureMasterHost() {
     let host = document.getElementById(MASTER_HOST_ID);
     if (host) return host;
 
+    const completeStep = document.getElementById("completeStep");
     const area = scannerArea();
-    const result = document.getElementById("scannerResult");
 
-    if (!area || !result) return null;
+    if (!completeStep || !area) return null;
 
     host = document.createElement("div");
     host.id = MASTER_HOST_ID;
     host.hidden = true;
 
-    area.insertBefore(host, result);
+    /*
+     * cameraPreview の外側に置く。
+     * これで cameraPreview を非表示にしてもマスタUIは表示できる。
+     */
+    completeStep.insertBefore(host, area);
     return host;
   }
 
   function restoreScannerVisuals() {
+    const area = scannerArea();
     const status = scannerStatus();
     const viewport = scannerViewport();
+    const note = connectionNote();
     const host = document.getElementById(MASTER_HOST_ID);
 
+    if (area) area.hidden = false;
     if (status) status.hidden = false;
     if (viewport) viewport.hidden = false;
+    if (note) note.hidden = false;
     if (host) host.hidden = true;
   }
 
   function movePickerToMasterReception() {
     const target = ensureMasterHost();
     const root = picker();
-    const status = scannerStatus();
-    const viewport = scannerViewport();
     const area = scannerArea();
+    const note = connectionNote();
     const irregular = irregularHost();
 
     if (!target || !root) {
       console.error("マスタ選択受付：マスタ選択UIを確認できません");
-      return;
+      return false;
     }
 
     if (typeof window.stopReadOnlyScanner === "function") {
       window.stopReadOnlyScanner();
     }
 
-    if (area) area.classList.remove("isActive");
-    if (status) status.hidden = true;
-    if (viewport) viewport.hidden = true;
+    /* カメラ領域そのものを隠し、専用ホストだけ表示する */
+    if (area) {
+      area.classList.remove("isActive");
+      area.hidden = true;
+    }
+    if (note) note.hidden = true;
     if (irregular) irregular.hidden = true;
 
     target.hidden = false;
@@ -101,6 +118,17 @@
     }
 
     target.scrollIntoView({behavior:"smooth", block:"start"});
+    return true;
+  }
+
+  function openMasterReceptionWithRetry(attempt) {
+    const count = Number(attempt || 0);
+    if (movePickerToMasterReception()) return;
+
+    if (count >= 10) return;
+    setTimeout(function() {
+      openMasterReceptionWithRetry(count + 1);
+    }, 100);
   }
 
   function movePickerToIrregular() {
@@ -130,7 +158,10 @@
       settings.receptionType === "master" &&
       settings.mode !== "検品"
     ) {
-      setTimeout(movePickerToMasterReception, 0);
+      /* app.js の完了後処理が終わってから確実に専用UIへ切り替える */
+      setTimeout(function() {
+        openMasterReceptionWithRetry(0);
+      }, 30);
       return;
     }
 
@@ -144,5 +175,5 @@
 
   ensureMasterHost();
 
-  console.info("開発版：マスタ選択受付入口テスト v4 読込完了");
+  console.info("開発版：マスタ選択受付入口テスト v5 読込完了");
 })();
