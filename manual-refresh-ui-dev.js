@@ -1,5 +1,5 @@
 /*
- * 手動更新UI v101
+ * 手動更新UI v102
  *
  * 責務：
  * - index.html に固定配置された在庫データ表示と［更新］ボタンへ動作を接続する。
@@ -8,18 +8,69 @@
  * - 更新ボタンはホーム画面追加版でも使えるよう、ページ全体を
  *   キャッシュバスター付きURLで再読込する。
  *
- * DOM生成・style生成は行わない。
- * 固定UIは index.html、見た目は styles.css を正とする。
+ * 受付ボタンについて：
+ * - app.js が受付ボタンへイベントを束ねる前に、マスタ選択受付を同じグリッドへ配置する。
+ * - 販売品入庫受付は index.html に固定配置済み。
  */
 (function() {
   "use strict";
 
   const STATUS_ID = "inventoryDataStatus";
   const BUTTON_ID = "manualAppRefreshButtonDev";
+  const MASTER_ENTRY_BUTTON_ID = "masterSelectionReceptionButton";
   const DOT_INTERVAL_MS = 400;
 
   let renderingFromCache = false;
   let dotsTimer = null;
+
+  function prepareReceptionButtons() {
+    const receptionStep = document.getElementById("receptionStep");
+    if (!receptionStep) return;
+
+    const grid = receptionStep.querySelector(".buttonGrid.singleColumn");
+    const normalButton = receptionStep.querySelector(
+      '[data-reception-type="normal"]'
+    );
+    const irregularButton = receptionStep.querySelector(
+      '[data-reception-type="irregular"]'
+    );
+
+    if (!grid || !normalButton || !irregularButton) return;
+
+    let masterButton = document.getElementById(MASTER_ENTRY_BUTTON_ID);
+
+    if (!masterButton) {
+      masterButton = document.createElement("button");
+      masterButton.id = MASTER_ENTRY_BUTTON_ID;
+      masterButton.className = "choiceButton";
+      masterButton.type = "button";
+      masterButton.dataset.receptionType = "normal";
+      masterButton.innerHTML =
+        'マスタ選択受付' +
+        '<span class="choiceSubText">QRを使わずマスタから対象を選ぶ</span>';
+
+      grid.insertBefore(masterButton, irregularButton);
+    }
+
+    function markMaster(value) {
+      window.__masterSelectionReception = value === true;
+    }
+
+    if (masterButton.dataset.masterEntryFlagBound !== "true") {
+      masterButton.dataset.masterEntryFlagBound = "true";
+      masterButton.addEventListener("click", function() {
+        markMaster(true);
+      }, true);
+    }
+
+    [normalButton, irregularButton].forEach(function(button) {
+      if (button.dataset.masterEntryResetBound === "true") return;
+      button.dataset.masterEntryResetBound = "true";
+      button.addEventListener("click", function() {
+        markMaster(false);
+      }, true);
+    });
+  }
 
   function pad2(value) {
     return String(value).padStart(2, "0");
@@ -131,6 +182,8 @@
   }
 
   function install() {
+    prepareReceptionButtons();
+
     const status = getStatus();
     const button = document.getElementById(BUTTON_ID);
 
@@ -173,7 +226,7 @@
       void renderLatestCacheTimestamp();
     }
 
-    console.info("開発版：手動更新UI v100 読込完了");
+    console.info("開発版：手動更新UI v102 読込完了");
   }
 
   if (
