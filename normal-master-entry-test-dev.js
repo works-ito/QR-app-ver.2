@@ -1,13 +1,12 @@
 /*
- * マスタ選択受付入口テスト v3
+ * マスタ選択受付入口テスト v4
  *
- * START画面の「マスタ選択受付」は、app.js が受付ボタンへ
- * イベントを束ねる前に同じグリッドへ配置される。
- * 内部処理は通常受付として進めるが、マスタ選択受付では
- * QRカメラを最初から起動しない。
+ * START画面の「マスタ選択受付」は receptionType=master として進める。
+ * app.js 側では normal ではないため QRカメラは起動しない。
+ * 設定完了後、既存のイレギュラーマスタ選択UIだけを
+ * マスタ受付用ホストへ移し、通常送信ブリッジへ接続する。
  *
  * GAS / sendWizardBatch() は変更しない。
- * 通常受付・イレギュラー受付の既存ルートも残す。
  */
 (function() {
   "use strict";
@@ -15,26 +14,6 @@
   const PICKER_ID = "irregularMasterPickerDev";
   const IRREGULAR_HOST_ID = "wizardIrregularArea";
   const MASTER_HOST_ID = "normalMasterEntryTestHost";
-  const MASTER_ENTRY_BUTTON_ID = "masterSelectionReceptionButton";
-
-  const originalStartReadOnlyScanner =
-    typeof window.startReadOnlyScanner === "function"
-      ? window.startReadOnlyScanner
-      : null;
-
-  function isMasterReception() {
-    return window.__masterSelectionReception === true;
-  }
-
-  if (originalStartReadOnlyScanner) {
-    window.startReadOnlyScanner = function() {
-      if (isMasterReception()) {
-        return Promise.resolve();
-      }
-
-      return originalStartReadOnlyScanner.apply(this, arguments);
-    };
-  }
 
   function picker() {
     return document.getElementById(PICKER_ID);
@@ -89,19 +68,21 @@
     const status = scannerStatus();
     const viewport = scannerViewport();
     const area = scannerArea();
+    const irregular = irregularHost();
 
-    if (!target || !root) return;
+    if (!target || !root) {
+      console.error("マスタ選択受付：マスタ選択UIを確認できません");
+      return;
+    }
 
     if (typeof window.stopReadOnlyScanner === "function") {
       window.stopReadOnlyScanner();
     }
 
-    if (area) {
-      area.classList.remove("isActive");
-    }
-
+    if (area) area.classList.remove("isActive");
     if (status) status.hidden = true;
     if (viewport) viewport.hidden = true;
+    if (irregular) irregular.hidden = true;
 
     target.hidden = false;
     target.appendChild(root);
@@ -118,6 +99,8 @@
     if (openButton && panel && panel.hidden) {
       openButton.click();
     }
+
+    target.scrollIntoView({behavior:"smooth", block:"start"});
   }
 
   function movePickerToIrregular() {
@@ -139,55 +122,20 @@
     }
   }
 
-  function bindReceptionButtons() {
-    const masterButton = document.getElementById(MASTER_ENTRY_BUTTON_ID);
-    const normalButton = document.querySelector(
-      '#receptionStep [data-reception-type="normal"]:not(#' + MASTER_ENTRY_BUTTON_ID + ')'
-    );
-    const irregularButton = document.querySelector(
-      '#receptionStep [data-reception-type="irregular"]'
-    );
-
-    if (masterButton && masterButton.dataset.masterReceptionBound !== "true") {
-      masterButton.dataset.masterReceptionBound = "true";
-      masterButton.addEventListener("click", function() {
-        window.__masterSelectionReception = true;
-      }, true);
-    }
-
-    if (normalButton && normalButton.dataset.masterReceptionResetBound !== "true") {
-      normalButton.dataset.masterReceptionResetBound = "true";
-      normalButton.addEventListener("click", function() {
-        window.__masterSelectionReception = false;
-        restoreScannerVisuals();
-      }, true);
-    }
-
-    if (irregularButton && irregularButton.dataset.masterReceptionResetBound !== "true") {
-      irregularButton.dataset.masterReceptionResetBound = "true";
-      irregularButton.addEventListener("click", function() {
-        window.__masterSelectionReception = false;
-        movePickerToIrregular();
-      }, true);
-    }
-  }
-
   window.addEventListener("entrywizard:complete", function(event) {
     const settings = event && event.detail ? event.detail : null;
-
     if (!settings) return;
 
     if (
-      isMasterReception() &&
-      settings.receptionType === "normal" &&
+      settings.receptionType === "master" &&
       settings.mode !== "検品"
     ) {
-      movePickerToMasterReception();
+      setTimeout(movePickerToMasterReception, 0);
       return;
     }
 
     if (settings.receptionType === "irregular") {
-      movePickerToIrregular();
+      setTimeout(movePickerToIrregular, 0);
       return;
     }
 
@@ -195,7 +143,6 @@
   });
 
   ensureMasterHost();
-  bindReceptionButtons();
 
-  console.info("開発版：マスタ選択受付入口テスト v3 読込完了");
+  console.info("開発版：マスタ選択受付入口テスト v4 読込完了");
 })();
