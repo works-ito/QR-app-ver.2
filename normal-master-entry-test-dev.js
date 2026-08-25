@@ -1,5 +1,5 @@
 /*
- * マスタ選択受付入口テスト v5
+ * マスタ選択受付入口テスト v6
  *
  * START画面の「マスタ選択受付」は receptionType=master として進める。
  * QRカメラは起動しない。
@@ -111,10 +111,16 @@
     }
 
     const openButton = document.getElementById("irregularMasterPickerOpenButton");
-    const panel = document.getElementById("irregularMasterPickerPanel");
-
-    if (openButton && panel && panel.hidden) {
-      openButton.click();
+    if (openButton) {
+      const small = openButton.querySelector("small");
+      openButton.childNodes.forEach(function(node) {
+        if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+          node.textContent = "\n          商品選択へ進む\n          ";
+        }
+      });
+      if (small) {
+        small.textContent = "大分類 → 機種・品目 → 管理番号／数量";
+      }
     }
 
     target.scrollIntoView({behavior:"smooth", block:"start"});
@@ -148,6 +154,19 @@
       lead.textContent =
         "QRがない・読めない場合は、マスタから対象を選べます。既存の直接入力・番号不明もそのまま使用できます。";
     }
+
+    const openButton = document.getElementById("irregularMasterPickerOpenButton");
+    if (openButton) {
+      const small = openButton.querySelector("small");
+      openButton.childNodes.forEach(function(node) {
+        if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+          node.textContent = "\n          マスタから選ぶ\n          ";
+        }
+      });
+      if (small) {
+        small.textContent = "大分類 → 機種・品目 → 管理番号／数量";
+      }
+    }
   }
 
   window.addEventListener("entrywizard:complete", function(event) {
@@ -175,5 +194,5 @@
 
   ensureMasterHost();
 
-  console.info("開発版：マスタ選択受付入口テスト v5 読込完了");
+  console.info("開発版：マスタ選択受付入口テスト v6 読込完了");
 })();
