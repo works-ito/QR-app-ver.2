@@ -1,5 +1,5 @@
 /*
- * 手動更新UI v102
+ * 手動更新UI v103
  *
  * 責務：
  * - index.html に固定配置された在庫データ表示と［更新］ボタンへ動作を接続する。
@@ -44,32 +44,13 @@
       masterButton.id = MASTER_ENTRY_BUTTON_ID;
       masterButton.className = "choiceButton";
       masterButton.type = "button";
-      masterButton.dataset.receptionType = "normal";
+      masterButton.dataset.receptionType = "master";
       masterButton.innerHTML =
         'マスタ選択受付' +
         '<span class="choiceSubText">QRを使わずマスタから対象を選ぶ</span>';
 
       grid.insertBefore(masterButton, irregularButton);
     }
-
-    function markMaster(value) {
-      window.__masterSelectionReception = value === true;
-    }
-
-    if (masterButton.dataset.masterEntryFlagBound !== "true") {
-      masterButton.dataset.masterEntryFlagBound = "true";
-      masterButton.addEventListener("click", function() {
-        markMaster(true);
-      }, true);
-    }
-
-    [normalButton, irregularButton].forEach(function(button) {
-      if (button.dataset.masterEntryResetBound === "true") return;
-      button.dataset.masterEntryResetBound = "true";
-      button.addEventListener("click", function() {
-        markMaster(false);
-      }, true);
-    });
   }
 
   function pad2(value) {
@@ -226,7 +207,7 @@
       void renderLatestCacheTimestamp();
     }
 
-    console.info("開発版：手動更新UI v102 読込完了");
+    console.info("開発版：手動更新UI v103 読込完了");
   }
 
   if (
