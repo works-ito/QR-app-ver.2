@@ -3464,175 +3464,36 @@ function changePreviousSettings() {
     }
 
     function buildWizardIrregularRecord() {
-      const numberTypeNode = document.querySelector('input[name="wizardIrregularNumberType"]:checked');
-      const slipNode = document.querySelector('input[name="wizardIrregularSlipStatus"]:checked');
-      const numberType = numberTypeNode ? numberTypeNode.value : "";
-      const slipStatus = slipNode ? slipNode.value : "";
-      const enteredNumber = document.getElementById("wizardIrregularNumber").value.trim();
       const note = document.getElementById("wizardIrregularNote").value.trim();
 
-      if (!numberType || !slipStatus) throw new Error("番号の状態と伝票の有無を選択してください");
-      if (numberType === "入力" && !enteredNumber) throw new Error("管理番号または品目コードを入力してください");
-      if (!note) throw new Error("状況・理由・機械の特徴を入力してください");
+      if (!note) {
+        throw new Error("状況・理由・機械の特徴を入力してください");
+      }
 
-      const base = {
+      if (!UNKNOWN_IRREGULAR_ALLOWED_MODES.includes(wizardState.mode)) {
+        throw new Error(
+          "対象不明では「" + wizardState.modeLabel +
+          "」を使用できません。\n出庫・出庫取消・返却・完成機・拠点移動から選び直してください。"
+        );
+      }
+
+      return {
         irregularCaseId:createWizardIrregularCaseId(),
-        qrText:numberType === "番号不明" ? "番号不明" : enteredNumber,
-        numberType:numberType,
+        qrText:"番号不明",
+        numberType:"番号不明",
         mode:wizardState.mode,
         user:wizardState.user,
         location:wizardState.location,
         recTarget:wizardState.recTarget || "",
         recDate:wizardState.recDate || "",
         irregularNote:note,
-        slipStatus:slipStatus,
-        readMethod:numberType === "番号不明"
-          ? "イレギュラーQR（番号不明）" : "イレギュラーQR（手入力）"
+        slipStatus:"任意",
+        readMethod:"イレギュラーQR（番号不明）",
+        managementType:"unknown",
+        displayName:"番号不明",
+        currentState:""
       };
-
-      if (numberType === "番号不明") {
-        if (!UNKNOWN_IRREGULAR_ALLOWED_MODES.includes(wizardState.mode)) {
-          throw new Error(
-            "番号不明では「" + wizardState.modeLabel +
-            "」を使用できません。\n出庫・出庫取消・返却・完成機・拠点移動から選び直してください。"
-          );
-        }
-
-        return Object.assign(base, {
-          managementType:"unknown", displayName:"番号不明", currentState:""
-        });
-      }
-
-      const managed = findManagedItemLocal(enteredNumber);
-      if (managed) {
-        const details = getScannerItemDetails(enteredNumber);
-        if (!details) throw new Error("管理番号の情報を取得できませんでした");
-        if (!isScannerModeAllowed(details.managementType, wizardState.mode)) {
-          throw new Error("この管理区分では「" + wizardState.modeLabel + "」を使用できません");
-        }
-        if (
-          isRecentSuccessfulWork(
-            enteredNumber,
-            wizardState.mode
-          )
-        ) {
-          throw new Error(
-            "この作業は5分以内に登録済みです。\n二重登録の可能性があるため登録できません。"
-          );
-        }
-
-        const knownState =
-          details.currentState === "状態なし"
-            ? ""
-            : details.currentState;
-        const stateCheck =
-          validateStateTransition(
-            knownState,
-            wizardState.mode
-          );
-
-        if (!stateCheck.ok) {
-          throw new Error(
-            stateCheck.message +
-            "\n現在状態：" + (knownState || "状態なし")
-          );
-        }
-
-        wizardIrregularDetected = details;
-        return Object.assign(base, {
-          managementType:details.managementType,
-          displayName:details.displayName,
-          currentState:details.currentState === "状態なし" ? "" : details.currentState
-        });
-      }
-
-      const quantityItem = findQuantityItemLocal(enteredNumber);
-      if (quantityItem) {
-        if (!isScannerModeAllowed("quantity", wizardState.mode)) {
-          throw new Error("数量管理品では「" + wizardState.modeLabel + "」を使用できません");
-        }
-
-        const itemCode = getFirstItemValue(
-          quantityItem,
-          ["品目コード", "itemCode", "商品コード", "コード"]
-        ) || enteredNumber;
-        const displayName = getFirstItemValue(
-          quantityItem,
-          ["表示名", "品名", "商品名", "名称", "displayName", "name"]
-        ) || enteredNumber;
-        const category = getFirstItemValue(
-          quantityItem,
-          ["区分", "category"]
-        ) || "";
-        const unit = getFirstItemValue(
-          quantityItem,
-          ["単位", "unit"]
-        ) || "";
-        const quantityBox =
-          document.getElementById("wizardIrregularQuantityBox");
-        const quantityInput =
-          document.getElementById("wizardIrregularQuantity");
-        const quantityUnit =
-          document.getElementById("wizardIrregularQuantityUnit");
-        const enteredQuantity = Number(quantityInput.value);
-
-        const stockLocation =
-          String(
-            base.location ||
-            wizardState.location ||
-            ""
-          ).trim();
-
-        const currentStock =
-          getQuantityCurrentStock(
-            itemCode,
-            stockLocation
-          );
-
-        quantityBox.hidden = false;
-        quantityUnit.innerText =
-          displayName +
-          (unit ? " ／ 単位：" + unit : "") +
-          " ／ 現在庫（" +
-          (stockLocation || "拠点未設定") +
-          "）：" +
-          currentStock +
-          unit;
-
-        if (
-          !Number.isInteger(enteredQuantity) ||
-          enteredQuantity <= 0
-        ) {
-          setTimeout(function() {
-            quantityInput.focus();
-          }, 50);
-          throw new Error(
-            "数量管理品「" + displayName + "」を確認しました。\n数量を1以上の整数で入力してください。"
-          );
-        }
-
-        wizardIrregularDetected = {
-          managementType:"quantity",
-          recordType:"quantity",
-          item:quantityItem
-        };
-
-        return Object.assign(base, {
-          qrText:itemCode,
-          managementType:"quantity",
-          recordType:"quantity",
-          itemCode:itemCode,
-          displayName:displayName,
-          category:category,
-          unit:unit,
-          quantity:enteredQuantity,
-          currentState:""
-        });
-      }
-
-      throw new Error("入力した番号がマスタに登録されていません\n入力番号：" + enteredNumber);
     }
-
     function confirmWizardIrregularInput() {
       try {
         const record = buildWizardIrregularRecord();
