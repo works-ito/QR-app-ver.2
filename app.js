@@ -1208,9 +1208,14 @@ function changePreviousSettings() {
         "normal"
       ) {
         startReadOnlyScanner();
-      } else {
+      } else if (
+        settings.receptionType ===
+        "irregular"
+      ) {
         stopReadOnlyScanner();
         openWizardIrregularArea();
+      } else {
+        stopReadOnlyScanner();
       }
     }
 
