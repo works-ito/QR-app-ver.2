@@ -1,13 +1,13 @@
 /*
- * イレギュラー受付入口簡素化 v72
+ * イレギュラー受付入口簡素化 v73
  *
  * 目的:
- * - 旧「番号を入力する / 番号が読めない」の選択UIを現場画面から外す。
- * - 通常は「マスタから選ぶ」を主経路にする。
- * - 本当に対象を特定できない場合だけ「対象を特定できない」を表示する。
+ * - イレギュラー受付を「対象を特定できない」専用にする。
+ * - 対象を特定できる場合は START の「マスタ選択受付」を使用する。
+ * - イレギュラー受付内の「マスタから選ぶ」「対象を特定できない」の二重入口をなくす。
  * - 既存GAS / buildWizardIrregularRecord() との互換性のため、旧radio/input自体はDOMに残す。
  *
- * 旧DOMを削除せず非表示化するため、既存送信ロジックには触れない。
+ * 旧DOMを削除せず非表示化し、既存の番号不明イレギュラー送信・写真処理はそのまま利用する。
  */
 (function() {
   "use strict";
@@ -24,41 +24,8 @@
     return radio ? radio.closest(".wizardRadioGrid") : null;
   }
 
-  function getSlipGrid(area) {
-    if (!area) return null;
-    const radio = area.querySelector('input[name="wizardIrregularSlipStatus"]');
-    return radio ? radio.closest(".wizardRadioGrid") : null;
-  }
-
   function getLabelFor(id, area) {
     return area ? area.querySelector('label[for="' + id + '"]') : null;
-  }
-
-  function getLegacyDetailNodes(area) {
-    if (!area) return [];
-
-    const note = document.getElementById("wizardIrregularNote");
-    const emphasis = note ? note.previousElementSibling : null;
-
-    return [
-      getSlipGrid(area),
-      document.getElementById("wizardIrregularSlipGuide"),
-      getLabelFor("wizardIrregularNote", area),
-      emphasis && emphasis.classList && emphasis.classList.contains("irregularNoteEmphasis")
-        ? emphasis
-        : null,
-      note,
-      document.getElementById("wizardIrregularQuantityBox"),
-      document.getElementById("wizardIrregularCheckResult"),
-      document.getElementById("wizardConfirmIrregularButton")
-    ].filter(Boolean);
-  }
-
-  function setLegacyDetailsVisible(visible) {
-    const area = getArea();
-    getLegacyDetailNodes(area).forEach(function(node) {
-      node.hidden = !visible;
-    });
   }
 
   function setNumberType(value) {
@@ -66,54 +33,29 @@
       'input[name="wizardIrregularNumberType"][value="' + value + '"]'
     );
     if (!radio) return;
-
     radio.checked = true;
     radio.dispatchEvent(new Event("change", {bubbles:true}));
   }
 
-  function closeMasterPickerIfOpen() {
-    const closeButton = document.getElementById("irregularMasterPickerCloseButton");
-    const panel = document.getElementById("irregularMasterPickerPanel");
-
-    if (closeButton && panel && !panel.hidden) {
-      closeButton.click();
-    }
+  function hideMasterPicker() {
+    const picker = document.getElementById("irregularMasterPickerDev");
+    if (picker) picker.hidden = true;
   }
 
-  function enterUnknownMode() {
+  function enterUnknownOnlyMode() {
+    const area = getArea();
+    if (!area) return;
+
     setNumberType("番号不明");
-    closeMasterPickerIfOpen();
-    setLegacyDetailsVisible(true);
+    hideMasterPicker();
 
-    const button = document.getElementById("irregularUnknownEntryButton");
+    const root = document.getElementById(ROOT_ID);
+    if (root) root.hidden = false;
+
     const hint = document.getElementById("irregularEntrySimplifyHint");
-
-    if (button) button.hidden = true;
     if (hint) {
       hint.innerText =
-        "対象を特定できない受付です。伝票の有無と状況・理由を入力してください。";
-    }
-
-    const note = document.getElementById("wizardIrregularNote");
-    if (note) {
-      setTimeout(function() {
-        note.scrollIntoView({behavior:"smooth", block:"center"});
-        note.focus();
-      }, 100);
-    }
-  }
-
-  function resetToMasterMode() {
-    setNumberType("入力");
-    setLegacyDetailsVisible(false);
-
-    const button = document.getElementById("irregularUnknownEntryButton");
-    const hint = document.getElementById("irregularEntrySimplifyHint");
-
-    if (button) button.hidden = false;
-    if (hint) {
-      hint.innerText =
-        "対象が分かる場合は上の「マスタから選ぶ」を使用してください。";
+        "対象を特定できない受付です。状況・理由と写真を残してください。伝票がある場合は、できるだけ写真を添付してください。";
     }
   }
 
@@ -125,23 +67,18 @@
     const numberLabel = getLabelFor("wizardIrregularNumber", area);
     const numberInput = document.getElementById("wizardIrregularNumber");
 
-    /*
-     * 内部互換のためDOMは残すが、現場UIからは完全に隠す。
-     */
+    /* 内部互換のためDOMは残すが、現場UIからは完全に隠す。 */
     if (numberGrid) numberGrid.hidden = true;
     if (numberLabel) numberLabel.hidden = true;
     if (numberInput) numberInput.hidden = true;
 
     const box = document.createElement("div");
     box.id = ROOT_ID;
-    box.style.margin = "12px 0 4px";
+    box.style.margin = "12px 0 8px";
     box.innerHTML =
-      '<div id="irregularEntrySimplifyHint" class="wizardPostSummary" style="margin-bottom:8px">' +
-        '対象が分かる場合は上の「マスタから選ぶ」を使用してください。' +
-      '</div>' +
-      '<button type="button" id="irregularUnknownEntryButton" class="secondaryButton" style="width:100%">' +
-        '対象を特定できない' +
-      '</button>';
+      '<div id="irregularEntrySimplifyHint" class="wizardPostSummary">' +
+        '対象を特定できない受付です。状況・理由と写真を残してください。伝票がある場合は、できるだけ写真を添付してください。' +
+      '</div>';
 
     const picker = document.getElementById("irregularMasterPickerDev");
     if (picker && picker.parentElement === area) {
@@ -154,10 +91,7 @@
       else area.prepend(box);
     }
 
-    document.getElementById("irregularUnknownEntryButton")
-      .addEventListener("click", enterUnknownMode);
-
-    resetToMasterMode();
+    enterUnknownOnlyMode();
   }
 
   function observeOpenState() {
@@ -168,11 +102,8 @@
 
     const observer = new MutationObserver(function() {
       if (!area.hidden) {
-        /*
-         * 既存 openWizardIrregularArea() は旧入力radioを初期化する。
-         * その直後に表示だけ新仕様へ戻す。
-         */
-        setTimeout(resetToMasterMode, 0);
+        /* 既存 openWizardIrregularArea() の初期化後に番号不明専用へ固定する。 */
+        setTimeout(enterUnknownOnlyMode, 0);
       }
     });
 
@@ -190,6 +121,6 @@
   init();
 
   console.info(
-    "開発版：イレギュラー受付入口簡素化 v72 読込完了"
+    "開発版：イレギュラー受付入口簡素化 v73 読込完了"
   );
 })();
