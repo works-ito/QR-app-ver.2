@@ -1,5 +1,5 @@
 /*
- * イレギュラー受付入口簡素化 v74
+ * イレギュラー受付入口簡素化 v75
  *
  * 目的:
  * - イレギュラー受付を「対象を特定できない」専用にする。
@@ -10,8 +10,10 @@
  * - 写真は既存イレギュラー写真フローをそのまま必須利用する。
  *
  * 既存GAS / buildWizardIrregularRecord() との互換性のため、
- * 旧radio/input自体はDOMに残し、内部値だけ
- * 「番号不明」「伝票なし」に固定する。
+ * 旧radio/input自体はDOMに残し、イレギュラー受付が確定した時だけ
+ * 内部値を「番号不明」「伝票なし」に設定する。
+ *
+ * タイマーやMutationObserverによる再強制は行わない。
  */
 (function() {
   "use strict";
@@ -38,10 +40,8 @@
     );
     if (!radio) return;
 
-    if (!radio.checked) {
-      radio.checked = true;
-      radio.dispatchEvent(new Event("change", {bubbles:true}));
-    }
+    radio.checked = true;
+    radio.dispatchEvent(new Event("change", {bubbles:true}));
   }
 
   function hideMasterPicker() {
@@ -66,14 +66,10 @@
     if (slipGuide) slipGuide.hidden = true;
   }
 
-  function enterUnknownOnlyMode() {
+  function applyUnknownOnlyMode() {
     const area = getArea();
     if (!area) return;
 
-    /*
-     * 既存の change ハンドラが表示状態を戻す可能性があるため、
-     * まず内部値を確定し、その後に旧UIを隠す。
-     */
     setRadioValue("wizardIrregularNumberType", "番号不明");
     setRadioValue("wizardIrregularSlipStatus", "伝票なし");
 
@@ -88,12 +84,6 @@
       hint.innerText =
         "対象を特定できない受付です。状況・理由と写真を残してください。伝票がある場合は、できるだけ写真を添付してください。";
     }
-
-    /*
-     * 旧 change ハンドラや受付初期化が遅れて走っても再表示されないよう、
-     * 短い遅延でもう一度だけ表示制御を確定する。
-     */
-    setTimeout(hideLegacyChoiceUi, 50);
   }
 
   function injectUi() {
@@ -121,36 +111,23 @@
       else area.prepend(box);
     }
 
-    enterUnknownOnlyMode();
-  }
-
-  function observeOpenState() {
-    const area = getArea();
-    if (!area || area.dataset.irregularSimplifyObserved === "true") return;
-
-    area.dataset.irregularSimplifyObserved = "true";
-
-    const observer = new MutationObserver(function() {
-      if (!area.hidden) {
-        /* 既存 openWizardIrregularArea() の初期化後に番号不明専用へ固定する。 */
-        setTimeout(enterUnknownOnlyMode, 0);
-      }
-    });
-
-    observer.observe(area, {
-      attributes:true,
-      attributeFilter:["hidden"]
-    });
+    hideMasterPicker();
+    hideLegacyChoiceUi();
   }
 
   function init() {
     injectUi();
-    observeOpenState();
+
+    window.addEventListener("entrywizard:complete", function(event) {
+      const settings = event && event.detail ? event.detail : null;
+      if (!settings || settings.receptionType !== "irregular") return;
+      applyUnknownOnlyMode();
+    });
   }
 
   init();
 
   console.info(
-    "開発版：イレギュラー受付入口簡素化 v74 読込完了"
+    "開発版：イレギュラー受付入口簡素化 v75 読込完了"
   );
 })();
