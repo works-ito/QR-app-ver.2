@@ -41,17 +41,19 @@ jobs:
           if text.find(start_marker, start + 1) != -1:
               raise SystemExit('Multiple openWizardIrregularArea functions found; aborting.')
 
-          replacement = '''    function openWizardIrregularArea() {
-      wizardIrregularRecord = null;
-      wizardIrregularDetected = null;
-      document.getElementById("wizardPostSendArea").hidden = false;
-      document.getElementById("wizardIrregularArea").hidden = false;
-      document.getElementById("wizardIrregularNote").value = "";
-      document.getElementById("wizardIrregularCheckResult").innerText = "";
-      scrollToWizardPostSend("wizardIrregularArea");
-    }
-
-'''
+          lines = [
+              '    function openWizardIrregularArea() {',
+              '      wizardIrregularRecord = null;',
+              '      wizardIrregularDetected = null;',
+              '      document.getElementById("wizardPostSendArea").hidden = false;',
+              '      document.getElementById("wizardIrregularArea").hidden = false;',
+              '      document.getElementById("wizardIrregularNote").value = "";',
+              '      document.getElementById("wizardIrregularCheckResult").innerText = "";',
+              '      scrollToWizardPostSend("wizardIrregularArea");',
+              '    }',
+              '',
+          ]
+          replacement = '\n'.join(lines)
 
           new_text = text[:start] + replacement + text[end:]
 
