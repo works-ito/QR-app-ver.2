@@ -1,4 +1,4 @@
-name: Patch sales loader cache key
+name: Patch master route separation
 
 on:
   push:
@@ -18,17 +18,22 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-      - name: Bump loader
-        run: sed -i 's#./sales-stockin.js?v=121#./sales-stockin.js?v=146#' index.html
+      - name: Run focused patch
+        run: python3 scripts/patch_master_route_separation.py
       - name: Verify
         run: |
-          grep -F './sales-stockin.js?v=146' index.html
           git diff --check
-          git diff -- index.html
+          git diff -- app.js index.html
+          grep -F 'else if (wizardState.receptionType === "irregular")' app.js
+          grep -F './app.js?v=72' index.html
       - name: Commit
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add index.html
-          git commit -m 'Bump sales-stockin loader cache key'
+          git add app.js index.html
+          if git diff --cached --quiet; then
+            echo 'No changes to commit.'
+            exit 0
+          fi
+          git commit -m 'Separate master completion route from irregular'
           git push origin HEAD:main
