@@ -3425,12 +3425,7 @@ function changePreviousSettings() {
       wizardIrregularDetected = null;
       document.getElementById("wizardPostSendArea").hidden = false;
       document.getElementById("wizardIrregularArea").hidden = false;
-      document.getElementById("wizardIrregularNumber").value = "";
-      document.getElementById("wizardIrregularNumber").disabled = false;
       document.getElementById("wizardIrregularNote").value = "";
-      document.getElementById("wizardIrregularQuantity").value = "";
-      document.getElementById("wizardIrregularQuantityUnit").innerText = "";
-      document.getElementById("wizardIrregularQuantityBox").hidden = true;
       document.getElementById("wizardIrregularCheckResult").innerText = "";
       scrollToWizardPostSend("wizardIrregularArea");
     }
