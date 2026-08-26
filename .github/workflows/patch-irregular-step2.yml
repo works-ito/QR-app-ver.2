@@ -21,67 +21,54 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Patch buildWizardIrregularRecord only
+      - name: Patch openWizardIrregularArea only
         run: |
           python3 - <<'PY'
           from pathlib import Path
 
           app = Path('app.js')
           text = app.read_text(encoding='utf-8')
-          start_marker = '    function buildWizardIrregularRecord() {'
-          end_marker = '    function confirmWizardIrregularInput() {'
+
+          start_marker = '    function openWizardIrregularArea() {'
+          end_marker = '    function updateWizardIrregularNumberType() {'
+
           start = text.find(start_marker)
           end = text.find(end_marker, start)
 
           if start == -1 or end == -1 or end <= start:
               raise SystemExit('Target function markers not found; aborting without changes.')
-          if text.find(start_marker, start + 1) != -1:
-              raise SystemExit('Multiple buildWizardIrregularRecord functions found; aborting.')
 
-          lines = [
-              '    function buildWizardIrregularRecord() {',
-              '      const note = document.getElementById("wizardIrregularNote").value.trim();',
-              '',
-              '      if (!note) {',
-              '        throw new Error("状況・理由・機械の特徴を入力してください");',
-              '      }',
-              '',
-              '      if (!UNKNOWN_IRREGULAR_ALLOWED_MODES.includes(wizardState.mode)) {',
-              '        throw new Error(',
-              '          "対象不明では「" + wizardState.modeLabel +',
-              '          "」を使用できません。\\n出庫・出庫取消・返却・完成機・拠点移動から選び直してください。"',
-              '        );',
-              '      }',
-              '',
-              '      return {',
-              '        irregularCaseId:createWizardIrregularCaseId(),',
-              '        qrText:"番号不明",',
-              '        numberType:"番号不明",',
-              '        mode:wizardState.mode,',
-              '        user:wizardState.user,',
-              '        location:wizardState.location,',
-              '        recTarget:wizardState.recTarget || "",',
-              '        recDate:wizardState.recDate || "",',
-              '        irregularNote:note,',
-              '        slipStatus:"任意",',
-              '        readMethod:"イレギュラーQR（番号不明）",',
-              '        managementType:"unknown",',
-              '        displayName:"番号不明",',
-              '        currentState:""',
-              '      };',
-              '    }',
-              '',
-          ]
-          replacement = '\n'.join(lines)
+          if text.find(start_marker, start + 1) != -1:
+              raise SystemExit('Multiple openWizardIrregularArea functions found; aborting.')
+
+          replacement = '''    function openWizardIrregularArea() {
+      wizardIrregularRecord = null;
+      wizardIrregularDetected = null;
+      document.getElementById("wizardPostSendArea").hidden = false;
+      document.getElementById("wizardIrregularArea").hidden = false;
+      document.getElementById("wizardIrregularNumber").value = "";
+      document.getElementById("wizardIrregularNumber").disabled = false;
+      document.getElementById("wizardIrregularNote").value = "";
+      document.getElementById("wizardIrregularQuantity").value = "";
+      document.getElementById("wizardIrregularQuantityUnit").innerText = "";
+      document.getElementById("wizardIrregularQuantityBox").hidden = true;
+      document.getElementById("wizardIrregularCheckResult").innerText = "";
+      scrollToWizardPostSend("wizardIrregularArea");
+    }
+
+'''
+
           new_text = text[:start] + replacement + text[end:]
+
           if new_text == text:
               raise SystemExit('No app.js change produced; aborting.')
+
           app.write_text(new_text, encoding='utf-8')
 
           index = Path('index.html')
           index_text = index.read_text(encoding='utf-8')
-          old = './app.js?v=67'
-          new = './app.js?v=68'
+          old = './app.js?v=68'
+          new = './app.js?v=69'
           if index_text.count(old) != 1:
               raise SystemExit(f'Expected exactly one {old}; found {index_text.count(old)}. Aborting.')
           index.write_text(index_text.replace(old, new, 1), encoding='utf-8')
@@ -101,5 +88,5 @@ jobs:
             echo 'No changes to commit.'
             exit 0
           fi
-          git commit -m 'Make irregular record unknown-only'
+          git commit -m 'Remove legacy irregular area defaults'
           git push origin HEAD:main
