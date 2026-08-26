@@ -29,35 +29,31 @@ jobs:
           index = Path('index.html')
           text = index.read_text(encoding='utf-8')
 
-          legacy_choices = '''      <div class="wizardRadioGrid">
-        <label><input type="radio" name="wizardIrregularNumberType" value="入力" checked>番号を入力する</label>
-        <label><input type="radio" name="wizardIrregularNumberType" value="番号不明">番号が読めない</label>
-      </div>
-      <label for="wizardIrregularNumber">管理番号または品目コード</label>
-      <input id="wizardIrregularNumber" type="text" autocomplete="off" placeholder="管理番号または品目コードを入力">
-      <div class="wizardRadioGrid">
-        <label><input type="radio" name="wizardIrregularSlipStatus" value="伝票あり" checked>伝票あり</label>
-        <label><input type="radio" name="wizardIrregularSlipStatus" value="伝票なし">伝票なし</label>
-      </div>
-      <div id="wizardIrregularSlipGuide" class="wizardPostSummary">1枚目に伝票写真を追加してください。</div>
-'''
+          choice_start_marker = '      <div class="wizardRadioGrid">\n        <label><input type="radio" name="wizardIrregularNumberType" value="入力" checked>番号を入力する</label>'
+          note_marker = '      <label for="wizardIrregularNote">状況・理由</label>'
+          choice_start = text.find(choice_start_marker)
+          note_start = text.find(note_marker, choice_start)
 
-          legacy_quantity = '''      <div id="wizardIrregularQuantityBox" hidden>
-        <label for="wizardIrregularQuantity">数量</label>
-        <input id="wizardIrregularQuantity" type="number" inputmode="numeric" min="1" step="1" placeholder="数量">
-        <div id="wizardIrregularQuantityUnit" class="wizardPostSummary"></div>
-      </div>
-'''
+          if choice_start == -1 or note_start == -1 or note_start <= choice_start:
+              raise SystemExit('Legacy irregular choice block markers not found; aborting without changes.')
+          if text.find(choice_start_marker, choice_start + 1) != -1:
+              raise SystemExit('Multiple legacy irregular choice blocks found; aborting.')
 
-          if text.count(legacy_choices) != 1:
-              raise SystemExit(f'Expected exactly one legacy choice block; found {text.count(legacy_choices)}. Aborting.')
-          if text.count(legacy_quantity) != 1:
-              raise SystemExit(f'Expected exactly one legacy quantity block; found {text.count(legacy_quantity)}. Aborting.')
+          text = text[:choice_start] + text[note_start:]
 
-          new_text = text.replace(legacy_choices, '', 1)
-          new_text = new_text.replace(legacy_quantity, '', 1)
+          quantity_start_marker = '      <div id="wizardIrregularQuantityBox" hidden>'
+          check_marker = '      <div id="wizardIrregularCheckResult" class="wizardPostSummary"></div>'
+          quantity_start = text.find(quantity_start_marker)
+          check_start = text.find(check_marker, quantity_start)
 
-          if new_text == text:
+          if quantity_start == -1 or check_start == -1 or check_start <= quantity_start:
+              raise SystemExit('Legacy irregular quantity block markers not found; aborting without changes.')
+          if text.find(quantity_start_marker, quantity_start + 1) != -1:
+              raise SystemExit('Multiple legacy irregular quantity blocks found; aborting.')
+
+          new_text = text[:quantity_start] + text[check_start:]
+
+          if new_text == index.read_text(encoding='utf-8'):
               raise SystemExit('No index.html change produced; aborting.')
 
           index.write_text(new_text, encoding='utf-8')
