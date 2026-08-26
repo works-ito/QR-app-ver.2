@@ -1,13 +1,14 @@
 /*
- * マスタ選択受付入口テスト v9
+ * マスタ選択受付入口テスト v10
  *
  * START画面の「マスタ選択受付」は receptionType=master として進める。
  * QRカメラは起動しない。
- * 設定完了後、既存のマスタ選択UIを completeStep 直下の専用ホストへ移し、
+ * 設定完了後、completeStep 直下の専用ホストに常設したマスタ選択UIを表示し、
  * 通常送信ブリッジへ接続する。
  *
  * 重要：専用ホストは cameraPreview の外に置く。
  * cameraPreview を非表示にしてもマスタ選択UIまで消えない構造にする。
+ * イレギュラー受付UIは master 受付時のみ非表示にする。
  *
  * GAS / sendWizardBatch() は変更しない。
  */
@@ -16,8 +17,10 @@
 
   const PICKER_ID = "irregularMasterPickerDev";
   const MASTER_HOST_ID = "normalMasterEntryTestHost";
+  const IRREGULAR_AREA_ID = "wizardIrregularArea";
 
   function picker() { return document.getElementById(PICKER_ID); }
+  function irregularArea() { return document.getElementById(IRREGULAR_AREA_ID); }
   function scannerArea() { return document.getElementById("cameraPreview"); }
   function scannerStatus() { return document.getElementById("scannerStatus"); }
   function scannerViewport() { return document.getElementById("scannerViewport"); }
@@ -54,6 +57,7 @@
     const root = picker();
     const area = scannerArea();
     const note = connectionNote();
+    const irregular = irregularArea();
     if (!target || !root) {
       console.error("マスタ選択受付：マスタ選択UIを確認できません");
       return false;
@@ -61,6 +65,7 @@
     if (typeof window.stopReadOnlyScanner === "function") window.stopReadOnlyScanner();
     if (area) { area.classList.remove("isActive"); area.hidden = true; }
     if (note) note.hidden = true;
+    if (irregular) irregular.hidden = true;
     target.hidden = false;
     root.hidden = false;
 
@@ -110,5 +115,5 @@
   });
 
   ensureMasterHost();
-  console.info("開発版：マスタ選択受付入口テスト v9 読込完了");
+  console.info("開発版：マスタ選択受付入口テスト v10 読込完了");
 })();
