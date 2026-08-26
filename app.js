@@ -3429,26 +3429,6 @@ function changePreviousSettings() {
       document.getElementById("wizardIrregularCheckResult").innerText = "";
       scrollToWizardPostSend("wizardIrregularArea");
     }
-    function updateWizardIrregularNumberType() {
-      const selected = document.querySelector('input[name="wizardIrregularNumberType"]:checked');
-      const input = document.getElementById("wizardIrregularNumber");
-      const unknown = selected && selected.value === "番号不明";
-      input.disabled = Boolean(unknown);
-      input.value = unknown ? "" : input.value;
-      input.placeholder = unknown ? "番号不明として登録します" : "管理番号または品目コードを入力";
-      document.getElementById("wizardIrregularQuantityBox").hidden = true;
-      document.getElementById("wizardIrregularCheckResult").innerText = unknown
-        ? "番号不明は通常管理ログと在庫状態を更新しません。" : "";
-    }
-
-    function updateWizardIrregularSlipGuide() {
-      const selected = document.querySelector('input[name="wizardIrregularSlipStatus"]:checked');
-      const hasSlip = selected && selected.value === "伝票あり";
-      document.getElementById("wizardIrregularSlipGuide").innerText = hasSlip
-        ? "1枚目に伝票写真を追加してください。"
-        : "機械全体・管理番号・QRラベル・状態が分かる写真を追加してください。";
-    }
-
     function buildWizardIrregularRecord() {
       const note = document.getElementById("wizardIrregularNote").value.trim();
 
@@ -6160,12 +6140,6 @@ document.getElementById("wizardBackToPhotosButton").addEventListener("click", fu
 document.getElementById("wizardSaveRecMemoButton").addEventListener("click", saveWizardRecMemo);
 document.getElementById("wizardSkipRecMemoButton").addEventListener("click", function() {
   resumeWizardContinuousScan("REC追記なしで完了 ✔\n続けてQRを読み取れます");
-});
-document.querySelectorAll('input[name="wizardIrregularNumberType"]').forEach(function(radio) {
-  radio.addEventListener("change", updateWizardIrregularNumberType);
-});
-document.querySelectorAll('input[name="wizardIrregularSlipStatus"]').forEach(function(radio) {
-  radio.addEventListener("change", updateWizardIrregularSlipGuide);
 });
 document.getElementById("wizardConfirmIrregularButton").addEventListener("click", confirmWizardIrregularInput);
 document.getElementById("wizardCancelIrregularButton").addEventListener("click", function() {
