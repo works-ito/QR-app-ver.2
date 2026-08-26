@@ -1,5 +1,5 @@
 /*
- * マスタ選択受付入口テスト v8
+ * マスタ選択受付入口テスト v9
  *
  * START画面の「マスタ選択受付」は receptionType=master として進める。
  * QRカメラは起動しない。
@@ -15,27 +15,16 @@
   "use strict";
 
   const PICKER_ID = "irregularMasterPickerDev";
-  const IRREGULAR_HOST_ID = "wizardIrregularArea";
   const MASTER_HOST_ID = "normalMasterEntryTestHost";
 
   function picker() { return document.getElementById(PICKER_ID); }
-  function irregularHost() { return document.getElementById(IRREGULAR_HOST_ID); }
   function scannerArea() { return document.getElementById("cameraPreview"); }
   function scannerStatus() { return document.getElementById("scannerStatus"); }
   function scannerViewport() { return document.getElementById("scannerViewport"); }
   function connectionNote() { return document.getElementById("connectionNote"); }
 
   function ensureMasterHost() {
-    let host = document.getElementById(MASTER_HOST_ID);
-    if (host) return host;
-    const completeStep = document.getElementById("completeStep");
-    const area = scannerArea();
-    if (!completeStep || !area) return null;
-    host = document.createElement("div");
-    host.id = MASTER_HOST_ID;
-    host.hidden = true;
-    completeStep.insertBefore(host, area);
-    return host;
+    return document.getElementById(MASTER_HOST_ID);
   }
 
   function restoreScannerVisuals() {
@@ -65,7 +54,6 @@
     const root = picker();
     const area = scannerArea();
     const note = connectionNote();
-    const irregular = irregularHost();
     if (!target || !root) {
       console.error("マスタ選択受付：マスタ選択UIを確認できません");
       return false;
@@ -73,9 +61,7 @@
     if (typeof window.stopReadOnlyScanner === "function") window.stopReadOnlyScanner();
     if (area) { area.classList.remove("isActive"); area.hidden = true; }
     if (note) note.hidden = true;
-    if (irregular) irregular.hidden = true;
     target.hidden = false;
-    target.appendChild(root);
     root.hidden = false;
 
     const lead = root.querySelector(".irregularMasterLead");
@@ -102,15 +88,11 @@
     setTimeout(function() { openMasterReceptionWithRetry(count + 1); }, 100);
   }
 
-  function movePickerToIrregular() {
-    const target = irregularHost();
+  function hideMasterReceptionUi() {
+    const host = ensureMasterHost();
     const root = picker();
-    if (!target || !root) return;
-    restoreScannerVisuals();
-    const heading = target.querySelector("h3");
-    if (heading) heading.insertAdjacentElement("afterend", root);
-    else target.prepend(root);
-    root.hidden = true;
+    if (host) host.hidden = true;
+    if (root) root.hidden = true;
   }
 
   window.addEventListener("entrywizard:complete", function(event) {
@@ -121,12 +103,12 @@
       return;
     }
     if (settings.receptionType === "irregular") {
-      setTimeout(movePickerToIrregular, 0);
+      hideMasterReceptionUi();
       return;
     }
     restoreScannerVisuals();
   });
 
   ensureMasterHost();
-  console.info("開発版：マスタ選択受付入口テスト v8 読込完了");
+  console.info("開発版：マスタ選択受付入口テスト v9 読込完了");
 })();
