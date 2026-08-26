@@ -28,44 +28,42 @@ jobs:
 
           app = Path('app.js')
           text = app.read_text(encoding='utf-8')
+
           start_marker = '    function openWizardIrregularArea() {'
           end_marker = '    function updateWizardIrregularNumberType() {'
+
           start = text.find(start_marker)
           end = text.find(end_marker, start)
 
           if start == -1 or end == -1 or end <= start:
               raise SystemExit('Target function markers not found; aborting without changes.')
+
           if text.find(start_marker, start + 1) != -1:
               raise SystemExit('Multiple openWizardIrregularArea functions found; aborting.')
 
-          lines = [
-              '    function openWizardIrregularArea() {',
-              '      wizardIrregularRecord = null;',
-              '      wizardIrregularDetected = null;',
-              '      document.getElementById("wizardPostSendArea").hidden = false;',
-              '      document.getElementById("wizardIrregularArea").hidden = false;',
-              '      document.getElementById("wizardIrregularNumber").value = "";',
-              '      document.getElementById("wizardIrregularNumber").disabled = false;',
-              '      document.getElementById("wizardIrregularNote").value = "";',
-              '      document.getElementById("wizardIrregularQuantity").value = "";',
-              '      document.getElementById("wizardIrregularQuantityUnit").innerText = "";',
-              '      document.getElementById("wizardIrregularQuantityBox").hidden = true;',
-              '      document.getElementById("wizardIrregularCheckResult").innerText = "";',
-              '      scrollToWizardPostSend("wizardIrregularArea");',
-              '    }',
-              '',
-          ]
-          replacement = '\n'.join(lines)
+          replacement = '''    function openWizardIrregularArea() {
+      wizardIrregularRecord = null;
+      wizardIrregularDetected = null;
+      document.getElementById("wizardPostSendArea").hidden = false;
+      document.getElementById("wizardIrregularArea").hidden = false;
+      document.getElementById("wizardIrregularNote").value = "";
+      document.getElementById("wizardIrregularCheckResult").innerText = "";
+      scrollToWizardPostSend("wizardIrregularArea");
+    }
+
+'''
+
           new_text = text[:start] + replacement + text[end:]
 
           if new_text == text:
               raise SystemExit('No app.js change produced; aborting.')
+
           app.write_text(new_text, encoding='utf-8')
 
           index = Path('index.html')
           index_text = index.read_text(encoding='utf-8')
-          old = './app.js?v=68'
-          new = './app.js?v=69'
+          old = './app.js?v=69'
+          new = './app.js?v=70'
           if index_text.count(old) != 1:
               raise SystemExit(f'Expected exactly one {old}; found {index_text.count(old)}. Aborting.')
           index.write_text(index_text.replace(old, new, 1), encoding='utf-8')
@@ -85,5 +83,5 @@ jobs:
             echo 'No changes to commit.'
             exit 0
           fi
-          git commit -m 'Remove legacy irregular area defaults'
+          git commit -m 'Remove obsolete irregular field initialization'
           git push origin HEAD:main
