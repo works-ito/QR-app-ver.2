@@ -1,5 +1,5 @@
 /*
- * イレギュラー受付入口簡素化 v75
+ * イレギュラー受付入口簡素化 v76
  *
  * 目的:
  * - イレギュラー受付を「対象を特定できない」専用にする。
@@ -9,11 +9,13 @@
  * - 状況・理由は既存入力欄をそのまま必須利用する。
  * - 写真は既存イレギュラー写真フローをそのまま必須利用する。
  *
- * 既存GAS / buildWizardIrregularRecord() との互換性のため、
- * 旧radio/input自体はDOMに残し、イレギュラー受付が確定した時だけ
- * 内部値を「番号不明」「伝票なし」に設定する。
- *
- * タイマーやMutationObserverによる再強制は行わない。
+ * 重要:
+ * - タイマー、MutationObserver、同名関数上書き、wrapperは使わない。
+ * - 既存 openWizardIrregularArea() は旧仕様として
+ *   「入力」「伝票あり」を初期値に戻すため、画面表示時の状態に依存しない。
+ * - 送信確定ボタンの capture フェーズでだけ、既存 buildWizardIrregularRecord()
+ *   が読む hidden radio を「番号不明」「伝票なし」に確定する。
+ * - 既存 click ハンドラより先に1回だけ値を整えるため、競合や再強制を作らない。
  */
 (function() {
   "use strict";
@@ -34,14 +36,29 @@
     return area ? area.querySelector('label[for="' + id + '"]') : null;
   }
 
-  function setRadioValue(name, value) {
-    const radio = document.querySelector(
-      'input[name="' + name + '"][value="' + value + '"]'
+  function selectHiddenRadio(name, value) {
+    const radios = document.querySelectorAll(
+      'input[name="' + name + '"]'
     );
-    if (!radio) return;
 
-    radio.checked = true;
-    radio.dispatchEvent(new Event("change", {bubbles:true}));
+    radios.forEach(function(radio) {
+      radio.checked = radio.value === value;
+    });
+  }
+
+  function prepareUnknownIrregularForSubmit() {
+    if (
+      typeof wizardState !== "undefined" &&
+      wizardState.receptionType !== "irregular"
+    ) {
+      return;
+    }
+
+    selectHiddenRadio("wizardIrregularNumberType", "番号不明");
+    selectHiddenRadio("wizardIrregularSlipStatus", "伝票なし");
+
+    const numberInput = document.getElementById("wizardIrregularNumber");
+    if (numberInput) numberInput.value = "";
   }
 
   function hideMasterPicker() {
@@ -64,26 +81,6 @@
     if (numberInput) numberInput.hidden = true;
     if (slipGrid) slipGrid.hidden = true;
     if (slipGuide) slipGuide.hidden = true;
-  }
-
-  function applyUnknownOnlyMode() {
-    const area = getArea();
-    if (!area) return;
-
-    setRadioValue("wizardIrregularNumberType", "番号不明");
-    setRadioValue("wizardIrregularSlipStatus", "伝票なし");
-
-    hideMasterPicker();
-    hideLegacyChoiceUi();
-
-    const root = document.getElementById(ROOT_ID);
-    if (root) root.hidden = false;
-
-    const hint = document.getElementById("irregularEntrySimplifyHint");
-    if (hint) {
-      hint.innerText =
-        "対象を特定できない受付です。状況・理由と写真を残してください。伝票がある場合は、できるだけ写真を添付してください。";
-    }
   }
 
   function injectUi() {
@@ -115,19 +112,33 @@
     hideLegacyChoiceUi();
   }
 
+  function installSubmitPreparation() {
+    const confirmButton = document.getElementById(
+      "wizardConfirmIrregularButton"
+    );
+
+    if (!confirmButton) {
+      console.error(
+        "イレギュラー受付簡素化：確定ボタンを確認できません"
+      );
+      return;
+    }
+
+    confirmButton.addEventListener(
+      "click",
+      prepareUnknownIrregularForSubmit,
+      true
+    );
+  }
+
   function init() {
     injectUi();
-
-    window.addEventListener("entrywizard:complete", function(event) {
-      const settings = event && event.detail ? event.detail : null;
-      if (!settings || settings.receptionType !== "irregular") return;
-      applyUnknownOnlyMode();
-    });
+    installSubmitPreparation();
   }
 
   init();
 
   console.info(
-    "開発版：イレギュラー受付入口簡素化 v75 読込完了"
+    "開発版：イレギュラー受付入口簡素化 v76 読込完了"
   );
 })();
