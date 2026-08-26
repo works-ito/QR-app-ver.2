@@ -3432,17 +3432,8 @@ function changePreviousSettings() {
       document.getElementById("wizardIrregularQuantityUnit").innerText = "";
       document.getElementById("wizardIrregularQuantityBox").hidden = true;
       document.getElementById("wizardIrregularCheckResult").innerText = "";
-      document.querySelectorAll('input[name="wizardIrregularNumberType"]').forEach(function(radio) {
-        radio.checked = radio.value === "入力";
-      });
-      document.querySelectorAll('input[name="wizardIrregularSlipStatus"]').forEach(function(radio) {
-        radio.checked = radio.value === "伝票あり";
-      });
-      updateWizardIrregularSlipGuide();
       scrollToWizardPostSend("wizardIrregularArea");
-      setTimeout(function() { document.getElementById("wizardIrregularNumber").focus(); }, 300);
     }
-
     function updateWizardIrregularNumberType() {
       const selected = document.querySelector('input[name="wizardIrregularNumberType"]:checked');
       const input = document.getElementById("wizardIrregularNumber");
