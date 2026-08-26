@@ -1,5 +1,5 @@
 /*
- * イレギュラー受付入口簡素化 v76
+ * イレギュラー受付入口簡素化 v77
  *
  * 目的:
  * - イレギュラー受付を「対象を特定できない」専用にする。
@@ -11,6 +11,7 @@
  *
  * 重要:
  * - タイマー、MutationObserver、同名関数上書き、wrapperは使わない。
+ * - マスタ選択UIには触れない。マスタ選択受付側で独立管理する。
  * - 既存 openWizardIrregularArea() は旧仕様として
  *   「入力」「伝票あり」を初期値に戻すため、画面表示時の状態に依存しない。
  * - 送信確定ボタンの capture フェーズでだけ、既存 buildWizardIrregularRecord()
@@ -61,11 +62,6 @@
     if (numberInput) numberInput.value = "";
   }
 
-  function hideMasterPicker() {
-    const picker = document.getElementById("irregularMasterPickerDev");
-    if (picker) picker.hidden = true;
-  }
-
   function hideLegacyChoiceUi() {
     const area = getArea();
     if (!area) return;
@@ -97,10 +93,7 @@
         '対象を特定できない受付です。状況・理由と写真を残してください。伝票がある場合は、できるだけ写真を添付してください。' +
       '</div>';
 
-    const picker = document.getElementById("irregularMasterPickerDev");
-    if (picker && picker.parentElement === area) {
-      picker.insertAdjacentElement("afterend", box);
-    } else if (numberGrid && numberGrid.parentElement === area) {
+    if (numberGrid && numberGrid.parentElement === area) {
       area.insertBefore(box, numberGrid);
     } else {
       const heading = area.querySelector("h3");
@@ -108,7 +101,6 @@
       else area.prepend(box);
     }
 
-    hideMasterPicker();
     hideLegacyChoiceUi();
   }
 
@@ -139,6 +131,6 @@
   init();
 
   console.info(
-    "開発版：イレギュラー受付入口簡素化 v76 読込完了"
+    "開発版：イレギュラー受付入口簡素化 v77 読込完了"
   );
 })();
