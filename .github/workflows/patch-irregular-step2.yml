@@ -1,4 +1,4 @@
-name: Patch master host separation
+name: Patch sales loader cache key
 
 on:
   push:
@@ -19,20 +19,30 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-      - name: Run focused patch
-        run: python3 scripts/patch_master_host_step.py
+      - name: Bump sales-stockin loader in index
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          text = p.read_text(encoding='utf-8')
+          old = './sales-stockin.js?v=121'
+          new = './sales-stockin.js?v=146'
+          if text.count(old) != 1:
+              raise SystemExit(f'Expected exactly one {old}; found {text.count(old)}. Aborting.')
+          p.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
       - name: Verify diff
         run: |
           git diff --check
-          git diff -- index.html normal-master-entry-test-dev.js sales-stockin.js
+          git diff -- index.html
       - name: Commit patch
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add index.html normal-master-entry-test-dev.js sales-stockin.js
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
           if git diff --cached --quiet; then
-            echo "No changes to commit."
+            echo 'No changes to commit.'
             exit 0
           fi
-          git commit -m "Separate master picker from irregular host"
+          git commit -m 'Bump sales-stockin loader cache key'
           git push origin HEAD:main
