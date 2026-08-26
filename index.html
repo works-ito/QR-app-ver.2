@@ -1136,27 +1136,11 @@
           </button>
         </div>
       </div>
-      <div class="wizardRadioGrid">
-        <label><input type="radio" name="wizardIrregularNumberType" value="入力" checked>番号を入力する</label>
-        <label><input type="radio" name="wizardIrregularNumberType" value="番号不明">番号が読めない</label>
-      </div>
-      <label for="wizardIrregularNumber">管理番号または品目コード</label>
-      <input id="wizardIrregularNumber" type="text" autocomplete="off" placeholder="管理番号または品目コードを入力">
-      <div class="wizardRadioGrid">
-        <label><input type="radio" name="wizardIrregularSlipStatus" value="伝票あり" checked>伝票あり</label>
-        <label><input type="radio" name="wizardIrregularSlipStatus" value="伝票なし">伝票なし</label>
-      </div>
-      <div id="wizardIrregularSlipGuide" class="wizardPostSummary">1枚目に伝票写真を追加してください。</div>
       <label for="wizardIrregularNote">状況・理由</label>
       <div class="irregularNoteEmphasis">
         欠油・未入庫・破損状況などを必ず入力
       </div>
       <textarea id="wizardIrregularNote" placeholder="QR破損・汚れ・管理番号が読めない・機械の特徴などを必ず入力"></textarea>
-      <div id="wizardIrregularQuantityBox" hidden>
-        <label for="wizardIrregularQuantity">数量</label>
-        <input id="wizardIrregularQuantity" type="number" inputmode="numeric" min="1" step="1" placeholder="数量">
-        <div id="wizardIrregularQuantityUnit" class="wizardPostSummary"></div>
-      </div>
       <div id="wizardIrregularCheckResult" class="wizardPostSummary"></div>
       <button type="button" id="wizardConfirmIrregularButton">入力内容を確認して写真へ進む</button>
       <button type="button" id="wizardCancelIrregularButton" class="secondaryButton">イレギュラー受付を取消</button>
