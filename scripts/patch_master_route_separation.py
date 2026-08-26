@@ -3,8 +3,8 @@ from pathlib import Path
 app = Path('app.js')
 text = app.read_text(encoding='utf-8')
 
-old = '''      if (\n        wizardState.receptionType ===\n        "normal"\n      ) {\n        startReadOnlyScanner();\n      } else {\n        stopReadOnlyScanner();\n        openWizardIrregularArea();\n      }\n'''
-new = '''      if (\n        wizardState.receptionType ===\n        "normal"\n      ) {\n        startReadOnlyScanner();\n      } else if (\n        wizardState.receptionType ===\n        "irregular"\n      ) {\n        stopReadOnlyScanner();\n        openWizardIrregularArea();\n      } else {\n        stopReadOnlyScanner();\n      }\n'''
+old = '''      if (\n        settings.mode === "検品"\n      ) {\n        stopReadOnlyScanner();\n      } else if (\n        settings.receptionType ===\n        "normal"\n      ) {\n        startReadOnlyScanner();\n      } else {\n        stopReadOnlyScanner();\n        openWizardIrregularArea();\n      }\n'''
+new = '''      if (\n        settings.mode === "検品"\n      ) {\n        stopReadOnlyScanner();\n      } else if (\n        settings.receptionType ===\n        "normal"\n      ) {\n        startReadOnlyScanner();\n      } else if (\n        settings.receptionType ===\n        "irregular"\n      ) {\n        stopReadOnlyScanner();\n        openWizardIrregularArea();\n      } else {\n        stopReadOnlyScanner();\n      }\n'''
 
 count = text.count(old)
 if count != 1:
