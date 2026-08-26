@@ -21,57 +21,65 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Remove legacy irregular DOM only
+      - name: Remove obsolete irregular handlers only
         run: |
           python3 - <<'PY'
           from pathlib import Path
 
+          app = Path('app.js')
+          text = app.read_text(encoding='utf-8')
+
+          function_start_marker = '    function updateWizardIrregularNumberType() {'
+          function_end_marker = '    function buildWizardIrregularRecord() {'
+          function_start = text.find(function_start_marker)
+          function_end = text.find(function_end_marker, function_start)
+
+          if function_start == -1 or function_end == -1 or function_end <= function_start:
+              raise SystemExit('Legacy irregular function markers not found; aborting without changes.')
+          if text.find(function_start_marker, function_start + 1) != -1:
+              raise SystemExit('Multiple updateWizardIrregularNumberType functions found; aborting.')
+
+          new_text = text[:function_start] + text[function_end:]
+
+          listener_start_marker = 'document.querySelectorAll(\'input[name="wizardIrregularNumberType"]\').forEach(function(radio) {'
+          listener_end_marker = 'document.getElementById("wizardConfirmIrregularButton").addEventListener("click", confirmWizardIrregularInput);'
+          listener_start = new_text.find(listener_start_marker)
+          listener_end = new_text.find(listener_end_marker, listener_start)
+
+          if listener_start == -1 or listener_end == -1 or listener_end <= listener_start:
+              raise SystemExit('Legacy irregular listener markers not found; aborting without changes.')
+          if new_text.find(listener_start_marker, listener_start + 1) != -1:
+              raise SystemExit('Multiple legacy irregular listener blocks found; aborting.')
+
+          new_text = new_text[:listener_start] + new_text[listener_end:]
+
+          if new_text == text:
+              raise SystemExit('No app.js change produced; aborting.')
+
+          app.write_text(new_text, encoding='utf-8')
+
           index = Path('index.html')
-          text = index.read_text(encoding='utf-8')
-
-          choice_start_marker = '      <div class="wizardRadioGrid">\n        <label><input type="radio" name="wizardIrregularNumberType" value="入力" checked>番号を入力する</label>'
-          note_marker = '      <label for="wizardIrregularNote">状況・理由</label>'
-          choice_start = text.find(choice_start_marker)
-          note_start = text.find(note_marker, choice_start)
-
-          if choice_start == -1 or note_start == -1 or note_start <= choice_start:
-              raise SystemExit('Legacy irregular choice block markers not found; aborting without changes.')
-          if text.find(choice_start_marker, choice_start + 1) != -1:
-              raise SystemExit('Multiple legacy irregular choice blocks found; aborting.')
-
-          text = text[:choice_start] + text[note_start:]
-
-          quantity_start_marker = '      <div id="wizardIrregularQuantityBox" hidden>'
-          check_marker = '      <div id="wizardIrregularCheckResult" class="wizardPostSummary"></div>'
-          quantity_start = text.find(quantity_start_marker)
-          check_start = text.find(check_marker, quantity_start)
-
-          if quantity_start == -1 or check_start == -1 or check_start <= quantity_start:
-              raise SystemExit('Legacy irregular quantity block markers not found; aborting without changes.')
-          if text.find(quantity_start_marker, quantity_start + 1) != -1:
-              raise SystemExit('Multiple legacy irregular quantity blocks found; aborting.')
-
-          new_text = text[:quantity_start] + text[check_start:]
-
-          if new_text == index.read_text(encoding='utf-8'):
-              raise SystemExit('No index.html change produced; aborting.')
-
-          index.write_text(new_text, encoding='utf-8')
+          index_text = index.read_text(encoding='utf-8')
+          old = './app.js?v=70'
+          new = './app.js?v=71'
+          if index_text.count(old) != 1:
+              raise SystemExit(f'Expected exactly one {old}; found {index_text.count(old)}. Aborting.')
+          index.write_text(index_text.replace(old, new, 1), encoding='utf-8')
           PY
 
       - name: Verify focused diff
         run: |
           git diff --check
-          git diff -- index.html
+          git diff -- app.js index.html
 
       - name: Commit patch
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add index.html
+          git add app.js index.html
           if git diff --cached --quiet; then
             echo 'No changes to commit.'
             exit 0
           fi
-          git commit -m 'Remove legacy irregular choice DOM'
+          git commit -m 'Remove obsolete irregular choice handlers'
           git push origin HEAD:main
