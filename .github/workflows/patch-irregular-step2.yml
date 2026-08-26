@@ -28,58 +28,54 @@ jobs:
 
           app = Path('app.js')
           text = app.read_text(encoding='utf-8')
-
           start_marker = '    function buildWizardIrregularRecord() {'
           end_marker = '    function confirmWizardIrregularInput() {'
-
           start = text.find(start_marker)
           end = text.find(end_marker, start)
 
           if start == -1 or end == -1 or end <= start:
               raise SystemExit('Target function markers not found; aborting without changes.')
-
           if text.find(start_marker, start + 1) != -1:
               raise SystemExit('Multiple buildWizardIrregularRecord functions found; aborting.')
 
-          replacement = '''    function buildWizardIrregularRecord() {
-      const note = document.getElementById("wizardIrregularNote").value.trim();
-
-      if (!note) {
-        throw new Error("状況・理由・機械の特徴を入力してください");
-      }
-
-      if (!UNKNOWN_IRREGULAR_ALLOWED_MODES.includes(wizardState.mode)) {
-        throw new Error(
-          "対象不明では「" + wizardState.modeLabel +
-          "」を使用できません。\\n出庫・出庫取消・返却・完成機・拠点移動から選び直してください。"
-        );
-      }
-
-      return {
-        irregularCaseId:createWizardIrregularCaseId(),
-        qrText:"番号不明",
-        numberType:"番号不明",
-        mode:wizardState.mode,
-        user:wizardState.user,
-        location:wizardState.location,
-        recTarget:wizardState.recTarget || "",
-        recDate:wizardState.recDate || "",
-        irregularNote:note,
-        slipStatus:"任意",
-        readMethod:"イレギュラーQR（番号不明）",
-        managementType:"unknown",
-        displayName:"番号不明",
-        currentState:""
-      };
-    }
-
-'''
-
+          lines = [
+              '    function buildWizardIrregularRecord() {',
+              '      const note = document.getElementById("wizardIrregularNote").value.trim();',
+              '',
+              '      if (!note) {',
+              '        throw new Error("状況・理由・機械の特徴を入力してください");',
+              '      }',
+              '',
+              '      if (!UNKNOWN_IRREGULAR_ALLOWED_MODES.includes(wizardState.mode)) {',
+              '        throw new Error(',
+              '          "対象不明では「" + wizardState.modeLabel +',
+              '          "」を使用できません。\\n出庫・出庫取消・返却・完成機・拠点移動から選び直してください。"',
+              '        );',
+              '      }',
+              '',
+              '      return {',
+              '        irregularCaseId:createWizardIrregularCaseId(),',
+              '        qrText:"番号不明",',
+              '        numberType:"番号不明",',
+              '        mode:wizardState.mode,',
+              '        user:wizardState.user,',
+              '        location:wizardState.location,',
+              '        recTarget:wizardState.recTarget || "",',
+              '        recDate:wizardState.recDate || "",',
+              '        irregularNote:note,',
+              '        slipStatus:"任意",',
+              '        readMethod:"イレギュラーQR（番号不明）",',
+              '        managementType:"unknown",',
+              '        displayName:"番号不明",',
+              '        currentState:""',
+              '      };',
+              '    }',
+              '',
+          ]
+          replacement = '\n'.join(lines)
           new_text = text[:start] + replacement + text[end:]
-
           if new_text == text:
               raise SystemExit('No app.js change produced; aborting.')
-
           app.write_text(new_text, encoding='utf-8')
 
           index = Path('index.html')
