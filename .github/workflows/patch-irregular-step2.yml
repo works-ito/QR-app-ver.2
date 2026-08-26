@@ -1,4 +1,4 @@
-# trigger: 2026-08-27-0648
+# trigger: 2026-08-27-0650
 name: Patch master route separation
 
 on:
@@ -25,8 +25,9 @@ jobs:
         run: |
           git diff --check
           git diff -- app.js index.html
-          grep -F 'else if (wizardState.receptionType === "irregular")' app.js
-          grep -F './app.js?v=72' index.html
+          grep -F 'settings.receptionType ===' app.js >/dev/null
+          grep -F '"irregular"' app.js >/dev/null
+          grep -F './app.js?v=72' index.html >/dev/null
       - name: Commit
         run: |
           git config user.name 'github-actions[bot]'
