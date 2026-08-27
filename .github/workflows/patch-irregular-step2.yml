@@ -1,5 +1,5 @@
-# trigger: 2026-08-27-0650
-name: Patch master route separation
+# trigger: 2026-08-27-2155
+name: Bump master loader cache key
 
 on:
   push:
@@ -19,23 +19,32 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-      - name: Run focused patch
-        run: python3 scripts/patch_master_route_separation.py
+      - name: Bump sales-stockin loader
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          text = p.read_text(encoding='utf-8')
+          old = './sales-stockin.js?v=146'
+          new = './sales-stockin.js?v=147'
+          count = text.count(old)
+          if count != 1:
+              raise SystemExit(f'Expected exactly one {old}; found {count}. Aborting.')
+          p.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
       - name: Verify
         run: |
           git diff --check
-          git diff -- app.js index.html
-          grep -F 'settings.receptionType ===' app.js >/dev/null
-          grep -F '"irregular"' app.js >/dev/null
-          grep -F './app.js?v=72' index.html >/dev/null
+          git diff -- index.html
+          grep -F './sales-stockin.js?v=147' index.html
       - name: Commit
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add app.js index.html
+          git add index.html
           if git diff --cached --quiet; then
             echo 'No changes to commit.'
             exit 0
           fi
-          git commit -m 'Separate master completion route from irregular'
+          git commit -m 'Bump sales-stockin loader cache key to v147'
           git push origin HEAD:main
