@@ -5679,6 +5679,15 @@ function changePreviousSettings() {
         currentStateDataLoaded = true;
         renderCancelSendButton();
 
+        emitInventoryDataStatusEvent(
+          "ready",
+          {
+            updatedAt:
+              result.fetchedAt ||
+              new Date().toISOString()
+          }
+        );
+
         void saveInventoryCache()
           .catch(function(error) {
             console.warn(
