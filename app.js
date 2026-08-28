@@ -1163,7 +1163,10 @@ function changePreviousSettings() {
         );
         connectionNote.hidden = true;
         connectionNote.innerText = "";
-      } else {
+      } else if (
+        settings.receptionType ===
+        "normal"
+      ) {
         inspectionArea.hidden = true;
         cameraPreview.classList.add(
           "isActive"
@@ -1171,6 +1174,13 @@ function changePreviousSettings() {
         connectionNote.hidden = false;
         connectionNote.innerText =
           "読み取った内容は、確認後にまとめて送信されます。";
+      } else {
+        inspectionArea.hidden = true;
+        cameraPreview.classList.remove(
+          "isActive"
+        );
+        connectionNote.hidden = true;
+        connectionNote.innerText = "";
       }
 
     }
