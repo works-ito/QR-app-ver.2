@@ -1,0 +1,58 @@
+name: Patch master camera UI
+
+on:
+  push:
+    paths:
+      - '.github/workflows/patch-master-camera-ui.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Patch master route camera UI
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          app = Path('app.js')
+          text = app.read_text(encoding='utf-8')
+
+          old = '''      } else {\n        inspectionArea.hidden = true;\n        cameraPreview.classList.add(\n          "isActive"\n        );\n        connectionNote.hidden = false;\n        connectionNote.innerText =\n          "読み取った内容は、確認後にまとめて送信されます。";\n      }'''
+
+          new = '''      } else if (\n        settings.receptionType ===\n        "normal"\n      ) {\n        inspectionArea.hidden = true;\n        cameraPreview.classList.add(\n          "isActive"\n        );\n        connectionNote.hidden = false;\n        connectionNote.innerText =\n          "読み取った内容は、確認後にまとめて送信されます。";\n      } else {\n        inspectionArea.hidden = true;\n        cameraPreview.classList.remove(\n          "isActive"\n        );\n        connectionNote.hidden = true;\n        connectionNote.innerText = "";\n      }'''
+
+          count = text.count(old)
+          if count != 1:
+            raise SystemExit(f'Expected exactly one camera UI block; found {count}. Aborting.')
+
+          app.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          index = Path('index.html')
+          html = index.read_text(encoding='utf-8')
+          old_key = './app.js?v=74'
+          new_key = './app.js?v=75'
+          count_key = html.count(old_key)
+          if count_key != 1:
+            raise SystemExit(f'Expected exactly one {old_key}; found {count_key}. Aborting.')
+          index.write_text(html.replace(old_key, new_key, 1), encoding='utf-8')
+          PY
+
+          node --check app.js
+
+      - name: Commit patch and remove workflow
+        shell: bash
+        run: |
+          rm -f .github/workflows/patch-master-camera-ui.yml
+          git config user.name "openai-chatgpt"
+          git config user.email "openai-chatgpt@users.noreply.github.com"
+          git add app.js index.html .github/workflows/patch-master-camera-ui.yml
+          git commit -m "Keep camera UI off for master selection"
+          git push origin main
