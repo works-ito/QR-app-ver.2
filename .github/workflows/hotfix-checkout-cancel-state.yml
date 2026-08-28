@@ -20,8 +20,9 @@ jobs:
           fetch-depth: 0
 
       - name: Patch app.js safely
-        shell: python
+        shell: bash
         run: |
+          python3 - <<'PY'
           from pathlib import Path
 
           path = Path("app.js")
@@ -99,6 +100,7 @@ jobs:
 
           text = text.replace(master_marker, master_replacement, 1)
           path.write_text(text, encoding="utf-8")
+          PY
 
       - name: Syntax check
         run: node --check app.js
