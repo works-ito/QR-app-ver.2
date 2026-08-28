@@ -907,6 +907,16 @@
   }
 
   function openPicker() {
+    if (
+      typeof currentStateDataLoaded !== "undefined" &&
+      !currentStateDataLoaded
+    ) {
+      alert(
+        "最新の在庫状態を取得中です。数秒後にもう一度お試しください。"
+      );
+      return;
+    }
+
     const targetPanel = panel();
     if (!targetPanel) return;
     targetPanel.hidden = false;

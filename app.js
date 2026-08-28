@@ -20,6 +20,8 @@ const PREVIOUS_SETTINGS_STORAGE_KEY =
     let appInitialDataLoaded = false;
     let appInitialDataLoading = false;
     let appInitialDataError = "";
+    let currentStateDataLoaded = false;
+    let currentStateDataLoading = false;
 
     let individualItems = [];
     let simpleItems = [];
@@ -4629,11 +4631,11 @@ function changePreviousSettings() {
     async function startReadOnlyScanner() {
       if (scannerRunning) return;
 
-      if (!appInitialDataLoaded) {
+      if (!currentStateDataLoaded) {
         document.getElementById(
           "scannerStatus"
         ).innerText =
-          "在庫データの取得完了後に、もう一度お試しください";
+          "最新の現在状態を取得後に、もう一度お試しください";
         return;
       }
 
@@ -5514,6 +5516,192 @@ function changePreviousSettings() {
       }
     }
 
+    function mergeCurrentStateRowsIntoItems(
+      items,
+      stateRows
+    ) {
+      const sourceItems =
+        Array.isArray(items)
+          ? items
+          : [];
+
+      const sourceRows =
+        Array.isArray(stateRows)
+          ? stateRows
+          : [];
+
+      const itemMap = new Map();
+
+      sourceItems.forEach(function(item) {
+        const managementId =
+          getFirstItemValue(
+            item,
+            [
+              "管理ID",
+              "管理ＩＤ",
+              "管理番号"
+            ]
+          );
+
+        const key =
+          normalizeManagedIdKey(
+            managementId
+          );
+
+        if (key) {
+          itemMap.set(key, item);
+        }
+      });
+
+      sourceRows.forEach(function(row) {
+        if (!Array.isArray(row)) return;
+
+        const managementId =
+          String(row[0] || "").trim();
+
+        if (!managementId) return;
+
+        const state =
+          String(row[1] || "").trim();
+
+        const location =
+          String(row[2] || "").trim();
+
+        const key =
+          normalizeManagedIdKey(
+            managementId
+          );
+
+        const existing =
+          itemMap.get(key);
+
+        if (existing) {
+          existing["状態"] = state;
+          existing["現在状態"] = state;
+          existing["現在拠点"] = location;
+          existing["拠点"] = location;
+          return;
+        }
+
+        const added = {
+          "管理ID":managementId,
+          "状態":state,
+          "現在状態":state,
+          "現在拠点":location,
+          "拠点":location
+        };
+
+        sourceItems.push(added);
+        itemMap.set(key, added);
+      });
+
+      return sourceItems;
+    }
+
+    async function loadCurrentStateData() {
+      if (currentStateDataLoading) {
+        return false;
+      }
+
+      currentStateDataLoading = true;
+
+      try {
+        let response = null;
+        let responseText = "";
+
+        for (
+          let attempt = 1;
+          attempt <= 2;
+          attempt++
+        ) {
+          response = await fetch(
+            GAS_URL +
+              "?t=" + Date.now() +
+              "&stateAttempt=" + attempt,
+            {
+              method:"POST",
+              headers:{
+                "Content-Type":"text/plain"
+              },
+              cache:"no-store",
+              body:JSON.stringify({
+                action:"getCurrentStateData"
+              })
+            }
+          );
+
+          responseText =
+            await response.text();
+
+          if (response.ok) break;
+
+          if (attempt === 1) {
+            await new Promise(
+              function(resolve) {
+                setTimeout(resolve, 700);
+              }
+            );
+          }
+        }
+
+        let result = null;
+
+        try {
+          result =
+            JSON.parse(responseText);
+        } catch (error) {
+          throw new Error(
+            "現在状態データの解析に失敗しました"
+          );
+        }
+
+        if (!result.success && !result.ok) {
+          throw new Error(
+            result.error ||
+            result.message ||
+            "現在状態データを取得できませんでした"
+          );
+        }
+
+        individualItems =
+          mergeCurrentStateRowsIntoItems(
+            individualItems,
+            result.individualStates
+          );
+
+        simpleItems =
+          mergeCurrentStateRowsIntoItems(
+            simpleItems,
+            result.simpleStates
+          );
+
+        buildAppInitialDataMaps();
+        currentStateDataLoaded = true;
+        renderCancelSendButton();
+
+        void saveInventoryCache()
+          .catch(function(error) {
+            console.warn(
+              "現在状態キャッシュ保存失敗",
+              error
+            );
+          });
+
+        return true;
+
+      } catch (error) {
+        console.error(
+          "現在状態データ取得失敗",
+          error
+        );
+
+        return false;
+
+      } finally {
+        currentStateDataLoading = false;
+      }
+    }
+
     async function loadAppInitialData(
       showLoading
     ) {
@@ -5671,6 +5859,7 @@ function changePreviousSettings() {
 
         buildAppInitialDataMaps();
         appInitialDataLoaded = true;
+        currentStateDataLoaded = true;
         renderCancelSendButton();
 
         const cache =
@@ -5716,9 +5905,17 @@ function changePreviousSettings() {
       if (cache) {
         emitInventoryDataStatusEvent("loading");
 
+        const currentStateReady =
+          await loadCurrentStateData();
+
+        if (currentStateReady) {
+          startScannerAfterInventoryReady();
+          void loadAppInitialData(false);
+          return;
+        }
+
         await loadAppInitialData(false);
         startScannerAfterInventoryReady();
-
         return;
       }
 
@@ -5741,7 +5938,7 @@ function changePreviousSettings() {
       }
 
       if (
-        appInitialDataLoaded &&
+        currentStateDataLoaded &&
         wizardState.currentStep === "complete" &&
         wizardState.receptionType === "normal" &&
         wizardState.mode !== "検品" &&
