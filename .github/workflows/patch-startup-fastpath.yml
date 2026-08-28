@@ -1,0 +1,87 @@
+name: Patch startup fast path
+
+on:
+  push:
+    paths:
+      - '.github/workflows/patch-startup-fastpath.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Patch startup fast path
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          app = Path('app.js')
+          text = app.read_text(encoding='utf-8')
+
+          old = '''    let appInitialDataLoaded = false;\n    let appInitialDataLoading = false;\n    let appInitialDataError = "";'''
+          new = '''    let appInitialDataLoaded = false;\n    let appInitialDataLoading = false;\n    let appInitialDataError = "";\n    let currentStateDataLoaded = false;\n    let currentStateDataLoading = false;'''
+          assert text.count(old) == 1, f'flags match count={text.count(old)}'
+          text = text.replace(old, new, 1)
+
+          marker = '''    async function loadAppInitialData(\n      showLoading\n    ) {'''
+          assert text.count(marker) == 1, f'loadAppInitialData marker count={text.count(marker)}'
+
+          insert = r'''    function mergeCurrentStateRowsIntoItems(\n      items,\n      stateRows\n    ) {\n      const sourceItems =\n        Array.isArray(items)\n          ? items\n          : [];\n\n      const sourceRows =\n        Array.isArray(stateRows)\n          ? stateRows\n          : [];\n\n      const itemMap = new Map();\n\n      sourceItems.forEach(function(item) {\n        const managementId =\n          getFirstItemValue(\n            item,\n            [\n              "管理ID",\n              "管理ＩＤ",\n              "管理番号"\n            ]\n          );\n\n        const key =\n          normalizeManagedIdKey(\n            managementId\n          );\n\n        if (key) {\n          itemMap.set(key, item);\n        }\n      });\n\n      sourceRows.forEach(function(row) {\n        if (!Array.isArray(row)) return;\n\n        const managementId =\n          String(row[0] || "").trim();\n\n        if (!managementId) return;\n\n        const state =\n          String(row[1] || "").trim();\n\n        const location =\n          String(row[2] || "").trim();\n\n        const key =\n          normalizeManagedIdKey(\n            managementId\n          );\n\n        const existing =\n          itemMap.get(key);\n\n        if (existing) {\n          existing["状態"] = state;\n          existing["現在状態"] = state;\n          existing["現在拠点"] = location;\n          existing["拠点"] = location;\n          return;\n        }\n\n        const added = {\n          "管理ID":managementId,\n          "状態":state,\n          "現在状態":state,\n          "現在拠点":location,\n          "拠点":location\n        };\n\n        sourceItems.push(added);\n        itemMap.set(key, added);\n      });\n\n      return sourceItems;\n    }\n\n    async function loadCurrentStateData() {\n      if (currentStateDataLoading) {\n        return false;\n      }\n\n      currentStateDataLoading = true;\n\n      try {\n        let response = null;\n        let responseText = "";\n\n        for (\n          let attempt = 1;\n          attempt <= 2;\n          attempt++\n        ) {\n          response = await fetch(\n            GAS_URL +\n              "?t=" + Date.now() +\n              "&stateAttempt=" + attempt,\n            {\n              method:"POST",\n              headers:{\n                "Content-Type":"text/plain"\n              },\n              cache:"no-store",\n              body:JSON.stringify({\n                action:"getCurrentStateData"\n              })\n            }\n          );\n\n          responseText =\n            await response.text();\n\n          if (response.ok) break;\n\n          if (attempt === 1) {\n            await new Promise(\n              function(resolve) {\n                setTimeout(resolve, 700);\n              }\n            );\n          }\n        }\n\n        let result = null;\n\n        try {\n          result =\n            JSON.parse(responseText);\n        } catch (error) {\n          throw new Error(\n            "現在状態データの解析に失敗しました"\n          );\n        }\n\n        if (!result.success && !result.ok) {\n          throw new Error(\n            result.error ||\n            result.message ||\n            "現在状態データを取得できませんでした"\n          );\n        }\n\n        individualItems =\n          mergeCurrentStateRowsIntoItems(\n            individualItems,\n            result.individualStates\n          );\n\n        simpleItems =\n          mergeCurrentStateRowsIntoItems(\n            simpleItems,\n            result.simpleStates\n          );\n\n        buildAppInitialDataMaps();\n        currentStateDataLoaded = true;\n        renderCancelSendButton();\n\n        void saveInventoryCache()\n          .catch(function(error) {\n            console.warn(\n              "現在状態キャッシュ保存失敗",\n              error\n            );\n          });\n\n        return true;\n\n      } catch (error) {\n        console.error(\n          "現在状態データ取得失敗",\n          error\n        );\n\n        return false;\n\n      } finally {\n        currentStateDataLoading = false;\n      }\n    }\n\n'''
+          insert = insert.replace('\\n', '\n')
+          text = text.replace(marker, insert + marker, 1)
+
+          old_success = '''        buildAppInitialDataMaps();\n        appInitialDataLoaded = true;\n        renderCancelSendButton();\n\n        const cache =\n          await saveInventoryCache();'''
+          new_success = '''        buildAppInitialDataMaps();\n        appInitialDataLoaded = true;\n        currentStateDataLoaded = true;\n        renderCancelSendButton();\n\n        const cache =\n          await saveInventoryCache();'''
+          assert text.count(old_success) == 1, f'full load success count={text.count(old_success)}'
+          text = text.replace(old_success, new_success, 1)
+
+          old_init = '''    async function initializeInventoryDataFoundation() {\n      const cache =\n        await restoreInventoryCache();\n\n      if (cache) {\n        emitInventoryDataStatusEvent("loading");\n\n        await loadAppInitialData(false);\n        startScannerAfterInventoryReady();\n\n        return;\n      }\n\n      await loadAppInitialData(true);\n      startScannerAfterInventoryReady();\n    }'''
+          new_init = '''    async function initializeInventoryDataFoundation() {\n      const cache =\n        await restoreInventoryCache();\n\n      if (cache) {\n        emitInventoryDataStatusEvent("loading");\n\n        const currentStateReady =\n          await loadCurrentStateData();\n\n        if (currentStateReady) {\n          startScannerAfterInventoryReady();\n          void loadAppInitialData(false);\n          return;\n        }\n\n        await loadAppInitialData(false);\n        startScannerAfterInventoryReady();\n        return;\n      }\n\n      await loadAppInitialData(true);\n      startScannerAfterInventoryReady();\n    }'''
+          assert text.count(old_init) == 1, f'init count={text.count(old_init)}'
+          text = text.replace(old_init, new_init, 1)
+
+          text = text.replace(
+            '        appInitialDataLoaded &&\n        wizardState.currentStep === "complete" &&\n        wizardState.mode === "検品"',
+            '        appInitialDataLoaded &&\n        wizardState.currentStep === "complete" &&\n        wizardState.mode === "検品"',
+            1
+          )
+
+          old_normal_ready = '''        appInitialDataLoaded &&\n        wizardState.currentStep === "complete" &&\n        wizardState.receptionType === "normal" &&'''
+          new_normal_ready = '''        currentStateDataLoaded &&\n        wizardState.currentStep === "complete" &&\n        wizardState.receptionType === "normal" &&'''
+          assert text.count(old_normal_ready) == 1, f'normal ready count={text.count(old_normal_ready)}'
+          text = text.replace(old_normal_ready, new_normal_ready, 1)
+
+          old_scanner_guard = '''      if (!appInitialDataLoaded) {\n        document.getElementById(\n          "scannerStatus"\n        ).innerText =\n          "在庫データの取得完了後に、もう一度お試しください";\n        return;\n      }'''
+          new_scanner_guard = '''      if (!currentStateDataLoaded) {\n        document.getElementById(\n          "scannerStatus"\n        ).innerText =\n          "最新の現在状態を取得後に、もう一度お試しください";\n        return;\n      }'''
+          assert text.count(old_scanner_guard) == 1, f'scanner guard count={text.count(old_scanner_guard)}'
+          text = text.replace(old_scanner_guard, new_scanner_guard, 1)
+
+          app.write_text(text, encoding='utf-8')
+
+          picker = Path('irregular-master-picker-dev.js')
+          ptext = picker.read_text(encoding='utf-8')
+          old_open = '''  function openPicker() {\n    const targetPanel = panel();\n    if (!targetPanel) return;\n    targetPanel.hidden = false;\n    renderCategories();\n    renderQueue();\n    targetPanel.scrollIntoView({behavior:"smooth",block:"start"});\n  }'''
+          new_open = '''  function openPicker() {\n    if (\n      typeof currentStateDataLoaded !== "undefined" &&\n      !currentStateDataLoaded\n    ) {\n      alert(\n        "最新の在庫状態を取得中です。数秒後にもう一度お試しください。"\n      );\n      return;\n    }\n\n    const targetPanel = panel();\n    if (!targetPanel) return;\n    targetPanel.hidden = false;\n    renderCategories();\n    renderQueue();\n    targetPanel.scrollIntoView({behavior:"smooth",block:"start"});\n  }'''
+          assert ptext.count(old_open) == 1, f'picker open count={ptext.count(old_open)}'
+          ptext = ptext.replace(old_open, new_open, 1)
+          picker.write_text(ptext, encoding='utf-8')
+          PY
+
+          node --check app.js
+          node --check irregular-master-picker-dev.js
+
+      - name: Commit patch and remove workflow
+        shell: bash
+        run: |
+          rm -f .github/workflows/patch-startup-fastpath.yml
+          git config user.name "openai-chatgpt"
+          git config user.email "openai-chatgpt@users.noreply.github.com"
+          git add app.js irregular-master-picker-dev.js .github/workflows/patch-startup-fastpath.yml
+          git commit -m "Add current-state startup fast path"
+          git push origin main
