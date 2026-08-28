@@ -1753,6 +1753,28 @@ function changePreviousSettings() {
             return false;
           }
 
+          if (details.managementType !== "quantity") {
+            const knownState =
+              details.currentState === "状態なし"
+                ? ""
+                : details.currentState;
+
+            const stateCheck =
+              validateStateTransition(
+                knownState,
+                wizardState.mode
+              );
+
+            if (!stateCheck.ok) {
+              alert(
+                stateCheck.message +
+                "\n現在状態：" +
+                (knownState || "状態なし")
+              );
+              return false;
+            }
+          }
+
           const record =
             buildWizardScanRecord(details);
 
@@ -2788,6 +2810,16 @@ function changePreviousSettings() {
       const action = String(mode || "").trim();
 
       if (!state) {
+        if (action === "出庫取消") {
+          return {
+            ok:false,
+            warning:false,
+            message:
+              "この機械は出庫中であることを確認できません。\n" +
+              "現在状態を取得できないため出庫取消できません。"
+          };
+        }
+
         return {
           ok:true,
           warning:true,
