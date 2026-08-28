@@ -1,0 +1,113 @@
+name: One-time checkout cancel state hotfix
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/hotfix-checkout-cancel-state.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch app.js safely
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("app.js")
+          text = path.read_text(encoding="utf-8")
+
+          old_state = '''      if (!state) {
+        return {
+          ok:true,
+          warning:true,
+          message:"現在状態を取得できませんでした"
+        };
+      }
+'''
+
+          new_state = '''      if (!state) {
+        if (action === "出庫取消") {
+          return {
+            ok:false,
+            warning:false,
+            message:
+              "この機械は出庫中であることを確認できません。\\n" +
+              "現在状態を取得できないため出庫取消できません。"
+          };
+        }
+
+        return {
+          ok:true,
+          warning:true,
+          message:"現在状態を取得できませんでした"
+        };
+      }
+'''
+
+          if text.count(old_state) != 1:
+              raise SystemExit(
+                  f"validateStateTransition target count was {text.count(old_state)}, expected 1"
+              )
+
+          text = text.replace(old_state, new_state, 1)
+
+          master_marker = '''          const record =
+            buildWizardScanRecord(details);
+'''
+
+          master_replacement = '''          if (details.managementType !== "quantity") {
+            const knownState =
+              details.currentState === "状態なし"
+                ? ""
+                : details.currentState;
+
+            const stateCheck =
+              validateStateTransition(
+                knownState,
+                wizardState.mode
+              );
+
+            if (!stateCheck.ok) {
+              alert(
+                stateCheck.message +
+                "\\n現在状態：" +
+                (knownState || "状態なし")
+              );
+              return false;
+            }
+          }
+
+          const record =
+            buildWizardScanRecord(details);
+'''
+
+          if text.count(master_marker) != 1:
+              raise SystemExit(
+                  f"master picker insertion target count was {text.count(master_marker)}, expected 1"
+              )
+
+          text = text.replace(master_marker, master_replacement, 1)
+          path.write_text(text, encoding="utf-8")
+
+      - name: Syntax check
+        run: node --check app.js
+
+      - name: Commit hotfix and remove one-time workflow
+        run: |
+          rm .github/workflows/hotfix-checkout-cancel-state.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.js .github/workflows/hotfix-checkout-cancel-state.yml
+          git commit -m "Fix checkout cancel state validation"
+          git push origin HEAD:main
