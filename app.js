@@ -1613,6 +1613,27 @@ function changePreviousSettings() {
       const isQuantity =
         details.managementType === "quantity";
 
+      const machineCode =
+        isQuantity
+          ? ""
+          : (
+              getFirstItemValue(
+                details.sourceItem || {},
+                [
+                  "機種コード",
+                  "機種CD",
+                  "機種ＣＤ",
+                  "machineCode",
+                  "machine_code"
+                ]
+              ) ||
+              String(
+                details.qrText || ""
+              )
+                .split("-")[0]
+                .trim()
+            );
+
       const record = {
         key:
           normalizeManagedIdKey(details.qrText) +
@@ -1637,6 +1658,7 @@ function changePreviousSettings() {
           ? "quantity"
           : "managed",
         managementType:details.managementType,
+        machineCode:machineCode,
         managedItem:isQuantity
           ? null
           : details.sourceItem,
@@ -1695,6 +1717,7 @@ function changePreviousSettings() {
           recDate:record.recDate || "",
           recordType:record.recordType || "",
           managementType:record.managementType || "",
+          machineCode:record.machineCode || "",
           displayName:record.displayName || ""
         };
 
