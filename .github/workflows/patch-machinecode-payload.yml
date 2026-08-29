@@ -42,9 +42,9 @@ jobs:
           old_payload = '''          managementType:record.managementType || "",\n          displayName:record.displayName || ""'''
           new_payload = '''          managementType:record.managementType || "",\n          machineCode:record.machineCode || "",\n          displayName:record.displayName || ""'''
           count = text.count(old_payload)
-          if count != 2:
-            raise SystemExit(f'Expected two payload insertion points; found {count}.')
-          text = text.replace(old_payload, new_payload)
+          if count != 1:
+            raise SystemExit(f'Expected one payload insertion point; found {count}.')
+          text = text.replace(old_payload, new_payload, 1)
 
           app.write_text(text, encoding='utf-8')
 
