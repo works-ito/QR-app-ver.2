@@ -2,9 +2,10 @@ name: AI refactor once
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
     paths:
-      - '.github/workflows/ai-refactor-once-20260829.yml'
+      - scripts/patch_ai_refactor_once.py
 
 permissions:
   contents: write
@@ -13,185 +14,30 @@ jobs:
   refactor:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout main
+        uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
-
-      - name: Refactor Gemini analysis path
-        shell: bash
+      - name: Run focused AI refactor patch
+        run: python3 scripts/patch_ai_refactor_once.py
+      - name: Verify diff
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import json
-
-          app = Path('app.js')
-          text = app.read_text(encoding='utf-8')
-
-          start_marker = '    async function analyzeWizardSlipPhoto(file, photoType) {'
-          end_marker = '    function drawWizardImageCover(context, image, x, y, width, height) {'
-
-          start = text.find(start_marker)
-          end = text.find(end_marker, start)
-          if start < 0 or end < 0:
-              raise SystemExit('analyzeWizardSlipPhoto block not found')
-
-          if text.count(start_marker) != 1:
-              raise SystemExit(f'unexpected analyzeWizardSlipPhoto count: {text.count(start_marker)}')
-
-          replacement = '''    async function analyzeWizardSlipPhoto(file, photoType) {
-      startAnimatedDots("wizardPhotoPreview", "伝票情報を確認しています");
-
-      try {
-        const profile = {
-          label:"3.5 Flash-Lite 全体1回",
-          cropRatio:1,
-          maxSide:1024,
-          quality:0.75
-        };
-
-        const photoBase64 =
-          await makeWizardSlipAnalysisImage(
-            file,
-            profile
-          );
-
-        const response = await fetch(GAS_URL, {
-          method:"POST",
-          headers:{"Content-Type":"text/plain"},
-          body:JSON.stringify({
-            action:"analyzeSlipPhoto",
-            photoBase64:photoBase64,
-            photoType:photoType,
-            requestedFields:["customerName", "siteName"],
-            analysisRegion:profile.label,
-            analysisModel:"gemini-3.5-flash-lite"
-          })
-        });
-
-        const text = await response.text();
-        let result;
-
-        try {
-          result = JSON.parse(text);
-        } catch (parseError) {
-          throw new Error(
-            "伝票解析結果を読み取れませんでした\\n" +
-            text.slice(0, 200)
-          );
-        }
-
-        if (!response.ok || !result || result.ok !== true) {
-          throw new Error(
-            result && result.message
-              ? result.message
-              : "伝票情報を取得できませんでした"
-          );
-        }
-
-        const customerName =
-          sanitizeWizardPhotoTitlePart(
-            result.customerName
-          );
-
-        const siteName =
-          sanitizeWizardPhotoTitlePart(
-            result.siteName
-          );
-
-        if (!customerName && !siteName) {
-          throw new Error(
-            "顧客名・現場名を判定できませんでした"
-          );
-        }
-
-        wizardCurrentSlipInfo = {
-          customerName:customerName,
-          siteName:siteName,
-          originalSiteName:siteName,
-          acquisitionMethod:
-            result.acquisitionMethod || "ai_ocr",
-          siteNameEdited:false,
-          confirmedTitle:
-            buildWizardPhotoTitle(
-              customerName,
-              siteName
-            ),
-          acquiredAt:new Date().toISOString(),
-          analysisRegion:profile.label,
-          analysisModel:
-            result.analysisModel || "gemini-3.5-flash-lite",
-          geminiFetchMs:Number(
-            result.geminiFetchMs || 0
-          )
-        };
-
-        return wizardCurrentSlipInfo;
-
-      } catch (error) {
-        console.warn(
-          "伝票情報取得失敗（3.5 Flash-Lite 全体1回）",
-          error
-        );
-
-        alert(
-          "伝票情報の解析に失敗しました\\n\\n" +
-          (error.message || String(error)) +
-          "\\n\\n写真保存はこのまま続行できます。"
-        );
-
-        wizardCurrentSlipInfo = null;
-        return null;
-
-      } finally {
-        stopAnimatedDots("wizardPhotoPreview");
-      }
-    }\n\n'''
-
-          text = text[:start] + replacement + text[end:]
-          app.write_text(text, encoding='utf-8')
-
-          sales = Path('sales-stockin.js')
-          sales_text = sales.read_text(encoding='utf-8')
-          target = '    .then(function() { return loadScript("./gemini-whole-image-dev.js?v=80"); })\n'
-          if target not in sales_text:
-              raise SystemExit('gemini-whole-image-dev loader not found')
-          sales_text = sales_text.replace(target, '', 1)
-          sales_text = sales_text.replace('/* 販売品入庫受付 v147 bootstrap */', '/* 販売品入庫受付 v148 bootstrap */', 1)
-          sales.write_text(sales_text, encoding='utf-8')
-
-          index = Path('index.html')
-          index_text = index.read_text(encoding='utf-8')
-          if './app.js?v=76' not in index_text:
-              raise SystemExit('app.js v76 reference not found')
-          if './sales-stockin.js?v=147' not in index_text:
-              raise SystemExit('sales-stockin.js v147 reference not found')
-          index_text = index_text.replace('./app.js?v=76', './app.js?v=77', 1)
-          index_text = index_text.replace('./sales-stockin.js?v=147', './sales-stockin.js?v=148', 1)
-          index.write_text(index_text, encoding='utf-8')
-
-          version = Path('version.json')
-          version.write_text(json.dumps({"version":"2.2-20260829-ai-single1"}, ensure_ascii=False) + '\n', encoding='utf-8')
-
-          workflow = Path('.github/workflows/ai-refactor-once-20260829.yml')
-          if workflow.exists():
-              workflow.unlink()
-          PY
-
-      - name: Verify changes
-        shell: bash
-        run: |
+          git diff --check
           grep -n '3.5 Flash-Lite 全体1回' app.js
           ! grep -q 'gemini-whole-image-dev.js?v=80' sales-stockin.js
           grep -n 'gemini-timing-dev.js?v=77' sales-stockin.js
           grep -n 'app.js?v=77' index.html
           grep -n 'sales-stockin.js?v=148' index.html
           grep -n '2.2-20260829-ai-single1' version.json
-
-      - name: Commit refactor
-        shell: bash
+      - name: Commit patch
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add app.js sales-stockin.js index.html version.json .github/workflows/ai-refactor-once-20260829.yml
+          git add app.js sales-stockin.js index.html version.json
+          if git diff --cached --quiet; then
+            echo 'No changes to commit.'
+            exit 0
+          fi
           git commit -m 'Refactor Gemini slip analysis into app core'
           git push origin HEAD:main
