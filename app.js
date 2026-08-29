@@ -3802,95 +3802,108 @@ function changePreviousSettings() {
 
     async function analyzeWizardSlipPhoto(file, photoType) {
       startAnimatedDots("wizardPhotoPreview", "伝票情報を確認しています");
+
       try {
-        const analysisProfiles = [
-          {
-            label:"上部優先",
-            cropRatio:0.5,
-            maxSide:1400,
-            quality:0.82
-          },
-          {
-            label:"全体再解析",
-            cropRatio:1,
-            maxSide:1600,
-            quality:0.85
-          }
-        ];
+        const profile = {
+          label:"3.5 Flash-Lite 全体1回",
+          cropRatio:1,
+          maxSide:1024,
+          quality:0.75
+        };
 
-        let lastAnalysisError = null;
+        const photoBase64 =
+          await makeWizardSlipAnalysisImage(
+            file,
+            profile
+          );
 
-        for (let attempt = 0; attempt < analysisProfiles.length; attempt++) {
-          const profile = analysisProfiles[attempt];
-          const photoBase64 = await makeWizardSlipAnalysisImage(file, profile);
-          const response = await fetchWithRetry(GAS_URL, {
-            method:"POST",
-            headers:{"Content-Type":"text/plain"},
-            body:JSON.stringify({
-              action:"analyzeSlipPhoto",
-              photoBase64:photoBase64,
-              photoType:photoType,
-              requestedFields:["customerName", "siteName"],
-              analysisRegion:profile.label
-            })
-          });
+        const response = await fetch(GAS_URL, {
+          method:"POST",
+          headers:{"Content-Type":"text/plain"},
+          body:JSON.stringify({
+            action:"analyzeSlipPhoto",
+            photoBase64:photoBase64,
+            photoType:photoType,
+            requestedFields:["customerName", "siteName"],
+            analysisRegion:profile.label,
+            analysisModel:"gemini-3.5-flash-lite"
+          })
+        });
 
-          const text = await response.text();
-          let result;
+        const text = await response.text();
+        let result;
 
-          try {
-            result = JSON.parse(text);
-          } catch (parseError) {
-            lastAnalysisError = new Error(
-              "伝票解析結果を読み取れませんでした\n" +
-              text.slice(0, 200)
-            );
-            if (attempt === 0) continue;
-            throw lastAnalysisError;
-          }
-
-          if (!result.ok) {
-            lastAnalysisError = new Error(
-              result.message || "伝票情報を取得できませんでした"
-            );
-            if (attempt === 0) continue;
-            throw lastAnalysisError;
-          }
-
-          const customerName = sanitizeWizardPhotoTitlePart(result.customerName);
-          const siteName = sanitizeWizardPhotoTitlePart(result.siteName);
-
-          if (!customerName && !siteName) {
-            lastAnalysisError = new Error(
-              "顧客名・現場名を判定できませんでした"
-            );
-            if (attempt === 0) continue;
-            throw lastAnalysisError;
-          }
-
-          wizardCurrentSlipInfo = {
-            customerName:customerName,
-            siteName:siteName,
-            originalSiteName:siteName,
-            acquisitionMethod:result.acquisitionMethod || "ai_ocr",
-            siteNameEdited:false,
-            confirmedTitle:buildWizardPhotoTitle(customerName, siteName),
-            acquiredAt:new Date().toISOString(),
-            analysisRegion:profile.label
-          };
-
-          return wizardCurrentSlipInfo;
+        try {
+          result = JSON.parse(text);
+        } catch (parseError) {
+          throw new Error(
+            "伝票解析結果を読み取れませんでした\n" +
+            text.slice(0, 200)
+          );
         }
 
-        throw lastAnalysisError || new Error(
-          "顧客名・現場名を判定できませんでした"
-        );
+        if (!response.ok || !result || result.ok !== true) {
+          throw new Error(
+            result && result.message
+              ? result.message
+              : "伝票情報を取得できませんでした"
+          );
+        }
+
+        const customerName =
+          sanitizeWizardPhotoTitlePart(
+            result.customerName
+          );
+
+        const siteName =
+          sanitizeWizardPhotoTitlePart(
+            result.siteName
+          );
+
+        if (!customerName && !siteName) {
+          throw new Error(
+            "顧客名・現場名を判定できませんでした"
+          );
+        }
+
+        wizardCurrentSlipInfo = {
+          customerName:customerName,
+          siteName:siteName,
+          originalSiteName:siteName,
+          acquisitionMethod:
+            result.acquisitionMethod || "ai_ocr",
+          siteNameEdited:false,
+          confirmedTitle:
+            buildWizardPhotoTitle(
+              customerName,
+              siteName
+            ),
+          acquiredAt:new Date().toISOString(),
+          analysisRegion:profile.label,
+          analysisModel:
+            result.analysisModel || "gemini-3.5-flash-lite",
+          geminiFetchMs:Number(
+            result.geminiFetchMs || 0
+          )
+        };
+
+        return wizardCurrentSlipInfo;
+
       } catch (error) {
-        console.warn("伝票情報取得失敗", error);
-        alert("伝票情報の解析に失敗しました\n\n" + (error.message || String(error)) +
-          "\n\n写真保存はこのまま続行できます。");
+        console.warn(
+          "伝票情報取得失敗（3.5 Flash-Lite 全体1回）",
+          error
+        );
+
+        alert(
+          "伝票情報の解析に失敗しました\n\n" +
+          (error.message || String(error)) +
+          "\n\n写真保存はこのまま続行できます。"
+        );
+
         wizardCurrentSlipInfo = null;
         return null;
+
       } finally {
         stopAnimatedDots("wizardPhotoPreview");
       }
