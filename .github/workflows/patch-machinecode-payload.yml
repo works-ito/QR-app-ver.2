@@ -15,77 +15,35 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
-          fetch-depth: 0
 
-      - name: Patch app and cache versions
+      - name: Patch machineCode payload
         shell: bash
         run: |
-          python - <<'PY'
+          python <<'PY'
           from pathlib import Path
 
           app = Path('app.js')
           text = app.read_text(encoding='utf-8')
 
-          old_start = '''    function buildWizardScanRecord(details) {
-      const isQuantity =
-        details.managementType === "quantity";
-
-      const record = {
-'''
-          new_start = '''    function buildWizardScanRecord(details) {
-      const isQuantity =
-        details.managementType === "quantity";
-
-      const machineCode =
-        isQuantity
-          ? ""
-          : (
-              getFirstItemValue(
-                details.sourceItem || {},
-                [
-                  "機種コード",
-                  "機種CD",
-                  "機種ＣＤ",
-                  "machineCode",
-                  "machine_code"
-                ]
-              ) ||
-              String(
-                details.qrText || ""
-              )
-                .split("-")[0]
-                .trim()
-            );
-
-      const record = {
-'''
+          old_start = '''    function buildWizardScanRecord(details) {\n      const isQuantity =\n        details.managementType === "quantity";\n\n      const record = {'''
+          new_start = '''    function buildWizardScanRecord(details) {\n      const isQuantity =\n        details.managementType === "quantity";\n\n      const machineCode =\n        isQuantity\n          ? ""\n          : (\n              getFirstItemValue(\n                details.sourceItem || {},\n                [\n                  "機種コード",\n                  "機種CD",\n                  "機種ＣＤ",\n                  "machineCode",\n                  "machine_code"\n                ]\n              ) ||\n              String(\n                details.qrText || ""\n              )\n                .split("-")[0]\n                .trim()\n            );\n\n      const record = {'''
           count = text.count(old_start)
           if count != 1:
-              raise SystemExit(f'buildWizardScanRecord start expected 1 match, found {count}')
+            raise SystemExit(f'Expected one buildWizardScanRecord start; found {count}.')
           text = text.replace(old_start, new_start, 1)
 
-          old_record = '''        managementType:details.managementType,
-        managedItem:isQuantity
-'''
-          new_record = '''        managementType:details.managementType,
-        machineCode:machineCode,
-        managedItem:isQuantity
-'''
+          old_record = '''        managementType:details.managementType,\n        managedItem:isQuantity'''
+          new_record = '''        managementType:details.managementType,\n        machineCode:machineCode,\n        managedItem:isQuantity'''
           count = text.count(old_record)
           if count != 1:
-              raise SystemExit(f'record machineCode insertion expected 1 match, found {count}')
+            raise SystemExit(f'Expected one record insertion point; found {count}.')
           text = text.replace(old_record, new_record, 1)
 
-          old_payload = '''          managementType:record.managementType || "",
-          displayName:record.displayName || ""
-'''
-          new_payload = '''          managementType:record.managementType || "",
-          machineCode:record.machineCode || "",
-          displayName:record.displayName || ""
-'''
+          old_payload = '''          managementType:record.managementType || "",\n          displayName:record.displayName || ""'''
+          new_payload = '''          managementType:record.managementType || "",\n          machineCode:record.machineCode || "",\n          displayName:record.displayName || ""'''
           count = text.count(old_payload)
           if count != 2:
-              raise SystemExit(f'payload insertion expected 2 matches, found {count}')
+            raise SystemExit(f'Expected two payload insertion points; found {count}.')
           text = text.replace(old_payload, new_payload)
 
           app.write_text(text, encoding='utf-8')
@@ -94,27 +52,23 @@ jobs:
           html = index.read_text(encoding='utf-8')
           old_key = './app.js?v=75'
           new_key = './app.js?v=76'
-          count = html.count(old_key)
-          if count != 1:
-              raise SystemExit(f'index app version expected 1 match, found {count}')
+          count_key = html.count(old_key)
+          if count_key != 1:
+            raise SystemExit(f'Expected one {old_key}; found {count_key}.')
           index.write_text(html.replace(old_key, new_key, 1), encoding='utf-8')
 
-          version = Path('version.json')
-          version.write_text('{"version":"2.2-20260829-machinecode1"}\n', encoding='utf-8')
+          Path('version.json').write_text('{"version":"2.2-20260829-machinecode1"}\n', encoding='utf-8')
           PY
 
           node --check app.js
           git diff --check
 
-      - name: Commit patch
+      - name: Commit patch and remove workflow
         shell: bash
         run: |
-          if git diff --quiet; then
-            echo 'No changes to commit.'
-            exit 0
-          fi
-          git config user.name 'works-ito'
-          git config user.email 'h.ito@works-rental.co.jp'
-          git add app.js index.html version.json
-          git commit -m 'Send machine code with inventory records'
-          git push origin HEAD:main
+          rm -f .github/workflows/patch-machinecode-payload.yml
+          git config user.name "openai-chatgpt"
+          git config user.email "openai-chatgpt@users.noreply.github.com"
+          git add app.js index.html version.json .github/workflows/patch-machinecode-payload.yml
+          git commit -m "Send machine code with inventory records"
+          git push origin main
