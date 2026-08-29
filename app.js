@@ -2774,6 +2774,7 @@ function changePreviousSettings() {
         recDate:record.recDate || "",
         recordType:record.recordType || "",
         managementType:record.managementType || "",
+        machineCode:record.machineCode || "",
         displayName:record.displayName || ""
       };
 
