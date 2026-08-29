@@ -1,0 +1,120 @@
+name: Patch machineCode payload
+
+on:
+  push:
+    paths:
+      - '.github/workflows/patch-machinecode-payload.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Patch app and cache versions
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          app = Path('app.js')
+          text = app.read_text(encoding='utf-8')
+
+          old_start = '''    function buildWizardScanRecord(details) {
+      const isQuantity =
+        details.managementType === "quantity";
+
+      const record = {
+'''
+          new_start = '''    function buildWizardScanRecord(details) {
+      const isQuantity =
+        details.managementType === "quantity";
+
+      const machineCode =
+        isQuantity
+          ? ""
+          : (
+              getFirstItemValue(
+                details.sourceItem || {},
+                [
+                  "機種コード",
+                  "機種CD",
+                  "機種ＣＤ",
+                  "machineCode",
+                  "machine_code"
+                ]
+              ) ||
+              String(
+                details.qrText || ""
+              )
+                .split("-")[0]
+                .trim()
+            );
+
+      const record = {
+'''
+          count = text.count(old_start)
+          if count != 1:
+              raise SystemExit(f'buildWizardScanRecord start expected 1 match, found {count}')
+          text = text.replace(old_start, new_start, 1)
+
+          old_record = '''        managementType:details.managementType,
+        managedItem:isQuantity
+'''
+          new_record = '''        managementType:details.managementType,
+        machineCode:machineCode,
+        managedItem:isQuantity
+'''
+          count = text.count(old_record)
+          if count != 1:
+              raise SystemExit(f'record machineCode insertion expected 1 match, found {count}')
+          text = text.replace(old_record, new_record, 1)
+
+          old_payload = '''          managementType:record.managementType || "",
+          displayName:record.displayName || ""
+'''
+          new_payload = '''          managementType:record.managementType || "",
+          machineCode:record.machineCode || "",
+          displayName:record.displayName || ""
+'''
+          count = text.count(old_payload)
+          if count != 2:
+              raise SystemExit(f'payload insertion expected 2 matches, found {count}')
+          text = text.replace(old_payload, new_payload)
+
+          app.write_text(text, encoding='utf-8')
+
+          index = Path('index.html')
+          html = index.read_text(encoding='utf-8')
+          old_key = './app.js?v=75'
+          new_key = './app.js?v=76'
+          count = html.count(old_key)
+          if count != 1:
+              raise SystemExit(f'index app version expected 1 match, found {count}')
+          index.write_text(html.replace(old_key, new_key, 1), encoding='utf-8')
+
+          version = Path('version.json')
+          version.write_text('{"version":"2.2-20260829-machinecode1"}\n', encoding='utf-8')
+          PY
+
+          node --check app.js
+          git diff --check
+
+      - name: Commit patch
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo 'No changes to commit.'
+            exit 0
+          fi
+          git config user.name 'works-ito'
+          git config user.email 'h.ito@works-rental.co.jp'
+          git add app.js index.html version.json
+          git commit -m 'Send machine code with inventory records'
+          git push origin HEAD:main
