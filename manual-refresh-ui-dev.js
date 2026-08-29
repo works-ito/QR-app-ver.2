@@ -19,9 +19,11 @@
   const BUTTON_ID = "manualAppRefreshButtonDev";
   const MASTER_ENTRY_BUTTON_ID = "masterSelectionReceptionButton";
   const DOT_INTERVAL_MS = 400;
+  const CANCEL_SUCCESS_HIDE_MS = 5000;
 
   let renderingFromCache = false;
   let dotsTimer = null;
+  let cancelSuccessHideTimer = null;
 
   function prepareReceptionButtons() {
     const receptionStep = document.getElementById("receptionStep");
@@ -51,6 +53,39 @@
 
       grid.insertBefore(masterButton, irregularButton);
     }
+  }
+
+  function installCancelSuccessAutoHide() {
+    const status = document.getElementById("wizardSendStatus");
+    if (!status || status.dataset.cancelSuccessAutoHide === "true") return;
+
+    status.dataset.cancelSuccessAutoHide = "true";
+
+    const observer = new MutationObserver(function() {
+      const message = String(status.innerText || "").trim();
+
+      if (!message.startsWith("直前送信を取消しました ✔")) return;
+
+      if (cancelSuccessHideTimer) {
+        clearTimeout(cancelSuccessHideTimer);
+      }
+
+      cancelSuccessHideTimer = setTimeout(function() {
+        const currentMessage = String(status.innerText || "").trim();
+
+        if (currentMessage !== message) return;
+
+        status.classList.remove("isVisible", "isSuccess");
+        status.innerText = "";
+        cancelSuccessHideTimer = null;
+      }, CANCEL_SUCCESS_HIDE_MS);
+    });
+
+    observer.observe(status, {
+      childList:true,
+      characterData:true,
+      subtree:true
+    });
   }
 
   function pad2(value) {
@@ -164,6 +199,7 @@
 
   function install() {
     prepareReceptionButtons();
+    installCancelSuccessAutoHide();
 
     const status = getStatus();
     const button = document.getElementById(BUTTON_ID);
