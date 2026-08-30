@@ -3890,7 +3890,7 @@ function changePreviousSettings() {
 
       } catch (error) {
         console.warn(
-          "伝票情報取得失敗（3.5 Flash-Lite 全体1回）",
+          "伝票情報取得失敗（AI解析）",
           error
         );
 
