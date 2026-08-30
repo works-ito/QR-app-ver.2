@@ -3365,7 +3365,6 @@ function changePreviousSettings() {
     }
 
     function sendBatchRecords(records, options) {
-      const clientTimingStartedAt = performance.now();
       const batchId = createBatchId();
       lastPendingSendId = batchId;
 
@@ -3396,8 +3395,6 @@ function changePreviousSettings() {
        * GASで登録済みなのに応答だけ失われた場合の
        * 二重登録を避けるため、結果不明として止める。
        */
-      const clientFetchStartedAt = performance.now();
-
       return fetch(GAS_URL, {
         method:"POST",
         headers:{
@@ -3405,9 +3402,7 @@ function changePreviousSettings() {
         },
         body:JSON.stringify(payload)
       }).then(async function(response) {
-        const clientHeadersReceivedAt = performance.now();
         const responseText = await response.text();
-        const clientResponseTextReadAt = performance.now();
         let result;
 
         try {
@@ -3445,40 +3440,8 @@ function changePreviousSettings() {
           result.sendId = batchId;
         }
 
-        const clientCompletedAt = performance.now();
-        result.clientSendTiming = {
-          prepareMs:Math.round(
-            clientFetchStartedAt - clientTimingStartedAt
-          ),
-          fetchWaitMs:Math.round(
-            clientHeadersReceivedAt - clientFetchStartedAt
-          ),
-          responseReadMs:Math.round(
-            clientResponseTextReadAt - clientHeadersReceivedAt
-          ),
-          afterReadMs:Math.round(
-            clientCompletedAt - clientResponseTextReadAt
-          ),
-          totalMs:Math.round(
-            clientCompletedAt - clientTimingStartedAt
-          )
-        };
-
         return result;
       });
-    }
-
-    function formatClientSendTiming(result) {
-      const timing = result && result.clientSendTiming;
-      if (!timing) return "";
-
-      return (
-        "\n送信計測：準備 " + timing.prepareMs + "ms" +
-        " / 通信 " + timing.fetchWaitMs + "ms" +
-        " / 読込 " + timing.responseReadMs + "ms" +
-        " / 後処理 " + timing.afterReadMs + "ms" +
-        " / 合計 " + timing.totalMs + "ms"
-      );
     }
 
     function setWizardSendStatus(message, state) {
@@ -4343,8 +4306,7 @@ function changePreviousSettings() {
             "失敗：" + failedCount + "件" +
             (failureText ? "\n\n" + failureText : "") +
             "\n\n送信ID：" +
-            (result.sendId || lastPendingSendId) +
-            formatClientSendTiming(result),
+            (result.sendId || lastPendingSendId),
             "isError"
           );
 
@@ -4360,8 +4322,7 @@ function changePreviousSettings() {
           "送信完了 ✔\n" +
           successCount + "件\n" +
           "送信ID：" +
-          (result.sendId || lastPendingSendId) +
-            formatClientSendTiming(result),
+          (result.sendId || lastPendingSendId),
           "isSuccess"
         );
 
