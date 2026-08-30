@@ -3805,7 +3805,7 @@ function changePreviousSettings() {
 
       try {
         const profile = {
-          label:"3.5 Flash-Lite 全体1回",
+          label:"上半分1回",
           cropRatio:0.5,
           maxSide:1024,
           quality:0.75
