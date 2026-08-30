@@ -139,7 +139,7 @@
   }, 0);
 })();
 
-/* 開発版：LINE内ブラウザ対策の途中作業復旧＋AI解析安定化 */
+/* 開発版：LINE内ブラウザ対策の途中作業復旧 */
 (function() {
   "use strict";
 
@@ -445,42 +445,9 @@
     }
   }
 
-  function installAiAnalysisRetry() {
-    if (typeof analyzeWizardSlipPhoto !== "function") return;
-
-    const originalAnalyzeWizardSlipPhoto = analyzeWizardSlipPhoto;
-
-    analyzeWizardSlipPhoto = async function(file, photoType) {
-      let result = await originalAnalyzeWizardSlipPhoto(file, photoType);
-
-      if (result) return result;
-
-      const preview = byId("wizardPhotoPreview");
-      if (preview) {
-        preview.innerText =
-          "AI解析をもう一度試しています...\n写真保存は失敗しても続行できます。";
-      }
-
-      await new Promise(function(resolve) {
-        setTimeout(resolve, 1600);
-      });
-
-      result = await originalAnalyzeWizardSlipPhoto(file, photoType);
-
-      if (!result && preview) {
-        preview.innerText =
-          "AI解析はできませんでした。\n写真保存はこのまま続行します。";
-      }
-
-      return result;
-    };
-
-    console.log("AI伝票解析の追加再試行を有効にしました");
-  }
 
   setTimeout(function() {
     installDraftAutosave();
-    installAiAnalysisRetry();
     offerDraftRestore();
   }, 50);
 })();

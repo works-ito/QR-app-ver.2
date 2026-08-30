@@ -3803,90 +3803,124 @@ function changePreviousSettings() {
     async function analyzeWizardSlipPhoto(file, photoType) {
       startAnimatedDots("wizardPhotoPreview", "伝票情報を確認しています");
 
-      try {
-        const profile = {
-          label:"全体1回",
-          cropRatio:1,
-          maxSide:1024,
-          quality:0.75
-        };
+      const profile = {
+        label:"全体1回",
+        cropRatio:1,
+        maxSide:1024,
+        quality:0.75
+      };
 
+      try {
         const photoBase64 =
           await makeWizardSlipAnalysisImage(
             file,
             profile
           );
 
-        const response = await fetch(GAS_URL, {
-          method:"POST",
-          headers:{"Content-Type":"text/plain"},
-          body:JSON.stringify({
-            action:"analyzeSlipPhoto",
-            photoBase64:photoBase64,
-            photoType:photoType,
-            requestedFields:["customerName", "siteName"],
-            analysisRegion:profile.label
-          })
-        });
+        let lastError = null;
 
-        const text = await response.text();
-        let result;
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            const response = await fetch(GAS_URL, {
+              method:"POST",
+              headers:{"Content-Type":"text/plain"},
+              body:JSON.stringify({
+                action:"analyzeSlipPhoto",
+                photoBase64:photoBase64,
+                photoType:photoType,
+                requestedFields:["customerName", "siteName"],
+                analysisRegion:profile.label
+              })
+            });
 
-        try {
-          result = JSON.parse(text);
-        } catch (parseError) {
-          throw new Error(
-            "伝票解析結果を読み取れませんでした\n" +
-            text.slice(0, 200)
-          );
+            const text = await response.text();
+            let result;
+
+            try {
+              result = JSON.parse(text);
+            } catch (parseError) {
+              throw new Error(
+                "伝票解析結果を読み取れませんでした\n" +
+                text.slice(0, 200)
+              );
+            }
+
+            if (!response.ok || !result || result.ok !== true) {
+              throw new Error(
+                result && result.message
+                  ? result.message
+                  : "伝票情報を取得できませんでした"
+              );
+            }
+
+            const customerName =
+              sanitizeWizardPhotoTitlePart(
+                result.customerName
+              );
+
+            const siteName =
+              sanitizeWizardPhotoTitlePart(
+                result.siteName
+              );
+
+            if (!customerName && !siteName) {
+              throw new Error(
+                "顧客名・現場名を判定できませんでした"
+              );
+            }
+
+            wizardCurrentSlipInfo = {
+              customerName:customerName,
+              siteName:siteName,
+              originalSiteName:siteName,
+              acquisitionMethod:
+                result.acquisitionMethod || "ai_ocr",
+              siteNameEdited:false,
+              confirmedTitle:
+                buildWizardPhotoTitle(
+                  customerName,
+                  siteName
+                ),
+              acquiredAt:new Date().toISOString(),
+              analysisRegion:profile.label,
+              analysisModel:
+                result.analysisModel || "",
+              geminiFetchMs:Number(
+                result.geminiFetchMs || 0
+              )
+            };
+
+            return wizardCurrentSlipInfo;
+
+          } catch (error) {
+            lastError = error;
+
+            if (attempt >= 2) break;
+
+            const preview = document.getElementById(
+              "wizardPhotoPreview"
+            );
+
+            if (preview) {
+              preview.innerText =
+                "AI解析をもう一度試しています...\n" +
+                "写真保存は失敗しても続行できます。";
+            }
+
+            console.warn(
+              "伝票情報取得失敗。AI解析を再試行します。",
+              error
+            );
+
+            await new Promise(function(resolve) {
+              setTimeout(resolve, 1600);
+            });
+          }
         }
 
-        if (!response.ok || !result || result.ok !== true) {
-          throw new Error(
-            result && result.message
-              ? result.message
-              : "伝票情報を取得できませんでした"
-          );
-        }
-
-        const customerName =
-          sanitizeWizardPhotoTitlePart(
-            result.customerName
-          );
-
-        const siteName =
-          sanitizeWizardPhotoTitlePart(
-            result.siteName
-          );
-
-        if (!customerName && !siteName) {
-          throw new Error(
-            "顧客名・現場名を判定できませんでした"
-          );
-        }
-
-        wizardCurrentSlipInfo = {
-          customerName:customerName,
-          siteName:siteName,
-          originalSiteName:siteName,
-          acquisitionMethod:
-            result.acquisitionMethod || "ai_ocr",
-          siteNameEdited:false,
-          confirmedTitle:
-            buildWizardPhotoTitle(
-              customerName,
-              siteName
-            ),
-          acquiredAt:new Date().toISOString(),
-          analysisRegion:profile.label,
-          analysisModel:
-            result.analysisModel || "",
-          geminiFetchMs:Number(
-            result.geminiFetchMs || 0
-          )
-        };
-
-        return wizardCurrentSlipInfo;
+        throw lastError || new Error(
+          "伝票情報を取得できませんでした"
+        );
 
       } catch (error) {
         console.warn(
