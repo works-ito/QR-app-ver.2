@@ -3825,8 +3825,7 @@ function changePreviousSettings() {
             photoBase64:photoBase64,
             photoType:photoType,
             requestedFields:["customerName", "siteName"],
-            analysisRegion:profile.label,
-            analysisModel:"gemini-3.5-flash-lite"
+            analysisRegion:profile.label
           })
         });
 
@@ -3881,7 +3880,7 @@ function changePreviousSettings() {
           acquiredAt:new Date().toISOString(),
           analysisRegion:profile.label,
           analysisModel:
-            result.analysisModel || "gemini-3.5-flash-lite",
+            result.analysisModel || "",
           geminiFetchMs:Number(
             result.geminiFetchMs || 0
           )
