@@ -1,0 +1,35 @@
+name: Apply AI slip analysis extraction
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-ai-slip-analysis-extraction.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Apply extraction
+        run: python scripts/patch_ai_slip_analysis_extraction_once.py
+      - name: Validate JavaScript
+        run: |
+          node --check app.js
+          node --check ai-slip-analysis.js
+          grep -q 'ai-slip-analysis.js?v=1' index.html
+          ! grep -q 'async function analyzeWizardSlipPhoto' app.js
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.js ai-slip-analysis.js index.html version.json
+          git diff --cached --check
+          git commit -m "Extract AI slip analysis module"
+          git push
