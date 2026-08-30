@@ -1,0 +1,35 @@
+name: Apply client timing cleanup
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-remove-client-send-timing.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Remove instrumentation
+        run: python scripts/patch_remove_client_send_timing_once.py
+      - name: Validate JavaScript
+        run: |
+          node --check app.js
+          ! grep -q 'formatClientSendTiming' app.js
+          ! grep -q 'clientSendTiming' app.js
+          grep -q 'app.js?v=81' index.html
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.js index.html
+          git diff --cached --check
+          git commit -m "Remove client send timing instrumentation"
+          git push
