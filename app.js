@@ -3805,8 +3805,8 @@ function changePreviousSettings() {
 
       try {
         const profile = {
-          label:"上半分1回",
-          cropRatio:0.5,
+          label:"全体1回",
+          cropRatio:1,
           maxSide:1024,
           quality:0.75
         };
