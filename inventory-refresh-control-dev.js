@@ -1,5 +1,5 @@
 /*
- * 在庫データ自動更新制御 v89
+ * 在庫データ自動更新制御 v90
  *
  * 目的：
  * - 表示中は15分ごとに在庫データを再同期する。
@@ -20,8 +20,6 @@
   const PENDING_CHECK_MS = 2000;
 
   let refreshHiddenAt = null;
-  let pendingInventoryRefresh = false;
-  let lastInventoryRefreshAt = 0;
   let pendingCheckTimer = null;
 
   function isVisible() {
@@ -67,33 +65,6 @@
     );
   }
 
-  function markRefreshSuccess() {
-    lastInventoryRefreshAt = Date.now();
-    pendingInventoryRefresh = false;
-  }
-
-  function installLoadAppInitialDataTracking() {
-    if (typeof loadAppInitialData !== "function") return false;
-    if (loadAppInitialData.__refreshTimeTrackingPatched) return true;
-
-    const original = loadAppInitialData;
-
-    const patched = async function() {
-      const result = await original.apply(this, arguments);
-      if (result === true) {
-        markRefreshSuccess();
-      }
-      return result;
-    };
-
-    patched.__refreshTimeTrackingPatched = true;
-    patched.__original = original;
-
-    loadAppInitialData = patched;
-    window.loadAppInitialData = patched;
-    return true;
-  }
-
   async function requestInventoryRefresh(reason) {
     if (!isVisible()) {
       pendingInventoryRefresh = true;
@@ -123,7 +94,6 @@
     const success = await loadAppInitialData(false);
 
     if (success) {
-      markRefreshSuccess();
       console.log("在庫データ自動更新完了", reason || "", new Date().toLocaleString());
       return true;
     }
@@ -220,17 +190,6 @@
   }
 
   function install() {
-    if (!installLoadAppInitialDataTracking()) {
-      setTimeout(installLoadAppInitialDataTracking, 500);
-    }
-
-    if (
-      typeof appInitialDataLoaded !== "undefined" &&
-      appInitialDataLoaded === true
-    ) {
-      lastInventoryRefreshAt = Date.now();
-    }
-
     installControlledTimer();
     installVisibilityControl();
     startPendingChecker();
@@ -239,7 +198,7 @@
       runPendingInventoryRefreshAfterSession;
     window.requestInventoryRefreshDev = requestInventoryRefresh;
 
-    console.info("開発版：在庫データ自動更新制御 v89 読込完了");
+    console.info("開発版：在庫データ自動更新制御 v90 読込完了");
   }
 
   if (document.readyState === "loading") {

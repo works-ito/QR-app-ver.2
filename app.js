@@ -70,6 +70,8 @@ const PREVIOUS_SETTINGS_STORAGE_KEY =
     let currentAppVersion = null;
     let pendingAutoReload = false;
     let lastHiddenTime = null;
+    let pendingInventoryRefresh = false;
+    let lastInventoryRefreshAt = 0;
     const animatedDotsTimers = new Map();
     let wizardPostSendContext = null;
     let wizardSelectedPhotos = [];
@@ -5792,6 +5794,9 @@ function changePreviousSettings() {
           "ready",
           {updatedAt:cache.updatedAt}
         );
+
+        lastInventoryRefreshAt = Date.now();
+        pendingInventoryRefresh = false;
 
         return true;
 
