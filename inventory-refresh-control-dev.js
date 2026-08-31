@@ -1,26 +1,25 @@
 /*
- * 在庫データ自動更新制御 v90
+ * 在庫データ自動更新制御 v91
  *
- * 目的：
- * - 表示中は15分ごとに在庫データを再同期する。
- * - 5分以上30分未満バックグラウンドだった場合、復帰時に再同期する。
- * - 30分以上は既存 app.js の完全リロード処理へ任せる。
- * - 受付途中は更新せず pendingInventoryRefresh として保留する。
- * - 正常な受付セッション終了後に保留更新を消化する。
- * - 直近2分以内に更新済みなら近接した二重取得を抑止する。
- * - pendingAutoReload（ページ全体の再読込待ち）とは完全に分離する。
+ * 方針：
+ * - 15分定期更新は停止する。
+ * - バックグラウンドからの復帰時は、経過時間に関係なく現在状態を再取得する。
+ * - 受付途中でも現在状態の軽量更新は許可する。
+ * - 全体同期は受付UIを壊さない安全なタイミングだけ実行する。
+ * - 全体同期が保留された場合は受付終了後に消化する。
+ * - 全体同期完了後は現在状態をもう一度取得し、状態の巻き戻りを防ぐ。
+ * - 30分以上の復帰は app.js の完全リロード処理へ任せる。
  *
  * GASは変更しない。
  */
 (function() {
   "use strict";
 
-  const RESUME_REFRESH_MS = 5 * 60 * 1000;
-  const RECENT_REFRESH_SUPPRESS_MS = 2 * 60 * 1000;
   const PENDING_CHECK_MS = 2000;
 
   let refreshHiddenAt = null;
   let pendingCheckTimer = null;
+  let resumeRefreshRunning = false;
 
   function isVisible() {
     return document.visibilityState === "visible";
@@ -58,75 +57,97 @@
     return false;
   }
 
-  function wasRecentlyRefreshed() {
-    return (
-      lastInventoryRefreshAt > 0 &&
-      Date.now() - lastInventoryRefreshAt < RECENT_REFRESH_SUPPRESS_MS
+  async function refreshCurrentState(reason) {
+    if (!isVisible()) return false;
+
+    if (typeof loadCurrentStateData !== "function") {
+      console.warn("現在状態更新関数を確認できません");
+      return false;
+    }
+
+    console.log("現在状態更新開始", reason || "");
+
+    const success = await loadCurrentStateData();
+
+    console.log(
+      success ? "現在状態更新完了" : "現在状態更新失敗",
+      reason || ""
     );
+
+    return success;
   }
 
-  async function requestInventoryRefresh(reason) {
+  async function requestFullInventoryRefresh(reason) {
     if (!isVisible()) {
       pendingInventoryRefresh = true;
       return false;
     }
 
-    if (wasRecentlyRefreshed()) {
-      pendingInventoryRefresh = false;
-      console.log("在庫データ自動更新を省略：直近2分以内に更新済み", reason || "");
-      return true;
-    }
-
     if (!isReceptionIdle()) {
       pendingInventoryRefresh = true;
-      console.log("在庫データ自動更新を保留：受付処理中", reason || "");
+      console.log("全体同期を保留：受付処理中", reason || "");
       return false;
     }
 
     if (typeof loadAppInitialData !== "function") {
       pendingInventoryRefresh = true;
-      console.warn("在庫データ更新関数を確認できません");
+      console.warn("全体同期関数を確認できません");
       return false;
     }
 
-    console.log("在庫データ自動更新開始", reason || "");
+    console.log("全体同期開始", reason || "");
 
     const success = await loadAppInitialData(false);
 
-    if (success) {
-      console.log("在庫データ自動更新完了", reason || "", new Date().toLocaleString());
-      return true;
-    }
-
-    pendingInventoryRefresh = true;
-    console.warn("在庫データ自動更新失敗", reason || "");
-    return false;
-  }
-
-  async function runControlledScheduledRefresh() {
-    if (!isVisible()) {
-      console.log("在庫データ定期更新を省略：バックグラウンド中");
+    if (!success) {
+      pendingInventoryRefresh = true;
+      console.warn("全体同期失敗", reason || "");
       return false;
     }
 
-    return await requestInventoryRefresh("15分定期更新");
+    pendingInventoryRefresh = false;
+    console.log("全体同期完了", reason || "", new Date().toLocaleString());
+
+    /*
+     * 全体同期で個体・簡易個体の配列が置き換わるため、
+     * 最後に軽量な現在状態を重ねて状態を最新化する。
+     */
+    await refreshCurrentState("全体同期後の最終状態更新");
+    return true;
   }
 
-  function installControlledTimer() {
-    if (typeof DATA_REFRESH_MINUTES === "undefined") return false;
+  async function runResumeRefresh() {
+    if (resumeRefreshRunning || !isVisible()) return false;
 
-    if (typeof inventoryRefreshTimer !== "undefined" && inventoryRefreshTimer) {
-      clearInterval(inventoryRefreshTimer);
+    resumeRefreshRunning = true;
+
+    try {
+      /*
+       * 復帰直後は受付中でも現在状態だけ更新する。
+       * 全体同期は安全な場合のみ並行して開始する。
+       */
+      const currentStatePromise =
+        refreshCurrentState("バックグラウンド復帰");
+
+      let fullDataPromise = null;
+
+      if (isReceptionIdle()) {
+        fullDataPromise =
+          requestFullInventoryRefresh("バックグラウンド復帰");
+      } else {
+        pendingInventoryRefresh = true;
+      }
+
+      await currentStatePromise;
+
+      if (fullDataPromise) {
+        void fullDataPromise;
+      }
+
+      return true;
+    } finally {
+      resumeRefreshRunning = false;
     }
-
-    inventoryRefreshTimer = setInterval(
-      function() {
-        void runControlledScheduledRefresh();
-      },
-      DATA_REFRESH_MINUTES * 60 * 1000
-    );
-
-    return true;
   }
 
   function handleVisibleReturn() {
@@ -135,7 +156,7 @@
     const awayMs = Date.now() - refreshHiddenAt;
     refreshHiddenAt = null;
 
-    /* 30分以上は既存app.jsの完全リロード処理を優先する */
+    /* 30分以上は既存 app.js の完全リロード処理を優先する */
     if (
       typeof AUTO_RELOAD_MINUTES !== "undefined" &&
       awayMs >= AUTO_RELOAD_MINUTES * 60 * 1000
@@ -143,11 +164,7 @@
       return;
     }
 
-    if (awayMs < RESUME_REFRESH_MS) {
-      return;
-    }
-
-    void requestInventoryRefresh("5分復帰更新");
+    void runResumeRefresh();
   }
 
   function installVisibilityControl() {
@@ -173,7 +190,7 @@
     if (!pendingInventoryRefresh) return;
 
     setTimeout(function() {
-      void requestInventoryRefresh("受付終了後の保留更新");
+      void requestFullInventoryRefresh("受付終了後の保留更新");
     }, 0);
   }
 
@@ -185,20 +202,31 @@
       if (!isVisible()) return;
       if (!isReceptionIdle()) return;
 
-      void requestInventoryRefresh("保留更新の再確認");
+      void requestFullInventoryRefresh("保留更新の再確認");
     }, PENDING_CHECK_MS);
   }
 
+  function stopLegacyScheduledRefresh() {
+    if (
+      typeof inventoryRefreshTimer !== "undefined" &&
+      inventoryRefreshTimer
+    ) {
+      clearInterval(inventoryRefreshTimer);
+      inventoryRefreshTimer = null;
+    }
+  }
+
   function install() {
-    installControlledTimer();
+    stopLegacyScheduledRefresh();
     installVisibilityControl();
     startPendingChecker();
 
     window.runPendingInventoryRefreshAfterSession =
       runPendingInventoryRefreshAfterSession;
-    window.requestInventoryRefreshDev = requestInventoryRefresh;
+    window.requestInventoryRefreshDev =
+      requestFullInventoryRefresh;
 
-    console.info("開発版：在庫データ自動更新制御 v90 読込完了");
+    console.info("開発版：在庫データ自動更新制御 v91 読込完了");
   }
 
   if (document.readyState === "loading") {
