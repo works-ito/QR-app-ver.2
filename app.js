@@ -5833,20 +5833,73 @@ function changePreviousSettings() {
       if (cache) {
         emitInventoryDataStatusEvent("loading");
 
+        /*
+         * 起動高速化：
+         * 軽量な現在状態取得と全体同期を同時に開始する。
+         *
+         * ① 現在状態が先に完了した時点で受付を開始可能にする。
+         * ② 全体同期はバックグラウンドで継続する。
+         * ③ ①と②の両方が終わった後、現在状態だけを再取得し、
+         *    全体同期完了時の状態上書きを防いで最終状態を最新化する。
+         */
+        const currentStatePromise =
+          loadCurrentStateData();
+
+        const fullDataPromise =
+          loadAppInitialData(false);
+
         const currentStateReady =
-          await loadCurrentStateData();
+          await currentStatePromise;
 
         if (currentStateReady) {
           startScannerAfterInventoryReady();
-          void loadAppInitialData(false);
-          return;
+        } else {
+          const fullDataReady =
+            await fullDataPromise;
+
+          if (fullDataReady) {
+            startScannerAfterInventoryReady();
+          }
         }
 
-        await loadAppInitialData(false);
-        startScannerAfterInventoryReady();
+        void (async function() {
+          try {
+            const fullDataReady =
+              await fullDataPromise;
+
+            /*
+             * 初回の現在状態取得がまだ終わっている最中に
+             * ③を開始すると currentStateDataLoading で弾かれるため、
+             * 必ず①の終了も待つ。
+             */
+            await currentStatePromise;
+
+            if (!fullDataReady) {
+              return;
+            }
+
+            const finalStateReady =
+              await loadCurrentStateData();
+
+            if (finalStateReady) {
+              startScannerAfterInventoryReady();
+            }
+          } catch (error) {
+            console.warn(
+              "起動後の最終現在状態更新に失敗",
+              error
+            );
+          }
+        })();
+
         return;
       }
 
+      /*
+       * 初回端末などキャッシュが存在しない場合は、
+       * 現在状態だけでは機種名・管理区分等が不足するため
+       * 従来どおり全体同期を待ってから使用可能にする。
+       */
       await loadAppInitialData(true);
       startScannerAfterInventoryReady();
     }
