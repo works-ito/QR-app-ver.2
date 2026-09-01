@@ -1,0 +1,43 @@
+name: Temporary foreground stabilization bump
+on:
+  push:
+    paths:
+      - '.github/workflows/temp-foreground-stabilize.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Verify v96 and bump loader
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          controller = Path('inventory-refresh-control-dev.js').read_text()
+          sales = Path('sales-stockin.js').read_text()
+          index = Path('index.html')
+          s = index.read_text()
+          assert 'const FOREGROUND_STABILIZE_MS = 500;' in controller
+          assert '在庫データ自動更新制御 v96' in controller
+          assert 'inventory-refresh-control-dev.js?v=96' in sales
+          assert '販売品入庫受付 v157 bootstrap' in sales
+          old = '<script src="./sales-stockin.js?v=156"></script>'
+          new = '<script src="./sales-stockin.js?v=157"></script>'
+          if s.count(old) != 1:
+              raise SystemExit(f'expected one v156 loader, found {s.count(old)}')
+          index.write_text(s.replace(old, new, 1))
+          PY
+          node --check inventory-refresh-control-dev.js
+          node --check sales-stockin.js
+          git diff --check
+          git diff -- index.html
+      - name: Commit loader bump
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git commit -m 'chore: activate foreground stabilization v96'
+          git push origin HEAD:main
