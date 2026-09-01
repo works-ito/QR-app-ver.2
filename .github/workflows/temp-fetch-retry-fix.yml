@@ -1,9 +1,8 @@
-name: Temporary safe fetch retry patch
+name: Temporary app cache bump
 on:
   push:
     paths:
       - '.github/workflows/temp-fetch-retry-fix.yml'
-  workflow_dispatch:
 permissions:
   contents: write
 jobs:
@@ -13,57 +12,32 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
-      - name: Patch only inventory read fetches
+      - name: Verify retry patch and bump app cache
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          p = Path('app.js')
+          app = Path('app.js').read_text()
+          for target in ['action:"getCurrentStateData"', 'action:"getAppInitialData"']:
+              pos = app.index(target)
+              if app.rfind('response = await fetchWithRetry(', max(0, pos - 1200), pos) < 0:
+                  raise SystemExit(f'retry patch missing near {target}')
+          p = Path('index.html')
           s = p.read_text()
-          original = s
-          targets = ['action:"getCurrentStateData"', 'action:"getAppInitialData"']
-
-          if s.count('async function fetchWithRetry(') != 1:
-              raise SystemExit('fetchWithRetry helper missing or duplicated')
-
-          for target in targets:
-              if s.count(target) != 1:
-                  raise SystemExit(f'expected exactly one {target}, found {s.count(target)}')
-              pos = s.index(target)
-              fetch_pos = s.rfind('response = await fetch(', max(0, pos - 1200), pos)
-              if fetch_pos < 0:
-                  raise SystemExit(f'nearby inventory fetch not found for {target}')
-              between = s[fetch_pos:pos]
-              if 'fetchWithRetry(' in between:
-                  raise SystemExit(f'{target} already uses fetchWithRetry')
-              s = s[:fetch_pos] + s[fetch_pos:].replace(
-                  'response = await fetch(',
-                  'response = await fetchWithRetry(',
-                  1
-              )
-
-          if s == original:
-              raise SystemExit('no changes produced')
-          if s.count('response = await fetchWithRetry(') < 2:
-              raise SystemExit('expected two inventory fetchWithRetry calls')
-          for target in targets:
-              pos = s.index(target)
-              if s.rfind('response = await fetchWithRetry(', max(0, pos - 1200), pos) < 0:
-                  raise SystemExit(f'post-patch retry call missing for {target}')
-
+          old = '<script src="./app.js?v=84"></script>'
+          new = '<script src="./app.js?v=85"></script>'
+          if s.count(old) != 1:
+              raise SystemExit(f'expected one app v84 loader, found {s.count(old)}')
+          s = s.replace(old, new, 1)
+          if s.count(new) != 1:
+              raise SystemExit('app v85 loader assertion failed')
           p.write_text(s)
           PY
-      - name: Syntax and whitespace checks
-        run: |
-          node --check app.js
           git diff --check
-      - name: Require exactly two focused replacements
-        run: |
-          test "$(git diff --numstat -- app.js | awk '{print $1+$2}')" = "4"
-          git diff -- app.js
-      - name: Commit patch
+          git diff -- index.html
+      - name: Commit cache bump
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add app.js
-          git commit -m 'fix: retry rejected inventory fetches'
+          git add index.html
+          git commit -m 'chore: bump app cache after inventory retry fix'
           git push origin HEAD:main
