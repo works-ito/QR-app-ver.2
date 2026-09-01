@@ -5534,7 +5534,7 @@ function changePreviousSettings() {
           attempt <= 2;
           attempt++
         ) {
-          response = await fetch(
+          response = await fetchWithRetry(
             GAS_URL +
               "?t=" + Date.now() +
               "&stateAttempt=" + attempt,
@@ -5654,7 +5654,7 @@ function changePreviousSettings() {
           attempt <= 2;
           attempt++
         ) {
-          response = await fetch(
+          response = await fetchWithRetry(
             GAS_URL +
               "?t=" + Date.now() +
               "&attempt=" + attempt,
