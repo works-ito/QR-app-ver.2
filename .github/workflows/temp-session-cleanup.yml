@@ -1,0 +1,80 @@
+name: Temporary session cleanup
+
+on:
+  push:
+    paths:
+      - '.github/workflows/temp-session-cleanup.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Refactor session completion safely
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          app = Path('app.js').read_text(encoding='utf-8')
+          sales = Path('sales-stockin.js').read_text(encoding='utf-8')
+          index = Path('index.html').read_text(encoding='utf-8')
+
+          signature = '    async function resumeWizardContinuousScan(message) {\n'
+          hook = '''    async function resumeWizardContinuousScan(message) {\n      if (\n        typeof finishWizardSessionAfterSend === "function" &&\n        await finishWizardSessionAfterSend(message)\n      ) {\n        return;\n      }\n'''
+
+          assert app.count(signature) == 1, f'resume signature count={app.count(signature)}'
+          assert 'finishWizardSessionAfterSend(message)' not in app, 'session hook already exists'
+          assert sales.count('./wizard-session-finish-dev.js?v=104') == 1, 'old session loader missing/duplicated'
+          assert sales.count('/* 販売品入庫受付 v154 bootstrap */') == 1, 'sales version mismatch'
+          assert index.count('./app.js?v=83') == 1, 'app cache version mismatch'
+          assert index.count('./sales-stockin.js?v=154') == 1, 'sales cache version mismatch'
+          assert Path('wizard-session-finish-dev.js').exists(), 'old session dev file missing'
+          assert not Path('wizard-session.js').exists(), 'wizard-session.js already exists'
+
+          app = app.replace(signature, hook, 1)
+          sales = sales.replace('/* 販売品入庫受付 v154 bootstrap */', '/* 販売品入庫受付 v155 bootstrap */', 1)
+          sales = sales.replace('./wizard-session-finish-dev.js?v=104', './wizard-session.js?v=1', 1)
+          index = index.replace('./app.js?v=83', './app.js?v=84', 1)
+          index = index.replace('./sales-stockin.js?v=154', './sales-stockin.js?v=155', 1)
+
+          session = '''/*\n * 受付セッション正常終了 v1\n *\n * 正常完了時だけ受付入口へ戻す正式処理。\n * app.js の resumeWizardContinuousScan() から呼び出す。\n * 取消完了・一部失敗で読取済みレコードが残る場合は false を返し、\n * app.js の従来継続読取処理へ委ねる。\n */\n(function() {\n  "use strict";\n\n  function clearStaleWizardSendStatus() {\n    const status = document.getElementById("wizardSendStatus");\n    if (!status) return;\n\n    if (\n      typeof wizardSendResultUnknown !== "undefined" &&\n      wizardSendResultUnknown === true\n    ) return;\n\n    if (typeof stopAnimatedDots === "function") {\n      stopAnimatedDots("wizardSendStatus");\n    }\n\n    status.innerText = "";\n    status.className = "wizardSendStatus";\n  }\n\n  async function finishWizardSessionAfterSend(message) {\n    const text = String(message || "");\n\n    if (text.includes("取消完了")) {\n      return false;\n    }\n\n    if (\n      typeof scannedEntries !== "undefined" &&\n      Array.isArray(scannedEntries) &&\n      scannedEntries.length > 0\n    ) {\n      return false;\n    }\n\n    if (typeof stopReadOnlyScanner === "function") {\n      await stopReadOnlyScanner();\n    }\n\n    if (typeof resetWizard === "function") {\n      resetWizard();\n    }\n\n    const pickerPanel = document.getElementById("irregularMasterPickerPanel");\n    if (pickerPanel) pickerPanel.hidden = true;\n\n    const pickerRoot = document.getElementById("irregularMasterPickerDev");\n    if (pickerRoot) {\n      pickerRoot.querySelectorAll(".irregularMasterStep").forEach(function(step) {\n        step.hidden = true;\n      });\n    }\n\n    clearStaleWizardSendStatus();\n\n    try {\n      window.scrollTo({top:0, behavior:"smooth"});\n    } catch (error) {}\n\n    return true;\n  }\n\n  window.finishWizardSessionAfterSend = finishWizardSessionAfterSend;\n  console.info("受付セッション正常終了 v1 読込完了");\n})();\n'''
+
+          Path('app.js').write_text(app, encoding='utf-8')
+          Path('sales-stockin.js').write_text(sales, encoding='utf-8')
+          Path('index.html').write_text(index, encoding='utf-8')
+          Path('wizard-session.js').write_text(session, encoding='utf-8')
+          Path('wizard-session-finish-dev.js').unlink()
+
+          # Post-write safety checks. These deliberately fail before commit if anything is off.
+          app2 = Path('app.js').read_text(encoding='utf-8')
+          sales2 = Path('sales-stockin.js').read_text(encoding='utf-8')
+          index2 = Path('index.html').read_text(encoding='utf-8')
+          session2 = Path('wizard-session.js').read_text(encoding='utf-8')
+          assert app2.count('finishWizardSessionAfterSend(message)') == 1
+          assert app2.count('async function resumeWizardContinuousScan(message)') == 1
+          assert './wizard-session-finish-dev.js' not in sales2
+          assert sales2.count('./wizard-session.js?v=1') == 1
+          assert index2.count('./app.js?v=84') == 1
+          assert index2.count('./sales-stockin.js?v=155') == 1
+          assert session2.count('async function finishWizardSessionAfterSend(message)') == 1
+          assert not Path('wizard-session-finish-dev.js').exists()
+          print('Safe session refactor checks OK')
+          PY
+
+      - name: Show diff
+        run: git diff --check && git diff -- app.js wizard-session.js wizard-session-finish-dev.js sales-stockin.js index.html
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.js wizard-session.js wizard-session-finish-dev.js sales-stockin.js index.html
+          git commit -m "refactor: formalize wizard session completion"
+          git push
