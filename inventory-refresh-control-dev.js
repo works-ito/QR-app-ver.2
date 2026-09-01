@@ -1,9 +1,10 @@
 /*
- * 在庫データ自動更新制御 v91
+ * 在庫データ自動更新制御 v92
  *
  * 方針：
  * - 15分定期更新は停止する。
  * - バックグラウンドからの復帰時は、経過時間に関係なく現在状態を再取得する。
+ * - 復帰時は現在状態更新と全体同期を同時発射せず、現在状態を先に完了させる。
  * - 受付途中でも現在状態の軽量更新は許可する。
  * - 全体同期は受付UIを壊さない安全なタイミングだけ実行する。
  * - 全体同期が保留された場合は受付終了後に消化する。
@@ -123,25 +124,20 @@
 
     try {
       /*
-       * 復帰直後は受付中でも現在状態だけ更新する。
-       * 全体同期は安全な場合のみ並行して開始する。
+       * 復帰直後はまず現在状態だけ更新する。
+       * iPhone Safari からGASへ複数通信を同時発射しないため、
+       * 全体同期は現在状態更新が終わってから開始する。
        */
-      const currentStatePromise =
-        refreshCurrentState("バックグラウンド復帰");
+      await refreshCurrentState("バックグラウンド復帰");
 
-      let fullDataPromise = null;
-
-      if (isReceptionIdle()) {
-        fullDataPromise =
-          requestFullInventoryRefresh("バックグラウンド復帰");
-      } else {
-        pendingInventoryRefresh = true;
+      if (!isVisible()) {
+        return false;
       }
 
-      await currentStatePromise;
-
-      if (fullDataPromise) {
-        void fullDataPromise;
+      if (isReceptionIdle()) {
+        void requestFullInventoryRefresh("バックグラウンド復帰");
+      } else {
+        pendingInventoryRefresh = true;
       }
 
       return true;
@@ -226,7 +222,7 @@
     window.requestInventoryRefreshDev =
       requestFullInventoryRefresh;
 
-    console.info("開発版：在庫データ自動更新制御 v91 読込完了");
+    console.info("開発版：在庫データ自動更新制御 v92 読込完了");
   }
 
   if (document.readyState === "loading") {
