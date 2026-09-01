@@ -1,9 +1,10 @@
 /*
- * 在庫データ自動更新制御 v95
+ * 在庫データ自動更新制御 v96
  *
  * 方針：
  * - アプリが前面へ戻ったら、hidden記録の有無に依存せず現在状態を再取得する。
  * - visibilitychange / pageshow の重複発火は短時間ガードで1回にまとめる。
+ * - iOS復帰直後の通信層が安定するまで、ごく短時間だけ待ってから現在状態を取得する。
  * - 復帰時は現在状態更新と全体同期を同時発射せず、現在状態を先に完了させる。
  * - 復帰時の現在状態更新中は、画面上にも「在庫データ：更新中」を表示する。
  * - 受付途中でも現在状態の軽量更新は許可する。
@@ -19,6 +20,7 @@
 
   const PENDING_CHECK_MS = 2000;
   const FOREGROUND_DEDUP_MS = 1000;
+  const FOREGROUND_STABILIZE_MS = 500;
 
   let refreshHiddenAt = null;
   let pendingCheckTimer = null;
@@ -117,6 +119,12 @@
         emitInventoryDataStatusEvent("loading");
       }
 
+      await new Promise(function(resolve) {
+        setTimeout(resolve, FOREGROUND_STABILIZE_MS);
+      });
+
+      if (!isVisible()) return false;
+
       await refreshCurrentState("バックグラウンド復帰");
       if (!isVisible()) return false;
 
@@ -198,7 +206,7 @@
     window.runPendingInventoryRefreshAfterSession = runPendingInventoryRefreshAfterSession;
     window.requestInventoryRefreshDev = requestFullInventoryRefresh;
 
-    console.info("開発版：在庫データ自動更新制御 v95 読込完了");
+    console.info("開発版：在庫データ自動更新制御 v96 読込完了");
   }
 
   if (document.readyState === "loading") {
