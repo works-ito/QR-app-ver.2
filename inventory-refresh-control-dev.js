@@ -1,8 +1,7 @@
 /*
- * 在庫データ自動更新制御 v94
+ * 在庫データ自動更新制御 v95
  *
  * 方針：
- * - 15分定期更新は停止する。
  * - アプリが前面へ戻ったら、hidden記録の有無に依存せず現在状態を再取得する。
  * - visibilitychange / pageshow の重複発火は短時間ガードで1回にまとめる。
  * - 復帰時は現在状態更新と全体同期を同時発射せず、現在状態を先に完了させる。
@@ -71,14 +70,8 @@
     }
 
     console.log("現在状態更新開始", reason || "");
-
     const success = await loadCurrentStateData();
-
-    console.log(
-      success ? "現在状態更新完了" : "現在状態更新失敗",
-      reason || ""
-    );
-
+    console.log(success ? "現在状態更新完了" : "現在状態更新失敗", reason || "");
     return success;
   }
 
@@ -101,7 +94,6 @@
     }
 
     console.log("全体同期開始", reason || "");
-
     const success = await loadAppInitialData(false);
 
     if (!success) {
@@ -112,14 +104,12 @@
 
     pendingInventoryRefresh = false;
     console.log("全体同期完了", reason || "", new Date().toLocaleString());
-
     await refreshCurrentState("全体同期後の最終状態更新");
     return true;
   }
 
   async function runResumeRefresh() {
     if (resumeRefreshRunning || !isVisible()) return false;
-
     resumeRefreshRunning = true;
 
     try {
@@ -128,10 +118,7 @@
       }
 
       await refreshCurrentState("バックグラウンド復帰");
-
-      if (!isVisible()) {
-        return false;
-      }
+      if (!isVisible()) return false;
 
       if (isReceptionIdle()) {
         void requestFullInventoryRefresh("バックグラウンド復帰");
@@ -152,7 +139,6 @@
     const hiddenAt = refreshHiddenAt;
     refreshHiddenAt = null;
 
-    /* hidden時刻を取得できた場合だけ30分以上の完全リロード判定に使う */
     if (
       hiddenAt &&
       typeof AUTO_RELOAD_MINUTES !== "undefined" &&
@@ -161,10 +147,7 @@
       return;
     }
 
-    /* visibilitychange と pageshow が同じ復帰で続けて来ても1回だけ実行する */
-    if (now - lastForegroundRefreshAt < FOREGROUND_DEDUP_MS) {
-      return;
-    }
+    if (now - lastForegroundRefreshAt < FOREGROUND_DEDUP_MS) return;
 
     lastForegroundRefreshAt = now;
     void runResumeRefresh();
@@ -204,32 +187,18 @@
       if (!pendingInventoryRefresh) return;
       if (!isVisible()) return;
       if (!isReceptionIdle()) return;
-
       void requestFullInventoryRefresh("保留更新の再確認");
     }, PENDING_CHECK_MS);
   }
 
-  function stopLegacyScheduledRefresh() {
-    if (
-      typeof inventoryRefreshTimer !== "undefined" &&
-      inventoryRefreshTimer
-    ) {
-      clearInterval(inventoryRefreshTimer);
-      inventoryRefreshTimer = null;
-    }
-  }
-
   function install() {
-    stopLegacyScheduledRefresh();
     installVisibilityControl();
     startPendingChecker();
 
-    window.runPendingInventoryRefreshAfterSession =
-      runPendingInventoryRefreshAfterSession;
-    window.requestInventoryRefreshDev =
-      requestFullInventoryRefresh;
+    window.runPendingInventoryRefreshAfterSession = runPendingInventoryRefreshAfterSession;
+    window.requestInventoryRefreshDev = requestFullInventoryRefresh;
 
-    console.info("開発版：在庫データ自動更新制御 v94 読込完了");
+    console.info("開発版：在庫データ自動更新制御 v95 読込完了");
   }
 
   if (document.readyState === "loading") {
