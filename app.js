@@ -62,10 +62,8 @@ const PREVIOUS_SETTINGS_STORAGE_KEY =
     const RECENT_WORK_STORAGE_KEY =
       "qrInventoryRecentSuccessfulWorks";
     const RECENT_WORK_BLOCK_MS = 5 * 60 * 1000;
-    const DATA_REFRESH_MINUTES = 15;
     const AUTO_RELOAD_MINUTES = 30;
     const APP_VERSION_CHECK_MS = 10 * 1000;
-    let inventoryRefreshTimer = null;
     let appVersionCheckTimer = null;
     let currentAppVersion = null;
     let pendingAutoReload = false;
@@ -6395,74 +6393,6 @@ function reloadAppWithCacheBust() {
   window.location.replace(url.toString());
 }
 
-async function runScheduledInventoryRefresh() {
-  if (!canRefreshInventoryAutomatically()) {
-    console.log("在庫データ定期更新を保留しました");
-    return false;
-  }
-
-  console.log("在庫データ定期更新開始");
-
-  const success = await loadAppInitialData(false);
-
-  console.log(
-    success
-      ? "在庫データ定期更新完了"
-      : "在庫データ定期更新失敗",
-    new Date().toLocaleString()
-  );
-
-  return success;
-}
-
-function startInventoryRefreshTimer() {
-  if (inventoryRefreshTimer) {
-    clearInterval(inventoryRefreshTimer);
-  }
-
-  inventoryRefreshTimer = setInterval(
-    runScheduledInventoryRefresh,
-    DATA_REFRESH_MINUTES * 60 * 1000
-  );
-}
-
-async function checkAppVersion() {
-  try {
-    const response = await fetch(
-      "./version.json?t=" + Date.now(),
-      {cache:"no-store"}
-    );
-
-    if (!response.ok) {
-      throw new Error("HTTP " + response.status);
-    }
-
-    const data = await response.json();
-    const version = String(data.version || "").trim();
-
-    if (!version) {
-      throw new Error("versionが空です");
-    }
-
-    if (currentAppVersion === null) {
-      currentAppVersion = version;
-      return;
-    }
-
-    if (version !== currentAppVersion) {
-      currentAppVersion = version;
-      pendingAutoReload = true;
-    }
-
-    if (pendingAutoReload && isAutomaticReloadSafe()) {
-      pendingAutoReload = false;
-      reloadAppWithCacheBust();
-    }
-  } catch (error) {
-    console.warn("アプリ更新確認失敗", error);
-  }
-}
-
 function startAppVersionCheckTimer() {
   if (appVersionCheckTimer) {
     clearInterval(appVersionCheckTimer);
@@ -6504,5 +6434,4 @@ renderButtons();
 resetWizard();
 restoreLastSuccessfulSend();
 initializeInventoryDataFoundation();
-startInventoryRefreshTimer();
 startAppVersionCheckTimer();
