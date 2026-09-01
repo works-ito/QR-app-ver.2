@@ -13,75 +13,55 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
-      - name: Patch fetch retry handling safely
+      - name: Patch only inventory read fetches
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p = Path('app.js')
           s = p.read_text()
+          original = s
+          targets = ['action:"getCurrentStateData"', 'action:"getAppInitialData"']
 
-          # Only touch the two inventory-read fetch loops. Convert a rejected fetch
-          # into a retryable attempt while preserving the existing HTTP retry logic.
-          targets = [
-              'action:"getCurrentStateData"',
-              'action:"getAppInitialData"',
-          ]
-          for t in targets:
-              if s.count(t) != 1:
-                  raise SystemExit(f'expected exactly one {t}, found {s.count(t)}')
+          if s.count('async function fetchWithRetry(') != 1:
+              raise SystemExit('fetchWithRetry helper missing or duplicated')
 
-          # Find each target's enclosing two-attempt loop and wrap only its fetch call.
+          for target in targets:
+              if s.count(target) != 1:
+                  raise SystemExit(f'expected exactly one {target}, found {s.count(target)}')
+              pos = s.index(target)
+              fetch_pos = s.rfind('response = await fetch(', max(0, pos - 1200), pos)
+              if fetch_pos < 0:
+                  raise SystemExit(f'nearby inventory fetch not found for {target}')
+              between = s[fetch_pos:pos]
+              if 'fetchWithRetry(' in between:
+                  raise SystemExit(f'{target} already uses fetchWithRetry')
+              s = s[:fetch_pos] + s[fetch_pos:].replace(
+                  'response = await fetch(',
+                  'response = await fetchWithRetry(',
+                  1
+              )
+
+          if s == original:
+              raise SystemExit('no changes produced')
+          if s.count('response = await fetchWithRetry(') < 2:
+              raise SystemExit('expected two inventory fetchWithRetry calls')
           for target in targets:
               pos = s.index(target)
-              loop_start = s.rfind('for (let attempt = 0; attempt < 2; attempt += 1) {', 0, pos)
-              if loop_start < 0:
-                  raise SystemExit(f'retry loop not found for {target}')
-              loop_end = s.find('\n        }', pos)
-              if loop_end < 0:
-                  raise SystemExit(f'retry loop end not found for {target}')
-              block = s[loop_start:loop_end+10]
-              fetch_start = block.find('response = await fetch(')
-              if fetch_start < 0:
-                  raise SystemExit(f'fetch not found for {target}')
-              # Locate the fetch statement through its closing ');' after the target.
-              rel_target = block.index(target)
-              fetch_end = block.find('\n          );', rel_target)
-              if fetch_end < 0:
-                  raise SystemExit(f'fetch end not found for {target}')
-              fetch_end += len('\n          );')
-              fetch_stmt = block[fetch_start:fetch_end]
-              replacement = (
-                  'try {\n'
-                  '            ' + fetch_stmt.replace('\n', '\n            ') + '\n'
-                  '          } catch (fetchError) {\n'
-                  '            if (attempt >= 1) {\n'
-                  '              throw fetchError;\n'
-                  '            }\n'
-                  '            continue;\n'
-                  '          }'
-              )
-              new_block = block[:fetch_start] + replacement + block[fetch_end:]
-              s = s[:loop_start] + new_block + s[loop_end+10:]
-
-          # Safety assertions: both actions still unique; exactly two retry catches added.
-          if s.count('if (attempt >= 1) {\n              throw fetchError;') != 2:
-              raise SystemExit('retry catch assertion failed')
-          for t in targets:
-              if s.count(t) != 1:
-                  raise SystemExit(f'post-patch target count changed for {t}')
+              if s.rfind('response = await fetchWithRetry(', max(0, pos - 1200), pos) < 0:
+                  raise SystemExit(f'post-patch retry call missing for {target}')
 
           p.write_text(s)
           PY
-      - name: Syntax check
-        run: node --check app.js
-      - name: Show focused diff
-        run: git diff --check && git diff -- app.js
+      - name: Syntax and whitespace checks
+        run: |
+          node --check app.js
+          git diff --check
+      - name: Require exactly two focused replacements
+        run: |
+          test "$(git diff --numstat -- app.js | awk '{print $1+$2}')" = "4"
+          git diff -- app.js
       - name: Commit patch
         run: |
-          if git diff --quiet; then
-            echo 'No changes produced' >&2
-            exit 1
-          fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add app.js
