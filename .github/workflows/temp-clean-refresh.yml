@@ -19,34 +19,28 @@ jobs:
 
           p = Path('app.js')
           s = p.read_text()
-
           replacements = [
               (r'^\s*const DATA_REFRESH_MINUTES = 15;\n', '', 1, 'DATA_REFRESH_MINUTES'),
               (r'^\s*let inventoryRefreshTimer = null;\n', '', 1, 'inventoryRefreshTimer'),
               (r'\nasync function runScheduledInventoryRefresh\(\) \{.*?\n\}\n\nfunction startInventoryRefreshTimer\(\) \{.*?\n\}\n\n(?=function startAppVersionCheckTimer\(\))', '\n', 1, 'legacy refresh functions'),
               (r'^startInventoryRefreshTimer\(\);\n', '', 1, 'startup timer call'),
           ]
-
           for pattern, repl, expected, label in replacements:
-              s, n = re.subn(pattern, repl, s, count=expected, flags=re.M | re.S if 'functions' in label else re.M)
+              flags = re.M | (re.S if label == 'legacy refresh functions' else 0)
+              s, n = re.subn(pattern, repl, s, count=expected, flags=flags)
               if n != expected:
                   raise SystemExit(f'{label}: expected {expected} replacement, got {n}')
-
           for forbidden in ['DATA_REFRESH_MINUTES', 'inventoryRefreshTimer', 'runScheduledInventoryRefresh', 'startInventoryRefreshTimer']:
               if forbidden in s:
                   raise SystemExit(f'obsolete symbol remains: {forbidden}')
-
           p.write_text(s)
 
           p = Path('index.html')
           s = p.read_text()
-          old = s
-          s = s.replace('./app.js?v=82', './app.js?v=83')
-          s = s.replace('./sales-stockin.js?v=153', './sales-stockin.js?v=154')
-          if s == old:
-              raise SystemExit('index cache versions were not changed')
-          if './app.js?v=83' not in s or './sales-stockin.js?v=154' not in s:
-              raise SystemExit('expected cache versions missing')
+          s, n1 = re.subn(r'\./app\.js\?v=82', './app.js?v=83', s, count=1)
+          s, n2 = re.subn(r'\./sales-stockin\.js\?v=152', './sales-stockin.js?v=154', s, count=1)
+          if n1 != 1 or n2 != 1:
+              raise SystemExit(f'cache bump count app={n1} sales={n2}')
           p.write_text(s)
           PY
       - name: Commit cleanup
