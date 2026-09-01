@@ -1,0 +1,26 @@
+name: Temporary sales cache bump 151
+on:
+  push:
+    paths:
+      - '.github/workflows/temp-bump-sales151.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Bump sales loader cache
+        run: |
+          sed -i 's#./sales-stockin.js?v=150#./sales-stockin.js?v=151#' index.html
+          grep -q './sales-stockin.js?v=151' index.html
+      - name: Commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git diff --cached --quiet && exit 0
+          git commit -m 'chore: bump sales bootstrap cache to 151'
+          git push origin main
