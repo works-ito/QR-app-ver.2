@@ -3582,6 +3582,12 @@ function changePreviousSettings() {
     }
 
     async function resumeWizardContinuousScan(message) {
+      if (
+        typeof finishWizardSessionAfterSend === "function" &&
+        await finishWizardSessionAfterSend(message)
+      ) {
+        return;
+      }
       wizardPostSendContext = null;
       wizardSelectedPhotos = [];
       wizardCurrentSlipInfo = null;
