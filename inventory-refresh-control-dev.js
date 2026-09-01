@@ -1,27 +1,30 @@
 /*
- * 在庫データ自動更新制御 v93
+ * 在庫データ自動更新制御 v94
  *
  * 方針：
  * - 15分定期更新は停止する。
- * - バックグラウンドからの復帰時は、経過時間に関係なく現在状態を再取得する。
+ * - アプリが前面へ戻ったら、hidden記録の有無に依存せず現在状態を再取得する。
+ * - visibilitychange / pageshow の重複発火は短時間ガードで1回にまとめる。
  * - 復帰時は現在状態更新と全体同期を同時発射せず、現在状態を先に完了させる。
  * - 復帰時の現在状態更新中は、画面上にも「在庫データ：更新中」を表示する。
  * - 受付途中でも現在状態の軽量更新は許可する。
  * - 全体同期は受付UIを壊さない安全なタイミングだけ実行する。
  * - 全体同期が保留された場合は受付終了後に消化する。
  * - 全体同期完了後は現在状態をもう一度取得し、状態の巻き戻りを防ぐ。
- * - 30分以上の復帰は app.js の完全リロード処理へ任せる。
+ * - hidden時刻を取得できていて30分以上経過した場合だけ app.js の完全リロード処理へ任せる。
  *
- * GASは変更しない。
+ * GASは変更しない。既存関数のwrapper/monkey-patchは行わない。
  */
 (function() {
   "use strict";
 
   const PENDING_CHECK_MS = 2000;
+  const FOREGROUND_DEDUP_MS = 1000;
 
   let refreshHiddenAt = null;
   let pendingCheckTimer = null;
   let resumeRefreshRunning = false;
+  let lastForegroundRefreshAt = 0;
 
   function isVisible() {
     return document.visibilityState === "visible";
@@ -110,10 +113,6 @@
     pendingInventoryRefresh = false;
     console.log("全体同期完了", reason || "", new Date().toLocaleString());
 
-    /*
-     * 全体同期で個体・簡易個体の配列が置き換わるため、
-     * 最後に軽量な現在状態を重ねて状態を最新化する。
-     */
     await refreshCurrentState("全体同期後の最終状態更新");
     return true;
   }
@@ -124,21 +123,10 @@
     resumeRefreshRunning = true;
 
     try {
-      /*
-       * 復帰したことが利用者にも分かるよう、
-       * 軽量な現在状態更新を始める直前に更新中表示へ切り替える。
-       * loadCurrentStateData() 成功時の inventorydata:ready で
-       * 更新時刻表示へ自動的に戻る。
-       */
       if (typeof emitInventoryDataStatusEvent === "function") {
         emitInventoryDataStatusEvent("loading");
       }
 
-      /*
-       * 復帰直後はまず現在状態だけ更新する。
-       * iPhone Safari からGASへ複数通信を同時発射しないため、
-       * 全体同期は現在状態更新が終わってから開始する。
-       */
       await refreshCurrentState("バックグラウンド復帰");
 
       if (!isVisible()) {
@@ -157,20 +145,28 @@
     }
   }
 
-  function handleVisibleReturn() {
-    if (!refreshHiddenAt) return;
+  function handleForegroundReturn() {
+    if (!isVisible()) return;
 
-    const awayMs = Date.now() - refreshHiddenAt;
+    const now = Date.now();
+    const hiddenAt = refreshHiddenAt;
     refreshHiddenAt = null;
 
-    /* 30分以上は既存 app.js の完全リロード処理を優先する */
+    /* hidden時刻を取得できた場合だけ30分以上の完全リロード判定に使う */
     if (
+      hiddenAt &&
       typeof AUTO_RELOAD_MINUTES !== "undefined" &&
-      awayMs >= AUTO_RELOAD_MINUTES * 60 * 1000
+      now - hiddenAt >= AUTO_RELOAD_MINUTES * 60 * 1000
     ) {
       return;
     }
 
+    /* visibilitychange と pageshow が同じ復帰で続けて来ても1回だけ実行する */
+    if (now - lastForegroundRefreshAt < FOREGROUND_DEDUP_MS) {
+      return;
+    }
+
+    lastForegroundRefreshAt = now;
     void runResumeRefresh();
   }
 
@@ -182,13 +178,13 @@
       }
 
       if (document.visibilityState === "visible") {
-        handleVisibleReturn();
+        handleForegroundReturn();
       }
     });
 
     window.addEventListener("pageshow", function() {
       if (document.visibilityState === "visible") {
-        handleVisibleReturn();
+        handleForegroundReturn();
       }
     });
   }
@@ -233,7 +229,7 @@
     window.requestInventoryRefreshDev =
       requestFullInventoryRefresh;
 
-    console.info("開発版：在庫データ自動更新制御 v93 読込完了");
+    console.info("開発版：在庫データ自動更新制御 v94 読込完了");
   }
 
   if (document.readyState === "loading") {
