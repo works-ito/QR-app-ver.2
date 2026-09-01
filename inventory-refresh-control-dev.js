@@ -1,10 +1,11 @@
 /*
- * 在庫データ自動更新制御 v92
+ * 在庫データ自動更新制御 v93
  *
  * 方針：
  * - 15分定期更新は停止する。
  * - バックグラウンドからの復帰時は、経過時間に関係なく現在状態を再取得する。
  * - 復帰時は現在状態更新と全体同期を同時発射せず、現在状態を先に完了させる。
+ * - 復帰時の現在状態更新中は、画面上にも「在庫データ：更新中」を表示する。
  * - 受付途中でも現在状態の軽量更新は許可する。
  * - 全体同期は受付UIを壊さない安全なタイミングだけ実行する。
  * - 全体同期が保留された場合は受付終了後に消化する。
@@ -124,6 +125,16 @@
 
     try {
       /*
+       * 復帰したことが利用者にも分かるよう、
+       * 軽量な現在状態更新を始める直前に更新中表示へ切り替える。
+       * loadCurrentStateData() 成功時の inventorydata:ready で
+       * 更新時刻表示へ自動的に戻る。
+       */
+      if (typeof emitInventoryDataStatusEvent === "function") {
+        emitInventoryDataStatusEvent("loading");
+      }
+
+      /*
        * 復帰直後はまず現在状態だけ更新する。
        * iPhone Safari からGASへ複数通信を同時発射しないため、
        * 全体同期は現在状態更新が終わってから開始する。
@@ -222,7 +233,7 @@
     window.requestInventoryRefreshDev =
       requestFullInventoryRefresh;
 
-    console.info("開発版：在庫データ自動更新制御 v92 読込完了");
+    console.info("開発版：在庫データ自動更新制御 v93 読込完了");
   }
 
   if (document.readyState === "loading") {
