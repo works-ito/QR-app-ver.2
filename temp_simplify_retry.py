@@ -2,7 +2,7 @@ from pathlib import Path
 p=Path('app.js')
 s=p.read_text()
 
-def replace_loop(text, marker, delay):
+def replace_loop(text, marker, delay, replacement_marker):
     marker_pos=text.index(marker)
     start=text.rfind('        for (\n',0,marker_pos)
     if start<0: raise SystemExit('loop start not found for '+marker)
@@ -21,17 +21,17 @@ def replace_loop(text, marker, delay):
     fetch_block=block[fetch_start:fetch_end]
     fetch_block=fetch_block.replace('          response =','        response =',1)
     fetch_block=fetch_block.replace('            GAS_URL +','          GAS_URL +',1)
-    if marker=='"&stateAttempt=" + attempt':
-        fetch_block=fetch_block.replace('              "&stateAttempt=" + attempt','            "&stateRequest=1"',1)
-    else:
-        fetch_block=fetch_block.replace('              "&attempt=" + attempt','            "&fullRequest=1"',1)
+    marker_line_start=fetch_block.rfind('\n',0,fetch_block.index(marker))+1
+    marker_line_end=fetch_block.index(',',fetch_block.index(marker))+1
+    old_line=fetch_block[marker_line_start:marker_line_end]
+    fetch_block=fetch_block.replace(old_line,'            "&'+replacement_marker+'=1",',1)
     fetch_block=fetch_block.replace('\n            {','\n          {',1)
     fetch_block=fetch_block.replace('\n          );','\n        );',1)
     replacement=fetch_block+'\n\n        responseText =\n          await response.text();'
     return text[:start]+replacement+text[end:]
 
-s=replace_loop(s,'"&stateAttempt=" + attempt',700)
-s=replace_loop(s,'"&attempt=" + attempt',1000)
+s=replace_loop(s,'&stateAttempt=',700,'stateRequest')
+s=replace_loop(s,'&attempt=',1000,'fullRequest')
 if 'attempt <= 2;' in s: raise SystemExit('outer retry remains')
 if s.count('&stateRequest=1')!=1 or s.count('&fullRequest=1')!=1: raise SystemExit('request markers mismatch')
 p.write_text(s)
