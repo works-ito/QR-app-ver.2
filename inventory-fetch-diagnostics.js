@@ -1,5 +1,5 @@
 /*
- * 在庫通信診断 v3（一時調査用）
+ * 在庫通信診断 v4（一時調査用）
  *
  * - 在庫通信だけを観測し、挙動は変更しない。
  * - 診断ログは localStorage に直近50件だけ保存する。
@@ -175,10 +175,11 @@
 
   function showDiagnostics() {
     const entries = readEntries();
-    const text = entries.length
-      ? entries.map(formatEntry).join("\n")
+    const latestEntries = entries.slice(-20).reverse();
+    const text = latestEntries.length
+      ? latestEntries.map(formatEntry).join("\n")
       : "診断ログはまだありません";
-    alert("在庫通信診断（保存上限50イベント）\n\n" + text);
+    alert("在庫通信診断（最新20件 / 保存上限50件）\n\n" + text);
   }
 
   function installTripleTap() {
@@ -234,5 +235,5 @@
     installTripleTap();
   }
 
-  console.info("在庫通信診断 v3 読込完了（日時3回タップで表示）");
+  console.info("在庫通信診断 v4 読込完了（日時3回タップで表示）");
 })();
