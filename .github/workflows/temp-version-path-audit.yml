@@ -15,14 +15,13 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           s=Path('app.js').read_text()
-          keys=['function reloadAppWithCacheBust','async function checkAppVersion','function startAppVersionCheckTimer','startAppVersionCheckTimer();','initializeInventoryDataFoundation();']
           lines=s.splitlines()
-          for key in keys:
+          for key in ['checkAppVersion','currentAppVersion','pendingAutoReload','reloadAppWithCacheBust']:
               print('\n###', key)
               hits=[i for i,l in enumerate(lines) if key in l]
               print('hits', [i+1 for i in hits])
               for i in hits:
-                  a=max(0,i-8); b=min(len(lines),i+45)
+                  a=max(0,i-12); b=min(len(lines),i+28)
                   for n in range(a,b): print(f'{n+1}: {lines[n]}')
                   print('---')
           print('\n### version.json')
