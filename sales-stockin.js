@@ -1,4 +1,4 @@
-/* 販売品入庫受付 v160 bootstrap */
+/* 販売品入庫受付 v161 bootstrap */
 (function() {
   function loadScript(src) {
     return new Promise(function(resolve, reject) {
@@ -33,7 +33,7 @@
     .then(function() { return loadScript("./quantity-transfer-dev.js?v=96"); })
     .then(function() { return loadScript("./mode-description-hint-dev.js?v=37"); })
     .then(function() { return loadScript("./wizard-session.js?v=2"); })
-    .then(function() { return loadScript("./inventory-refresh-control-dev.js?v=97"); })
+    .then(function() { return loadScript("./inventory-refresh-control.js?v=1"); })
     .catch(function(error) {
       console.error("開発版追加処理の初期化に失敗しました", error);
     });
