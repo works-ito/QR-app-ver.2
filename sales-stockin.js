@@ -19,7 +19,7 @@
     .then(function() { return loadScript("./sales-stockin-scan-enhancements.js?v=33"); })
     .then(function() { return loadScript("./sales-stockin-guards.js?v=33"); })
     .then(function() { return loadScript("./compact-scanner-dev.js?v=53"); })
-    .then(function() { return loadScript("./irregular-master-picker-dev.js?v=71"); })
+    .then(function() { return loadScript("./irregular-master-picker-dev.js?v=72"); })
     .then(function() { return loadScript("./irregular-entry-simplify-dev.js?v=77"); })
     .then(function() { return loadScript("./irregular-category-ui-tuning-dev.js?v=64"); })
     .then(function() { return loadScript("./irregular-simple-id-alias-dev.js?v=42"); })
@@ -33,7 +33,7 @@
     .then(function() { return loadScript("./normal-master-entry-test-dev.js?v=11"); })
     .then(function() { return loadScript("./quantity-transfer-dev.js?v=96"); })
     .then(function() { return loadScript("./mode-description-hint-dev.js?v=37"); })
-    .then(function() { return loadScript("./wizard-session.js?v=1"); })
+    .then(function() { return loadScript("./wizard-session.js?v=2"); })
     .then(function() { return loadScript("./inventory-refresh-control-dev.js?v=96"); })
     .catch(function(error) {
       console.error("開発版追加処理の初期化に失敗しました", error);
