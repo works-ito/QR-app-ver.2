@@ -5529,16 +5529,11 @@ function changePreviousSettings() {
         let response = null;
         let responseText = "";
 
-        for (
-          let attempt = 1;
-          attempt <= 2;
-          attempt++
-        ) {
-          response = await fetchWithRetry(
-            GAS_URL +
-              "?t=" + Date.now() +
-              "&stateAttempt=" + attempt,
-            {
+        response = await fetchWithRetry(
+          GAS_URL +
+            "?t=" + Date.now() +
+            "&stateRequest=1",
+          {
               method:"POST",
               headers:{
                 "Content-Type":"text/plain"
@@ -5548,21 +5543,10 @@ function changePreviousSettings() {
                 action:"getCurrentStateData"
               })
             }
-          );
+        );
 
-          responseText =
-            await response.text();
-
-          if (response.ok) break;
-
-          if (attempt === 1) {
-            await new Promise(
-              function(resolve) {
-                setTimeout(resolve, 700);
-              }
-            );
-          }
-        }
+        responseText =
+          await response.text();
 
         let result = null;
 
@@ -5649,16 +5633,11 @@ function changePreviousSettings() {
         let response = null;
         let responseText = "";
 
-        for (
-          let attempt = 1;
-          attempt <= 2;
-          attempt++
-        ) {
-          response = await fetchWithRetry(
-            GAS_URL +
-              "?t=" + Date.now() +
-              "&attempt=" + attempt,
-            {
+        response = await fetchWithRetry(
+          GAS_URL +
+            "?t=" + Date.now() +
+            "&fullRequest=1",
+          {
               method:"POST",
               headers:{
                 "Content-Type":"text/plain"
@@ -5679,21 +5658,10 @@ function changePreviousSettings() {
                     : ""
               })
             }
-          );
+        );
 
-          responseText =
-            await response.text();
-
-          if (response.ok) break;
-
-          if (attempt === 1) {
-            await new Promise(
-              function(resolve) {
-                setTimeout(resolve, 1000);
-              }
-            );
-          }
-        }
+        responseText =
+          await response.text();
 
         let result = null;
 
