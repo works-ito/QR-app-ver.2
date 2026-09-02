@@ -1,0 +1,50 @@
+name: Temporary early diagnostics loading
+on:
+  push:
+    paths:
+      - '.github/workflows/temp-diagnostics-early-load.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Move diagnostics before app startup
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          sales = Path('sales-stockin.js').read_text()
+          assert '/* 販売品入庫受付 v159 bootstrap */' in sales
+          assert 'inventory-fetch-diagnostics.js' not in sales
+
+          index = Path('index.html')
+          s = index.read_text()
+          old_block = '''  <script src="./manual-refresh-ui-dev.js?v=103"></script>\n  <script src="./app.js?v=85"></script>'''
+          new_block = '''  <script src="./manual-refresh-ui-dev.js?v=103"></script>\n  <script src="./inventory-fetch-diagnostics.js?v=2"></script>\n  <script src="./app.js?v=85"></script>'''
+          if s.count(old_block) != 1:
+              raise SystemExit(f'app loader block mismatch: {s.count(old_block)}')
+          s = s.replace(old_block, new_block, 1)
+
+          old_sales = '<script src="./sales-stockin.js?v=158"></script>'
+          new_sales = '<script src="./sales-stockin.js?v=159"></script>'
+          if s.count(old_sales) != 1:
+              raise SystemExit(f'sales loader mismatch: {s.count(old_sales)}')
+          s = s.replace(old_sales, new_sales, 1)
+          index.write_text(s)
+          PY
+          node --check sales-stockin.js
+          node --check inventory-fetch-diagnostics.js
+          git diff --check
+          grep -n -A3 -B1 'inventory-fetch-diagnostics.js?v=2' index.html
+          grep -F 'sales-stockin.js?v=159' index.html
+      - name: Commit early diagnostics loading
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git commit -m 'chore: load inventory diagnostics before app startup'
+          git push origin HEAD:main
