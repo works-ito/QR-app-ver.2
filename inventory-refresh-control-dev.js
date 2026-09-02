@@ -1,19 +1,21 @@
 /*
- * 在庫データ自動更新制御 v96
+ * 在庫データ自動更新制御 v97
  *
  * 方針：
  * - アプリが前面へ戻ったら、hidden記録の有無に依存せず現在状態を再取得する。
  * - visibilitychange / pageshow の重複発火は短時間ガードで1回にまとめる。
  * - iOS復帰直後の通信層が安定するまで、ごく短時間だけ待ってから現在状態を取得する。
  * - 復帰時は現在状態更新と全体同期を同時発射せず、現在状態を先に完了させる。
- * - 復帰時の現在状態更新中は、画面上にも「在庫データ：更新中」を表示する。
  * - 受付途中でも現在状態の軽量更新は許可する。
  * - 全体同期は受付UIを壊さない安全なタイミングだけ実行する。
- * - 全体同期が保留された場合は受付終了後に消化する。
+ * - 「受付中/hidden/既存同期中による保留」と「通信失敗」を分離する。
+ * - 同じ制御内からの全体同期要求は1本のPromiseへ集約し、重複発射しない。
+ * - 通信失敗を2秒タイマーで無限に再試行しない。
  * - 全体同期完了後は現在状態をもう一度取得し、状態の巻き戻りを防ぐ。
  * - hidden時刻を取得できていて30分以上経過した場合だけ app.js の完全リロード処理へ任せる。
  *
- * GASは変更しない。既存関数のwrapper/monkey-patchは行わない。
+ * GASとapp.jsのデータ取得関数は変更しない。
+ * 既存関数のwrapper/monkey-patchは行わない。
  */
 (function() {
   "use strict";
@@ -25,6 +27,7 @@
   let refreshHiddenAt = null;
   let pendingCheckTimer = null;
   let resumeRefreshRunning = false;
+  let fullRefreshPromise = null;
   let lastForegroundRefreshAt = 0;
 
   function isVisible() {
@@ -77,29 +80,22 @@
     return success;
   }
 
-  async function requestFullInventoryRefresh(reason) {
-    if (!isVisible()) {
-      pendingInventoryRefresh = true;
-      return false;
-    }
+  function deferFullRefresh(reason) {
+    pendingInventoryRefresh = true;
+    console.log("全体同期を保留", reason || "");
+    return false;
+  }
 
-    if (!isReceptionIdle()) {
-      pendingInventoryRefresh = true;
-      console.log("全体同期を保留：受付処理中", reason || "");
-      return false;
-    }
-
-    if (typeof loadAppInitialData !== "function") {
-      pendingInventoryRefresh = true;
-      console.warn("全体同期関数を確認できません");
-      return false;
-    }
-
+  async function runFullInventoryRefresh(reason) {
     console.log("全体同期開始", reason || "");
     const success = await loadAppInitialData(false);
 
     if (!success) {
-      pendingInventoryRefresh = true;
+      /*
+       * app.js側の通信失敗は、ここでは保留扱いにしない。
+       * 以前はpending=trueにして2秒ごとに再試行していたため、
+       * 長時間のLoad failed後に別の全体同期が自動発射されていた。
+       */
       console.warn("全体同期失敗", reason || "");
       return false;
     }
@@ -108,6 +104,49 @@
     console.log("全体同期完了", reason || "", new Date().toLocaleString());
     await refreshCurrentState("全体同期後の最終状態更新");
     return true;
+  }
+
+  async function requestFullInventoryRefresh(reason) {
+    if (!isVisible()) {
+      return deferFullRefresh("画面非表示：" + (reason || ""));
+    }
+
+    if (!isReceptionIdle()) {
+      return deferFullRefresh("受付処理中：" + (reason || ""));
+    }
+
+    if (typeof loadAppInitialData !== "function") {
+      console.warn("全体同期関数を確認できません");
+      return false;
+    }
+
+    /*
+     * app.js側ですでに全体同期が走っている場合は「失敗」ではない。
+     * その通信が終わった後に必要ならpending checkerが1回だけ拾えるよう、
+     * 保留として扱う。
+     */
+    if (
+      typeof appInitialDataLoading !== "undefined" &&
+      appInitialDataLoading
+    ) {
+      return deferFullRefresh("既存の全体同期を待機：" + (reason || ""));
+    }
+
+    /*
+     * このコントローラ自身から同時に要求された場合は、
+     * 新しい通信を作らず既存Promiseを共有する。
+     */
+    if (fullRefreshPromise) {
+      console.log("既存の全体同期を共有", reason || "");
+      return fullRefreshPromise;
+    }
+
+    fullRefreshPromise = runFullInventoryRefresh(reason)
+      .finally(function() {
+        fullRefreshPromise = null;
+      });
+
+    return fullRefreshPromise;
   }
 
   async function runResumeRefresh() {
@@ -131,7 +170,7 @@
       if (isReceptionIdle()) {
         void requestFullInventoryRefresh("バックグラウンド復帰");
       } else {
-        pendingInventoryRefresh = true;
+        deferFullRefresh("バックグラウンド復帰時に受付処理中");
       }
 
       return true;
@@ -195,6 +234,19 @@
       if (!pendingInventoryRefresh) return;
       if (!isVisible()) return;
       if (!isReceptionIdle()) return;
+      if (fullRefreshPromise) return;
+      if (
+        typeof appInitialDataLoading !== "undefined" &&
+        appInitialDataLoading
+      ) {
+        return;
+      }
+
+      /*
+       * pendingは通信失敗ではなく「実行できるまで保留」の意味だけにする。
+       * 実行開始前に消費し、失敗しても2秒ループへ戻さない。
+       */
+      pendingInventoryRefresh = false;
       void requestFullInventoryRefresh("保留更新の再確認");
     }, PENDING_CHECK_MS);
   }
@@ -206,7 +258,7 @@
     window.runPendingInventoryRefreshAfterSession = runPendingInventoryRefreshAfterSession;
     window.requestInventoryRefreshDev = requestFullInventoryRefresh;
 
-    console.info("開発版：在庫データ自動更新制御 v96 読込完了");
+    console.info("開発版：在庫データ自動更新制御 v97 読込完了");
   }
 
   if (document.readyState === "loading") {
