@@ -1,5 +1,5 @@
 /*
- * イレギュラー受付：マスタ選択UI（開発版 v71）
+ * イレギュラー受付：マスタ選択UI（開発版 v72）
  *
  * GAS・既存送信処理は変更しない。
  * 管理番号候補は「簡易個体 → 個体 → REC → 軽量マスタ」の順で現在状態を優先し、
@@ -19,19 +19,23 @@
     "保安機材","販売品"
   ];
 
-  let pickerState = {
-    category:"",
-    item:null,
-    itemRows:[],
-    itemPage:0,
-    pending:null,
-    selectedManaged:new Map(),
-    managedRows:[],
-    managedPage:0,
-    quantityCheckoutCandidates:[],
-    selectedQuantityCheckout:null,
-    queue:[]
-  };
+  function createEmptyPickerState() {
+    return {
+      category:"",
+      item:null,
+      itemRows:[],
+      itemPage:0,
+      pending:null,
+      selectedManaged:new Map(),
+      managedRows:[],
+      managedPage:0,
+      quantityCheckoutCandidates:[],
+      selectedQuantityCheckout:null,
+      queue:[]
+    };
+  }
+
+  let pickerState = createEmptyPickerState();
 
   function value(item, keys) {
     if (!item) return "";
@@ -935,6 +939,35 @@
     pickerState.managedPage = 0;
     clearManagedSelection();
   }
+
+  function resetPickerSession() {
+    pickerState = createEmptyPickerState();
+
+    const targetPanel = panel();
+    if (targetPanel) targetPanel.hidden = true;
+
+    clearManagedSelection();
+    setCategoryBadge("");
+    notice("");
+    renderQueue();
+
+    const quantityInput = document.getElementById("irregularMasterQuantityValue");
+    if (quantityInput) {
+      quantityInput.value = "";
+      quantityInput.removeAttribute("max");
+    }
+
+    const checkoutSelect = document.getElementById("irregularMasterQuantityCheckoutSelect");
+    if (checkoutSelect) checkoutSelect.replaceChildren();
+
+    const checkoutStatus = document.getElementById("irregularMasterQuantityCheckoutStatus");
+    if (checkoutStatus) checkoutStatus.textContent = "";
+
+    const checkoutBox = document.getElementById("irregularMasterQuantityCheckout");
+    if (checkoutBox) checkoutBox.hidden = true;
+  }
+
+  window.resetIrregularMasterPickerSession = resetPickerSession;
 
   function resetPickerForNextItem() {
     renderCategories();
