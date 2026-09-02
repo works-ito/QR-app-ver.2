@@ -1,0 +1,83 @@
+name: Temporary diagnostics caller tracing
+on:
+  push:
+    paths:
+      - '.github/workflows/temp-diagnostics-source.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Add caller source to temporary diagnostics
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('inventory-fetch-diagnostics.js')
+          s = p.read_text()
+          old_header = ' * 在庫通信診断 v1（一時調査用）'
+          if s.count(old_header) != 1:
+              raise SystemExit('diagnostics v1 header not found exactly once')
+          s = s.replace(old_header, ' * 在庫通信診断 v2（一時調査用）', 1)
+
+          marker = '''  function installFetchObserver() {\n'''
+          helper = '''  function detectCallerSource() {\n    try {\n      const stack = String(new Error().stack || "");\n      if (stack.includes("initializeInventoryDataFoundation")) return "startup";\n      if (stack.includes("refreshInventoryInBackground")) return "post-send-refresh";\n      if (stack.includes("requestFullInventoryRefresh")) return "controller-full-sync";\n      if (stack.includes("refreshCurrentState")) return "controller-current-state";\n      if (stack.includes("loadCurrentStateData")) return "current-state-direct";\n      if (stack.includes("loadAppInitialData")) return "full-sync-direct";\n      return "unknown";\n    } catch (error) {\n      return "unknown";\n    }\n  }\n\n'''
+          if s.count(marker) != 1:
+              raise SystemExit('installFetchObserver marker mismatch')
+          s = s.replace(marker, helper + marker, 1)
+
+          old_base = '''        sinceForegroundMs:Math.max(0, startedWall - lastForegroundAt)\n      };'''
+          new_base = '''        sinceForegroundMs:Math.max(0, startedWall - lastForegroundAt),\n        source:detectCallerSource()\n      };'''
+          if s.count(old_base) != 1:
+              raise SystemExit('base marker mismatch')
+          s = s.replace(old_base, new_base, 1)
+
+          old_format = '''    if (Number.isFinite(entry.sinceForegroundMs)) text += " foreground+" + entry.sinceForegroundMs + "ms";\n    text += " " + (entry.visibility || "");'''
+          new_format = '''    if (Number.isFinite(entry.sinceForegroundMs)) text += " foreground+" + entry.sinceForegroundMs + "ms";\n    if (entry.source) text += " source=" + entry.source;\n    text += " " + (entry.visibility || "");'''
+          if s.count(old_format) != 1:
+              raise SystemExit('format marker mismatch')
+          s = s.replace(old_format, new_format, 1)
+
+          old_info = '  console.info("在庫通信診断 v1 読込完了（日時3回タップで表示）");'
+          new_info = '  console.info("在庫通信診断 v2 読込完了（日時3回タップで表示）");'
+          if s.count(old_info) != 1:
+              raise SystemExit('diagnostics console marker mismatch')
+          s = s.replace(old_info, new_info, 1)
+          p.write_text(s)
+
+          sales = Path('sales-stockin.js')
+          ss = sales.read_text()
+          if '/* 販売品入庫受付 v157 bootstrap */' not in ss:
+              raise SystemExit('sales v157 header missing')
+          if ss.count('loadScript("./inventory-fetch-diagnostics.js?v=1")') != 1:
+              raise SystemExit('diagnostics loader v1 mismatch')
+          ss = ss.replace('/* 販売品入庫受付 v157 bootstrap */', '/* 販売品入庫受付 v158 bootstrap */', 1)
+          ss = ss.replace('loadScript("./inventory-fetch-diagnostics.js?v=1")', 'loadScript("./inventory-fetch-diagnostics.js?v=2")', 1)
+          sales.write_text(ss)
+
+          index = Path('index.html')
+          ix = index.read_text()
+          old = '<script src="./sales-stockin.js?v=157"></script>'
+          new = '<script src="./sales-stockin.js?v=158"></script>'
+          if ix.count(old) != 1:
+              raise SystemExit('index sales v157 loader mismatch')
+          index.write_text(ix.replace(old, new, 1))
+          PY
+
+          node --check inventory-fetch-diagnostics.js
+          node --check sales-stockin.js
+          git diff --check
+          grep -F 'source:detectCallerSource()' inventory-fetch-diagnostics.js
+          grep -F 'inventory-fetch-diagnostics.js?v=2' sales-stockin.js
+          grep -F 'sales-stockin.js?v=158' index.html
+      - name: Commit diagnostics caller tracing
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add inventory-fetch-diagnostics.js sales-stockin.js index.html
+          git commit -m 'chore: trace inventory refresh caller source'
+          git push origin HEAD:main
