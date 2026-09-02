@@ -1,5 +1,5 @@
 /*
- * 在庫通信診断 v1（一時調査用）
+ * 在庫通信診断 v2（一時調査用）
  *
  * - fetchWithRetry の通信だけを観測し、挙動は変更しない。
  * - 診断ログは localStorage に直近50件だけ保存する。
@@ -50,6 +50,21 @@
     return "other";
   }
 
+  function detectCallerSource() {
+    try {
+      const stack = String(new Error().stack || "");
+      if (stack.includes("initializeInventoryDataFoundation")) return "startup";
+      if (stack.includes("refreshInventoryInBackground")) return "post-send-refresh";
+      if (stack.includes("requestFullInventoryRefresh")) return "controller-full-sync";
+      if (stack.includes("refreshCurrentState")) return "controller-current-state";
+      if (stack.includes("loadCurrentStateData")) return "current-state-direct";
+      if (stack.includes("loadAppInitialData")) return "full-sync-direct";
+      return "unknown";
+    } catch (error) {
+      return "unknown";
+    }
+  }
+
   function installFetchObserver() {
     if (typeof window.fetch !== "function" || window.fetch.__inventoryDiagnosticsWrapped) return;
 
@@ -67,7 +82,8 @@
         time: nowIso(),
         type:type,
         visibility:document.visibilityState,
-        sinceForegroundMs:Math.max(0, startedWall - lastForegroundAt)
+        sinceForegroundMs:Math.max(0, startedWall - lastForegroundAt),
+        source:detectCallerSource()
       };
 
       writeEntry(Object.assign({}, base, {event:"start"}));
@@ -115,6 +131,7 @@
     if (Number.isFinite(entry.status)) text += " HTTP " + entry.status;
     if (entry.message) text += " " + entry.message;
     if (Number.isFinite(entry.sinceForegroundMs)) text += " foreground+" + entry.sinceForegroundMs + "ms";
+    if (entry.source) text += " source=" + entry.source;
     text += " " + (entry.visibility || "");
     return text;
   }
@@ -164,5 +181,5 @@
     installTripleTap();
   }
 
-  console.info("在庫通信診断 v1 読込完了（日時3回タップで表示）");
+  console.info("在庫通信診断 v2 読込完了（日時3回タップで表示）");
 })();

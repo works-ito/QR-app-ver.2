@@ -1,4 +1,4 @@
-/* 販売品入庫受付 v157 bootstrap */
+/* 販売品入庫受付 v158 bootstrap */
 (function() {
   function loadScript(src) {
     return new Promise(function(resolve, reject) {
@@ -12,7 +12,7 @@
     });
   }
 
-  loadScript("./inventory-fetch-diagnostics.js?v=1")
+  loadScript("./inventory-fetch-diagnostics.js?v=2")
     .then(function() { return loadScript("https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.3/dist/iife/reader/index.js"); })
     .then(function() { return loadScript("./scanner-zxing-wasm-dev.js?v=50"); })
     .then(function() { return loadScript("./sales-stockin-core.js?v=33"); })
