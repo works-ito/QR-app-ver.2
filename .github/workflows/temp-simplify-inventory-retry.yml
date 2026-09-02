@@ -3,45 +3,14 @@ on:
   push:
     paths:
       - '.github/workflows/temp-simplify-inventory-retry.yml'
-  workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
 jobs:
-  patch:
+  inspect:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Patch retry structure and app loader
+      - name: Show retry call sites
         run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          app = Path('app.js')
-          s = app.read_text()
-          old = 'async function fetchWithRetry(url, options, retryCount = 1, retryDelayMs = 1200) {'
-          new = 'async function fetchWithRetry(url, options, retryCount = 0, retryDelayMs = 1200) {'
-          if s.count(old) != 1:
-              raise SystemExit(f'fetchWithRetry definition mismatch: {s.count(old)}')
-          if s.count('fetchWithRetry(') != 3:
-              raise SystemExit(f'unexpected fetchWithRetry call count: {s.count("fetchWithRetry(")}')
-          if s.count('attempt <= 2;') != 2:
-              raise SystemExit(f'unexpected inventory outer retry count: {s.count("attempt <= 2;")}')
-          app.write_text(s.replace(old, new, 1))
-
-          index = Path('index.html')
-          h = index.read_text()
-          old_loader = '<script src="./app.js?v=85"></script>'
-          new_loader = '<script src="./app.js?v=86"></script>'
-          if h.count(old_loader) != 1:
-              raise SystemExit(f'app loader mismatch: {h.count(old_loader)}')
-          index.write_text(h.replace(old_loader, new_loader, 1))
-          PY
-      - name: Commit
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add app.js index.html
-          git diff --cached --check
-          git diff --cached --quiet && exit 0
-          git commit -m 'refactor: simplify inventory fetch retry layers'
-          git push
+          grep -n -B 8 -A 12 'fetchWithRetry(' app.js
+          grep -n -B 4 -A 8 'attempt <= 2;' app.js
