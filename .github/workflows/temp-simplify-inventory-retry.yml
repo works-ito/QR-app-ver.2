@@ -4,13 +4,173 @@ on:
     paths:
       - '.github/workflows/temp-simplify-inventory-retry.yml'
 permissions:
-  contents: read
+  contents: write
 jobs:
-  inspect:
+  patch:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Show retry call sites
+      - name: Simplify inventory retry to one layer
         run: |
-          grep -n -B 8 -A 12 'fetchWithRetry(' app.js
-          grep -n -B 4 -A 8 'attempt <= 2;' app.js
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('app.js')
+          s = p.read_text()
+
+          old_state = '''        for (
+          let attempt = 1;
+          attempt <= 2;
+          attempt++
+        ) {
+          response = await fetchWithRetry(
+            GAS_URL +
+              "?t=" + Date.now() +
+              "&stateAttempt=" + attempt,
+            {
+              method:"POST",
+              headers:{
+                "Content-Type":"text/plain"
+              },
+              cache:"no-store",
+              body:JSON.stringify({
+                action:"getCurrentStateData"
+              })
+            }
+          );
+
+          responseText =
+            await response.text();
+
+          if (response.ok) break;
+
+          if (attempt === 1) {
+            await new Promise(
+              function(resolve) {
+                setTimeout(resolve, 700);
+              }
+            );
+          }
+        }'''
+          new_state = '''        response = await fetchWithRetry(
+          GAS_URL +
+            "?t=" + Date.now() +
+            "&stateRequest=1",
+          {
+            method:"POST",
+            headers:{
+              "Content-Type":"text/plain"
+            },
+            cache:"no-store",
+            body:JSON.stringify({
+              action:"getCurrentStateData"
+            })
+          }
+        );
+
+        responseText =
+          await response.text();'''
+
+          old_full = '''        for (
+          let attempt = 1;
+          attempt <= 2;
+          attempt++
+        ) {
+          response = await fetchWithRetry(
+            GAS_URL +
+              "?t=" + Date.now() +
+              "&attempt=" + attempt,
+            {
+              method:"POST",
+              headers:{
+                "Content-Type":"text/plain"
+              },
+              cache:"no-store",
+              body:JSON.stringify({
+                action:"getAppInitialData",
+                initialDataVersion:"status-light-v2",
+
+                /*
+                 * 索引と一緒に保存したrevisionを送る。
+                 * 索引がない場合は空文字を送り、
+                 * GASから最新索引を受け取る。
+                 */
+                clientManagedMasterRevision:
+                  managedMasterItems.length > 0
+                    ? managedMasterRevision
+                    : ""
+              })
+            }
+          );
+
+          responseText =
+            await response.text();
+
+          if (response.ok) break;
+
+          if (attempt === 1) {
+            await new Promise(
+              function(resolve) {
+                setTimeout(resolve, 1000);
+              }
+            );
+          }
+        }'''
+          new_full = '''        response = await fetchWithRetry(
+          GAS_URL +
+            "?t=" + Date.now() +
+            "&fullRequest=1",
+          {
+            method:"POST",
+            headers:{
+              "Content-Type":"text/plain"
+            },
+            cache:"no-store",
+            body:JSON.stringify({
+              action:"getAppInitialData",
+              initialDataVersion:"status-light-v2",
+
+              /*
+               * 索引と一緒に保存したrevisionを送る。
+               * 索引がない場合は空文字を送り、
+               * GASから最新索引を受け取る。
+               */
+              clientManagedMasterRevision:
+                managedMasterItems.length > 0
+                  ? managedMasterRevision
+                  : ""
+            })
+          }
+        );
+
+        responseText =
+          await response.text();'''
+
+          if s.count(old_state) != 1:
+              raise SystemExit(f'current-state retry block mismatch: {s.count(old_state)}')
+          if s.count(old_full) != 1:
+              raise SystemExit(f'full-sync retry block mismatch: {s.count(old_full)}')
+          s = s.replace(old_state, new_state, 1).replace(old_full, new_full, 1)
+          if s.count('attempt <= 2;') != 0:
+              raise SystemExit('inventory outer retry loop still remains')
+          if s.count('fetchWithRetry(') != 4:
+              raise SystemExit(f'unexpected fetchWithRetry count after patch: {s.count("fetchWithRetry(")}')
+          p.write_text(s)
+
+          index = Path('index.html')
+          h = index.read_text()
+          old_loader = '<script src="./app.js?v=85"></script>'
+          new_loader = '<script src="./app.js?v=86"></script>'
+          if h.count(old_loader) != 1:
+              raise SystemExit(f'app loader mismatch: {h.count(old_loader)}')
+          index.write_text(h.replace(old_loader, new_loader, 1))
+          PY
+      - name: Verify and commit
+        run: |
+          git diff --check
+          grep -n -B 3 -A 18 'stateRequest=1' app.js
+          grep -n -B 3 -A 25 'fullRequest=1' app.js
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app.js index.html
+          git commit -m 'refactor: use one retry layer for inventory fetches'
+          git push
