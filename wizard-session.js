@@ -1,5 +1,5 @@
 /*
- * 受付セッション正常終了 v1
+ * 受付セッション正常終了 v2
  *
  * 正常完了時だけ受付入口へ戻す正式処理。
  * app.js の resumeWizardContinuousScan() から呼び出す。
@@ -45,6 +45,13 @@
       await stopReadOnlyScanner();
     }
 
+    if (
+      typeof window.resetIrregularMasterPickerSession ===
+      "function"
+    ) {
+      window.resetIrregularMasterPickerSession();
+    }
+
     if (typeof resetWizard === "function") {
       resetWizard();
     }
@@ -69,5 +76,5 @@
   }
 
   window.finishWizardSessionAfterSend = finishWizardSessionAfterSend;
-  console.info("受付セッション正常終了 v1 読込完了");
+  console.info("受付セッション正常終了 v2 読込完了");
 })();
