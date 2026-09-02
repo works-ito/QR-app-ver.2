@@ -1,9 +1,11 @@
 /*
- * 在庫通信診断 v2（一時調査用）
+ * 在庫通信診断 v3（一時調査用）
  *
- * - fetchWithRetry の通信だけを観測し、挙動は変更しない。
+ * - 在庫通信だけを観測し、挙動は変更しない。
  * - 診断ログは localStorage に直近50件だけ保存する。
  * - 「在庫データ：日時」を3回タップするとログを表示する。
+ * - pageSession で同一ページ起動か別ページ再読込かを識別する。
+ * - 表示時刻は日本時間で出す。
  * - 調査終了後はこのファイルと loader を削除する。
  */
 (function() {
@@ -14,11 +16,36 @@
   const TAP_COUNT = 3;
   const TAP_WINDOW_MS = 1200;
 
+  const pageSession =
+    Date.now().toString(36).slice(-5) +
+    Math.random().toString(36).slice(2, 5);
+
   let tapTimes = [];
   let lastForegroundAt = Date.now();
 
   function nowIso() {
     return new Date().toISOString();
+  }
+
+  function formatJapanTime(value) {
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return String(value || "");
+    const parts = new Intl.DateTimeFormat("ja-JP", {
+      timeZone:"Asia/Tokyo",
+      year:"numeric",
+      month:"2-digit",
+      day:"2-digit",
+      hour:"2-digit",
+      minute:"2-digit",
+      second:"2-digit",
+      hour12:false
+    }).formatToParts(date);
+    const map = {};
+    parts.forEach(function(part) {
+      map[part.type] = part.value;
+    });
+    return map.year + "/" + map.month + "/" + map.day + " " +
+      map.hour + ":" + map.minute + ":" + map.second;
   }
 
   function readEntries() {
@@ -33,7 +60,8 @@
   function writeEntry(entry) {
     try {
       const entries = readEntries();
-      entries.push(entry);
+      const value = Object.assign({pageSession:pageSession}, entry || {});
+      entries.push(value);
       if (entries.length > MAX_ENTRIES) {
         entries.splice(0, entries.length - MAX_ENTRIES);
       }
@@ -79,7 +107,7 @@
       const startedAt = performance.now();
       const startedWall = Date.now();
       const base = {
-        time: nowIso(),
+        time:nowIso(),
         type:type,
         visibility:document.visibilityState,
         sinceForegroundMs:Math.max(0, startedWall - lastForegroundAt),
@@ -122,11 +150,20 @@
   }
 
   function formatEntry(entry) {
+    const prefix = formatJapanTime(entry.time) +
+      " [" + (entry.pageSession || "old") + "] ";
+
     if (entry.type === "lifecycle") {
-      return entry.time + " foreground " + (entry.reason || "");
+      return prefix + "foreground " + (entry.reason || "");
     }
 
-    let text = entry.time + " " + entry.type + " " + entry.event;
+    if (entry.type === "page") {
+      return prefix + "page-start " +
+        (entry.navigationType || "") +
+        " " + (entry.url || "");
+    }
+
+    let text = prefix + entry.type + " " + entry.event;
     if (Number.isFinite(entry.durationMs)) text += " " + entry.durationMs + "ms";
     if (Number.isFinite(entry.status)) text += " HTTP " + entry.status;
     if (entry.message) text += " " + entry.message;
@@ -141,7 +178,7 @@
     const text = entries.length
       ? entries.map(formatEntry).join("\n")
       : "診断ログはまだありません";
-    alert("在庫通信診断（直近50件）\n\n" + text);
+    alert("在庫通信診断（保存上限50イベント）\n\n" + text);
   }
 
   function installTripleTap() {
@@ -163,6 +200,22 @@
     });
   }
 
+  const navigationEntry =
+    typeof performance !== "undefined" &&
+    typeof performance.getEntriesByType === "function"
+      ? performance.getEntriesByType("navigation")[0]
+      : null;
+
+  writeEntry({
+    time:nowIso(),
+    type:"page",
+    event:"start",
+    navigationType:navigationEntry && navigationEntry.type
+      ? navigationEntry.type
+      : "unknown",
+    url:window.location.href
+  });
+
   document.addEventListener("visibilitychange", function() {
     if (document.visibilityState === "visible") {
       markForeground("visibilitychange");
@@ -181,5 +234,5 @@
     installTripleTap();
   }
 
-  console.info("在庫通信診断 v2 読込完了（日時3回タップで表示）");
+  console.info("在庫通信診断 v3 読込完了（日時3回タップで表示）");
 })();
