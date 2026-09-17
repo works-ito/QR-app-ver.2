@@ -1,4 +1,4 @@
-/* 開発版 v53：10:9カメラを画面幅へふんわり追従 */
+/* 開発版 v54：10:9カメラ幅レスポンシブ + 管理ID重複ガード */
 (function() {
   "use strict";
 
@@ -8,7 +8,7 @@
    * 常に画面中央配置。読取ロジック・ズーム・入力解像度は変更しない。
    */
   const style = document.createElement("style");
-  style.id = "compactScannerV53Style";
+  style.id = "compactScannerV54Style";
   style.textContent = `
     .scannerViewport {
       width: clamp(351px, 94vw, 430px) !important;
@@ -41,5 +41,102 @@
   `;
   document.head.appendChild(style);
 
-  console.info("開発版 v53：10:9カメラ幅レスポンシブ + ガイド40% 有効");
+  /*
+   * QR読取・マスタ選択など入口に関係なく、
+   * scannedEntries へ追加する最終地点で同一管理IDを拒否する。
+   * 数量管理品は品目単位で複数登録する運用があるため対象外。
+   */
+  if (typeof commitWizardScanRecord === "function") {
+    const originalCommitWizardScanRecord =
+      commitWizardScanRecord;
+
+    function normalizeDuplicateManagedId(value) {
+      if (typeof normalizeManagedIdKey === "function") {
+        return normalizeManagedIdKey(value || "");
+      }
+
+      return String(value || "")
+        .normalize("NFKC")
+        .replace(/\s+/g, "")
+        .toUpperCase()
+        .trim();
+    }
+
+    commitWizardScanRecord = function(record) {
+      const sourceRecord = record || {};
+
+      if (sourceRecord.recordType !== "quantity") {
+        const incomingKey =
+          normalizeDuplicateManagedId(
+            sourceRecord.qrText ||
+            sourceRecord.qr ||
+            sourceRecord.itemCode ||
+            ""
+          );
+
+        if (incomingKey) {
+          const entries =
+            typeof scannedEntries !== "undefined" &&
+            Array.isArray(scannedEntries)
+              ? scannedEntries
+              : [];
+
+          const alreadyExists =
+            entries.some(function(entry) {
+              const existing = entry || {};
+              const existingKey =
+                normalizeDuplicateManagedId(
+                  existing.qrText ||
+                  existing.qr ||
+                  existing.itemCode ||
+                  ""
+                );
+
+              return (
+                existingKey &&
+                existingKey === incomingKey
+              );
+            });
+
+          if (alreadyExists) {
+            const message =
+              "この機械はすでに読み取り済みです";
+
+            if (
+              typeof notifyWizardScanError ===
+              "function"
+            ) {
+              notifyWizardScanError(
+                message,
+                1500
+              );
+            } else {
+              alert(message);
+            }
+
+            if (
+              typeof scannerBusy !==
+              "undefined"
+            ) {
+              scannerBusy = false;
+            }
+
+            return;
+          }
+        }
+      }
+
+      return originalCommitWizardScanRecord(
+        record
+      );
+    };
+  } else {
+    console.warn(
+      "開発版 v54：commitWizardScanRecord が見つからず、管理ID重複ガードを適用できませんでした"
+    );
+  }
+
+  console.info(
+    "開発版 v54：10:9カメラ幅レスポンシブ + 管理ID重複ガード 有効"
+  );
 })();
