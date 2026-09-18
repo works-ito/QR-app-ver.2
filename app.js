@@ -156,6 +156,7 @@ const PREVIOUS_SETTINGS_STORAGE_KEY =
       {
         value:"拠点移動",
         label:"拠点移動",
+        subText:"※受取側にて入力※",
         description:"機械を受け入れた拠点の担当者が入力します。実施拠点には、受入先の拠点を選択してください。"
       },
       {
@@ -282,6 +283,21 @@ const PREVIOUS_SETTINGS_STORAGE_KEY =
         data.label ||
         data.value ||
         "";
+
+      if (data.subText) {
+        const subText =
+          document.createElement("span");
+
+        subText.className =
+          "choiceSubText";
+
+        subText.innerText =
+          data.subText;
+
+        button.appendChild(
+          subText
+        );
+      }
 
       if (data.kind) {
         button.dataset.kind =
@@ -489,6 +505,7 @@ const PREVIOUS_SETTINGS_STORAGE_KEY =
               label:item.label,
               value:item.value,
               kind:item.kind,
+              subText:item.subText,
               description:item.description,
 
               onClick:function() {
