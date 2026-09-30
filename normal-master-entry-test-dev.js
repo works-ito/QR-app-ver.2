@@ -1,5 +1,5 @@
 /*
- * マスタ選択受付入口テスト v14
+ * マスタ選択受付入口テスト v15
  *
  * START画面の「マスタ選択受付」は receptionType=master として進める。
  * QRカメラは起動しない。
@@ -107,6 +107,13 @@
   const switchStatus = document.getElementById("receptionInputSwitchStatus");
   let switching = false;
 
+  function syncReceptionDisplay() {
+    wizardState.receptionLabel = wizardState.receptionType === "master"
+      ? "マスタ選択受付" : "通常受付";
+    updateReceptionStatus();
+    renderCompleteSettings(buildWizardSettings());
+  }
+
   function updateInputSwitch() {
     const active = wizardState.currentStep === "complete" &&
       wizardState.mode !== "検品" && !wizardPostSendContext &&
@@ -115,7 +122,7 @@
     if (switchArea) switchArea.hidden = !active;
     if (switchButton) switchButton.textContent =
       wizardState.receptionType === "master"
-        ? "QRを読み取って追加"
+        ? "QR読取に切り替える"
         : "QRのない機械をマスタから追加";
     if (switchStatus) switchStatus.textContent =
       "選択内容を保持して切り替えます。切替時には送信しません。";
@@ -141,10 +148,12 @@
           return;
         }
         wizardState.receptionType = "master";
+        syncReceptionDisplay();
       } else if (wizardState.receptionType === "master") {
         if (typeof window.stageIrregularMasterPickerSelections !== "function" ||
             !await window.stageIrregularMasterPickerSelections()) return;
         wizardState.receptionType = "normal";
+        syncReceptionDisplay();
         restoreScannerVisuals();
         renderScannerResults();
         await startReadOnlyScanner();
@@ -187,6 +196,6 @@
   });
 
   ensureMasterHost();
-  console.info("開発版：マスタ選択受付入口テスト v14 読込完了");
+  console.info("開発版：マスタ選択受付入口テスト v15 読込完了");
 })();
 

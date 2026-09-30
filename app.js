@@ -837,7 +837,9 @@ const PREVIOUS_SETTINGS_STORAGE_KEY =
   wizardState.receptionLabel =
     type === "irregular"
       ? "イレギュラー受付"
-      : "通常受付";
+      : type === "master"
+        ? "マスタ選択受付"
+        : "通常受付";
 
   wizardState.mode = "";
   wizardState.modeLabel = "";
