@@ -1,5 +1,5 @@
 /*
- * マスタ選択受付入口テスト v12
+ * マスタ選択受付入口テスト v13
  *
  * START画面の「マスタ選択受付」は receptionType=master として進める。
  * QRカメラは起動しない。
@@ -34,7 +34,13 @@
     const viewport = scannerViewport();
     const note = connectionNote();
     const host = document.getElementById(MASTER_HOST_ID);
-    if (area) area.hidden = false;
+    if (area) {
+      area.hidden = false;
+      area.classList.toggle(
+        "isActive",
+        wizardState.receptionType === "normal" && wizardState.mode !== "検品"
+      );
+    }
     if (status) status.hidden = false;
     if (viewport) viewport.hidden = false;
     if (note) note.hidden = false;
@@ -179,6 +185,6 @@
   });
 
   ensureMasterHost();
-  console.info("開発版：マスタ選択受付入口テスト v12 読込完了");
+  console.info("開発版：マスタ選択受付入口テスト v13 読込完了");
 })();
 
