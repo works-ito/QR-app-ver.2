@@ -338,7 +338,7 @@
     if (window.sendIrregularMasterPickerBatch.__quantityTransferPatched) return;
 
     const original = window.sendIrregularMasterPickerBatch;
-    const patched = async function(records) {
+    const patched = async function(records, options) {
       const nextRecords = Array.isArray(records)
         ? records.map(function(record) {
             const next = Object.assign({}, record);
@@ -366,8 +366,8 @@
           })
         : records;
 
-      const accepted = await original.call(this, nextRecords);
-      if (accepted) {
+      const accepted = await original.call(this, nextRecords, options);
+      if (accepted && !(options && options.stageOnly)) {
         irregularQueuedSourceByItemCode.clear();
       }
       return accepted;
@@ -419,7 +419,7 @@
       if (reset) setTimeout(clearTransferSelections, 0);
     }, false);
 
-    console.info("開発版：数量管理品 拠点移動 v96 読込完了");
+    console.info("開発版：数量管理品 拠点移動 v97 読込完了");
   }
 
   if (document.readyState === "loading") {

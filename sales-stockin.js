@@ -1,4 +1,4 @@
-/* 販売品入庫受付 v164 bootstrap */
+/* 販売品入庫受付 v165 bootstrap */
 (function() {
   function loadScript(src) {
     return new Promise(function(resolve, reject) {
@@ -30,7 +30,7 @@
     .then(function() { return loadScript("./wizard-return-memo-host-dev.js?v=2"); })
     .then(function() { return loadScript("./irregular-master-send-bridge-dev.js?v=89"); })
     .then(function() { return loadScript("./normal-master-entry-test-dev.js?v=13"); })
-    .then(function() { return loadScript("./quantity-transfer-dev.js?v=96"); })
+    .then(function() { return loadScript("./quantity-transfer-dev.js?v=97"); })
     .then(function() { return loadScript("./mode-description-hint-dev.js?v=37"); })
     .then(function() { return loadScript("./wizard-session.js?v=2"); })
     .then(function() { return loadScript("./inventory-refresh-control.js?v=1"); })
