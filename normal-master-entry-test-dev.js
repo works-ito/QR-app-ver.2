@@ -1,5 +1,5 @@
 /*
- * マスタ選択受付入口テスト v11
+ * マスタ選択受付入口テスト v12
  *
  * START画面の「マスタ選択受付」は receptionType=master として進める。
  * QRカメラは起動しない。
@@ -96,7 +96,75 @@
     if (root) root.hidden = true;
   }
 
+  const switchArea = document.getElementById("receptionInputSwitch");
+  const switchButton = document.getElementById("switchReceptionInputButton");
+  const switchStatus = document.getElementById("receptionInputSwitchStatus");
+  let switching = false;
+
+  function updateInputSwitch() {
+    const active = wizardState.currentStep === "complete" &&
+      wizardState.mode !== "検品" && !wizardPostSendContext &&
+      !wizardSendResultUnknown &&
+      (wizardState.receptionType === "normal" || wizardState.receptionType === "master");
+    if (switchArea) switchArea.hidden = !active;
+    if (switchButton) switchButton.textContent =
+      wizardState.receptionType === "master" ? "QR読取に戻る" : "マスタから追加";
+    if (switchStatus) switchStatus.textContent =
+      "選択済み：" + scannedEntries.length + "件（切替後も保持します）";
+  }
+
+  if (switchButton) switchButton.addEventListener("click", async function() {
+    if (switching || wizardSendBusy || wizardSendResultUnknown || scannerBusy || wizardPostSendContext) return;
+    const memoArea = document.getElementById("wizardReturnMemoArea");
+    if (memoArea && !memoArea.hidden) return;
+    if (wizardState.currentStep !== "complete" || wizardState.mode === "検品") return;
+    if (pendingWizardQuantityRecord) {
+      alert("入力中の数量を一覧へ追加するか、取消してから切り替えてください。");
+      return;
+    }
+    switching = true;
+    switchButton.disabled = true;
+    try {
+      if (wizardState.receptionType === "normal") {
+        await stopReadOnlyScanner();
+        if (!movePickerToMasterReception()) {
+          restoreScannerVisuals();
+          await startReadOnlyScanner();
+          return;
+        }
+        wizardState.receptionType = "master";
+      } else if (wizardState.receptionType === "master") {
+        if (typeof window.stageIrregularMasterPickerSelections !== "function" ||
+            !await window.stageIrregularMasterPickerSelections()) return;
+        wizardState.receptionType = "normal";
+        restoreScannerVisuals();
+        renderScannerResults();
+        await startReadOnlyScanner();
+      }
+      updateInputSwitch();
+    } finally {
+      switching = false;
+      switchButton.disabled = false;
+    }
+  });
+
+  // 設定画面に戻った場合は切替ボタンを隠す。
+  const completePanel = document.getElementById("completeStep");
+  if (completePanel) new MutationObserver(updateInputSwitch).observe(
+    completePanel, {attributes:true, attributeFilter:["class", "hidden"]}
+  );
+
+  const resultCount = document.getElementById("scannerResultCount");
+  if (resultCount) new MutationObserver(updateInputSwitch).observe(
+    resultCount, {childList:true, characterData:true, subtree:true}
+  );
+  const postSendArea = document.getElementById("wizardPostSendArea");
+  if (postSendArea) new MutationObserver(updateInputSwitch).observe(
+    postSendArea, {attributes:true, attributeFilter:["hidden"]}
+  );
+
   window.addEventListener("entrywizard:complete", function(event) {
+    updateInputSwitch();
     const settings = event && event.detail ? event.detail : null;
     if (!settings) return;
     if (settings.receptionType === "master" && settings.mode !== "検品") {
@@ -111,5 +179,6 @@
   });
 
   ensureMasterHost();
-  console.info("開発版：マスタ選択受付入口テスト v11 読込完了");
+  console.info("開発版：マスタ選択受付入口テスト v12 読込完了");
 })();
+

@@ -1,5 +1,5 @@
 /*
- * イレギュラー受付：マスタ選択 → 共通送信ブリッジ補強 v88
+ * イレギュラー受付：マスタ選択 → 共通送信ブリッジ補強 v89
  *
  * 責務：
  * - マスタ選択キューを通常QRと同じ scannedEntries / sendWizardBatch() へ渡す。
@@ -40,7 +40,7 @@
     );
   }
 
-  window.sendIrregularMasterPickerBatch = async function(records) {
+  window.sendIrregularMasterPickerBatch = async function(records, options) {
     if (!Array.isArray(records) || !records.length) {
       alert("送信する品目がありません");
       return false;
@@ -153,6 +153,8 @@
       renderScannerResults();
     }
 
+    if (options && options.stageOnly) return true;
+
     const isReturnMemoStage =
       wizardState.mode === "返却" &&
       !wizardReturnMemoConfirmed;
@@ -176,6 +178,7 @@
   };
 
   console.info(
-    "開発版：イレギュラーマスタ送信ブリッジ v88 読込完了"
+    "開発版：イレギュラーマスタ送信ブリッジ v89 読込完了"
   );
 })();
+

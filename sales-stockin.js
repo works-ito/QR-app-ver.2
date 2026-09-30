@@ -1,4 +1,4 @@
-/* 販売品入庫受付 v162 bootstrap */
+/* 販売品入庫受付 v163 bootstrap */
 (function() {
   function loadScript(src) {
     return new Promise(function(resolve, reject) {
@@ -18,7 +18,7 @@
     .then(function() { return loadScript("./sales-stockin-scan-enhancements.js?v=33"); })
     .then(function() { return loadScript("./sales-stockin-guards.js?v=33"); })
     .then(function() { return loadScript("./compact-scanner-dev.js?v=54"); })
-    .then(function() { return loadScript("./irregular-master-picker-dev.js?v=72"); })
+    .then(function() { return loadScript("./irregular-master-picker-dev.js?v=73"); })
     .then(function() { return loadScript("./irregular-entry-simplify-dev.js?v=77"); })
     .then(function() { return loadScript("./irregular-category-ui-tuning-dev.js?v=64"); })
     .then(function() { return loadScript("./irregular-simple-id-alias-dev.js?v=42"); })
@@ -28,8 +28,8 @@
     .then(function() { return loadScript("./wizard-send-status-host-dev.js?v=1"); })
     .then(function() { return loadScript("./wizard-photo-flow-dev.js?v=1"); })
     .then(function() { return loadScript("./wizard-return-memo-host-dev.js?v=2"); })
-    .then(function() { return loadScript("./irregular-master-send-bridge-dev.js?v=88"); })
-    .then(function() { return loadScript("./normal-master-entry-test-dev.js?v=11"); })
+    .then(function() { return loadScript("./irregular-master-send-bridge-dev.js?v=89"); })
+    .then(function() { return loadScript("./normal-master-entry-test-dev.js?v=12"); })
     .then(function() { return loadScript("./quantity-transfer-dev.js?v=96"); })
     .then(function() { return loadScript("./mode-description-hint-dev.js?v=37"); })
     .then(function() { return loadScript("./wizard-session.js?v=2"); })

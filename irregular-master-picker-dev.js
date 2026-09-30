@@ -1,5 +1,5 @@
 /*
- * イレギュラー受付：マスタ選択UI（開発版 v72）
+ * イレギュラー受付：マスタ選択UI（開発版 v73）
  *
  * GAS・既存送信処理は変更しない。
  * 管理番号候補は「簡易個体 → 個体 → REC → 軽量マスタ」の順で現在状態を優先し、
@@ -969,6 +969,20 @@
 
   window.resetIrregularMasterPickerSession = resetPickerSession;
 
+  // 入力方法を戻す前にマスタ選択分を共通一覧へ移す。送信はしない。
+  window.stageIrregularMasterPickerSelections = async function() {
+    if (!pickerState.queue.length) return true;
+    if (typeof window.sendIrregularMasterPickerBatch !== "function") return false;
+    const staged = await window.sendIrregularMasterPickerBatch(
+      pickerState.queue.map(function(record) { return Object.assign({}, record); }),
+      {stageOnly:true}
+    );
+    if (!staged) return false;
+    pickerState.queue = [];
+    renderQueue();
+    return true;
+  };
+
   function resetPickerForNextItem() {
     renderCategories();
     const targetPanel = panel();
@@ -1075,3 +1089,4 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded",init,{once:true});
   else init();
 })();
+
