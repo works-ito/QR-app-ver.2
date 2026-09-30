@@ -2054,3 +2054,44 @@
 #salesStockInEntryButton.salesComingSoon:disabled {
   opacity: 1;
 }
+
+/* QR読取とマスタ選択の切替操作 */
+#receptionInputSwitch {
+  margin: 16px 0 14px;
+  padding: 12px;
+  border: 1px solid #cbdcf0;
+  border-radius: 14px;
+  background: #f3f8ff;
+}
+
+#switchReceptionInputButton {
+  display: block;
+  width: 100%;
+  min-height: 56px;
+  padding: 10px 12px;
+  border: 2px solid #8db8e9;
+  border-radius: 11px;
+  background: #fff;
+  color: #153c68;
+  font-size: 17px;
+  line-height: 1.35;
+  font-weight: 800;
+  text-align: center;
+  cursor: pointer;
+}
+
+#switchReceptionInputButton:active {
+  background: #e8f2ff;
+}
+
+#switchReceptionInputButton:disabled {
+  opacity: .55;
+}
+
+#receptionInputSwitchStatus {
+  margin: 8px 2px 0;
+  color: #435a77;
+  font-size: 12px;
+  line-height: 1.45;
+  font-weight: 600;
+}

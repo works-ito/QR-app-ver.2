@@ -1,5 +1,5 @@
 /*
- * マスタ選択受付入口テスト v13
+ * マスタ選択受付入口テスト v14
  *
  * START画面の「マスタ選択受付」は receptionType=master として進める。
  * QRカメラは起動しない。
@@ -72,7 +72,7 @@
     root.hidden = false;
 
     const lead = root.querySelector(".irregularMasterLead");
-    if (lead) lead.textContent = "QRは使用しません。大分類 → 機種・品目 → 管理番号／数量の順に選択してください。";
+    if (lead) lead.textContent = "QRのない機械を、大分類 → 機種・品目 → 管理番号／数量の順に選択してください。";
 
     const openButton = document.getElementById("irregularMasterPickerOpenButton");
     if (openButton) {
@@ -114,9 +114,11 @@
       (wizardState.receptionType === "normal" || wizardState.receptionType === "master");
     if (switchArea) switchArea.hidden = !active;
     if (switchButton) switchButton.textContent =
-      wizardState.receptionType === "master" ? "QR読取に戻る" : "マスタから追加";
+      wizardState.receptionType === "master"
+        ? "QRを読み取って追加"
+        : "QRのない機械をマスタから追加";
     if (switchStatus) switchStatus.textContent =
-      "選択済み：" + scannedEntries.length + "件（切替後も保持します）";
+      "選択内容を保持して切り替えます。切替時には送信しません。";
   }
 
   if (switchButton) switchButton.addEventListener("click", async function() {
@@ -185,6 +187,6 @@
   });
 
   ensureMasterHost();
-  console.info("開発版：マスタ選択受付入口テスト v13 読込完了");
+  console.info("開発版：マスタ選択受付入口テスト v14 読込完了");
 })();
 
