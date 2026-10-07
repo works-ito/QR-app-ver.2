@@ -74,6 +74,7 @@ const PREVIOUS_SETTINGS_STORAGE_KEY =
     let wizardPostSendContext = null;
     let wizardSelectedPhotos = [];
     let wizardCurrentSlipInfo = null;
+    let wizardSlipAnalysisSource = null;
     let wizardPendingPhotoSave = null;
     let wizardPostSendBusy = false;
     let wizardReturnMemoConfirmed = false;
@@ -3148,7 +3149,8 @@ function changePreviousSettings() {
       buttons.forEach(function(button) {
         button.classList.toggle("isVisible", remaining > 0);
         button.disabled =
-          wizardSendBusy || quantityInspectionBusy || !appInitialDataLoaded;
+          wizardSendBusy || quantityInspectionBusy || !appInitialDataLoaded || wizardPostSendBusy ||
+          Boolean(wizardPendingPhotoSave && wizardPendingPhotoSave.saveAttempted && !wizardPendingPhotoSave.saveConfirmed);
 
         if (remaining > 0) {
           button.innerText =
@@ -3254,7 +3256,8 @@ function changePreviousSettings() {
     }
 
     async function cancelLastSuccessfulSend() {
-      if (wizardSendBusy || !lastSuccessfulSend) return;
+      if (wizardSendBusy || wizardPostSendBusy || !lastSuccessfulSend ||
+        (wizardPendingPhotoSave && wizardPendingPhotoSave.saveAttempted && !wizardPendingPhotoSave.saveConfirmed)) return;
       if (Date.now() >= Number(lastSuccessfulSend.expiresAt || 0)) {
         clearLastSuccessfulSend();
         alert("直前送信の取消可能時間（5分）を過ぎています");
@@ -3333,6 +3336,7 @@ function changePreviousSettings() {
           wizardPostSendContext = null;
           wizardSelectedPhotos = [];
           wizardCurrentSlipInfo = null;
+          wizardSlipAnalysisSource = null;
           wizardPendingPhotoSave = null;
           document.getElementById("wizardPostSendArea").hidden = true;
           document.getElementById("wizardRecMemoArea").hidden = true;
@@ -3610,6 +3614,7 @@ function changePreviousSettings() {
       wizardPostSendContext = null;
       wizardSelectedPhotos = [];
       wizardCurrentSlipInfo = null;
+      wizardSlipAnalysisSource = null;
       wizardPendingPhotoSave = null;
       /*
        * 写真・追記の完了後も、直前送信の取消期限内は
@@ -3703,6 +3708,7 @@ function changePreviousSettings() {
     function openWizardPhotoArea(context) {
       wizardSelectedPhotos = [];
       wizardCurrentSlipInfo = null;
+      wizardSlipAnalysisSource = null;
       document.getElementById("wizardSkipPhotosButton").hidden = false;
       document.getElementById("wizardPhotoHeading").innerText =
         context.mode === "出庫" ? "出庫写真の添付" : "返却写真の添付";
@@ -3728,6 +3734,7 @@ function changePreviousSettings() {
       };
       wizardSelectedPhotos = [];
       wizardCurrentSlipInfo = null;
+      wizardSlipAnalysisSource = null;
       document.getElementById("wizardPhotoHeading").innerText = "イレギュラー受付写真";
       document.getElementById("wizardPhotoSummary").innerText =
         (record.slipStatus === "伝票あり"
@@ -3742,6 +3749,7 @@ function changePreviousSettings() {
     }
 
     function addWizardPhotos(fileList) {
+      if (wizardPostSendBusy || (wizardPendingPhotoSave && wizardPendingPhotoSave.saveAttempted)) return;
       const files = Array.from(fileList || []);
       if (!files.length) return;
       if (wizardSelectedPhotos.length + files.length > 6) {
@@ -3749,13 +3757,18 @@ function changePreviousSettings() {
         return;
       }
       wizardSelectedPhotos.push.apply(wizardSelectedPhotos, files);
+      wizardPendingPhotoSave = null;
       document.getElementById("wizardPhotoPreview").innerText =
         wizardSelectedPhotos.length + "枚追加済み\n最大6枚まで。1枚のコラージュ画像にして保存します。";
       document.getElementById("wizardSavePhotosButton").hidden = false;
     }
 
     function clearWizardPhotos() {
+      if (wizardPostSendBusy || (wizardPendingPhotoSave && wizardPendingPhotoSave.saveAttempted)) return;
       wizardSelectedPhotos = [];
+      wizardCurrentSlipInfo = null;
+      wizardSlipAnalysisSource = null;
+      wizardPendingPhotoSave = null;
       document.getElementById("wizardPhotoCameraInput").value = "";
       document.getElementById("wizardPhotoLibraryInput").value = "";
       document.getElementById("wizardPhotoPreview").innerText = "写真はまだ選択されていません。";
@@ -3882,156 +3895,179 @@ function changePreviousSettings() {
       return info;
     }
 
-    async function saveWizardPhotoNow() {
-      if (wizardPostSendBusy || !wizardPendingPhotoSave) return;
+    function setWizardPhotoBusy(busy) {
+      wizardPostSendBusy = busy;
+      [
+        "wizardPhotoCameraButton", "wizardPhotoLibraryButton",
+        "wizardPhotoCameraInput", "wizardPhotoLibraryInput",
+        "wizardClearPhotosButton", "wizardSavePhotosButton",
+        "wizardSkipPhotosButton", "wizardBackToPhotosButton",
+        "wizardConfirmPhotoTitleButton", "wizardPhotoCustomerName",
+        "wizardPhotoSiteName", "wizardPostSendCancelButton", "headerBackButton", "restartButton"
+      ].forEach(function(id) {
+        const element = document.getElementById(id);
+        if (element) element.disabled = busy;
+      });
+      // Once a save has been sent, retries must keep the same files and ID.
+      if (!busy && wizardPendingPhotoSave && wizardPendingPhotoSave.saveAttempted) {
+        ["wizardBackToPhotosButton", "wizardPhotoCustomerName", "wizardPhotoSiteName",
+          "wizardPhotoCameraButton", "wizardPhotoLibraryButton", "wizardPhotoCameraInput",
+          "wizardPhotoLibraryInput", "wizardClearPhotosButton", "wizardSkipPhotosButton", "wizardPostSendCancelButton", "headerBackButton", "restartButton"].forEach(function(id) {
+          document.getElementById(id).disabled = true;
+        });
+      }
+    }
 
-      wizardPostSendBusy = true;
-      const button = document.getElementById(
-        "wizardConfirmPhotoTitleButton"
-      );
-      button.disabled = true;
-      startAnimatedDots(
-        "wizardPhotoTitleCandidate",
-        "写真を保存中"
-      );
-
+    async function finishWizardSavedPhoto(pending) {
+      // Hide save controls before any camera/session cleanup can fail.
+      document.getElementById("wizardPhotoArea").hidden = true;
+      document.getElementById("wizardPhotoTitleArea").hidden = true;
       try {
-        const pending = wizardPendingPhotoSave;
-        const photoInfo = pending.photoInfo;
-        const collage = await makeWizardPhotoCollage(
-          pending.files,
-          photoInfo
-        );
-
-        const action = photoInfo.photoType === "irregular"
-          ? "saveIrregularRegistration"
-          : photoInfo.photoType === "shipment"
-            ? "saveShipmentPhoto"
-            : "saveReturnPhoto";
-
-        const extraPayload = photoInfo.photoType === "irregular"
-          ? {
-              record:photoInfo.irregularRecord,
-              irregularCaseId:photoInfo.irregularCaseId
-            }
-          : {};
-
-        /*
-         * photoRequestIdは再試行時も同じ値を使用する。
-         * GAS側のPHOTO重複防止により、応答だけ失われた場合でも
-         * 同じ写真を二重保存しない。
-         */
-        const response = await fetchWithRetry(
-          GAS_URL,
-          {
-            method:"POST",
-            headers:{"Content-Type":"text/plain"},
-            body:JSON.stringify({
-              action:action,
-              photoRequestId:pending.photoRequestId,
-              photoBase64:collage,
-              photoInfo:photoInfo,
-              slipInfo:photoInfo.slipInfo,
-              saveTitleCandidate:photoInfo.confirmedTitle,
-              confirmedTitle:photoInfo.confirmedTitle,
-              ...extraPayload
-            })
-          }
-        );
-
-        const text = await response.text();
-        let result;
-
-        try {
-          result = JSON.parse(text);
-        } catch (parseError) {
-          throw new Error(
-            "写真保存結果を読み取れませんでした\n" +
-            text.slice(0, 200)
-          );
-        }
-
-        if (!result.ok) {
-          throw new Error(
-            result.message || "写真を保存できませんでした"
-          );
-        }
-
-        if (photoInfo.photoType === "irregular") {
-          alert("イレギュラー受付を保存しました");
+        if (pending.photoInfo.photoType === "irregular") {
           await finishWizardIrregularFlow();
         } else {
-          alert(photoInfo.mode + "写真を保存しました");
-          await resumeWizardContinuousScan(
-            "写真保存完了 ✔\n続けてQRを読み取れます"
-          );
+          await resumeWizardContinuousScan("写真保存完了 ✔\n続けてQRを読み取れます");
         }
       } catch (error) {
-        alert(
-          "写真保存失敗\n" +
-          (error.message || String(error)) +
-          "\n\n同じ画面から再度保存できます。"
-        );
+        console.error("写真は保存済みですが、受付画面への復帰に失敗しました", error);
+        // Never turn a successful save into a save-failure/retry prompt.
+        wizardPendingPhotoSave = null;
+        wizardSelectedPhotos = [];
+        wizardCurrentSlipInfo = null;
+        wizardSlipAnalysisSource = null;
+        wizardPostSendContext = null;
+        try { resetWizard(); } catch (resetError) {
+          console.error("受付画面の復帰に失敗しました", resetError);
+        }
+        setWizardSendStatus("写真は保存済みです。再送信は不要です。\n受付画面に戻れない場合は画面を再読み込みしてください。", "isSuccess");
+      }
+    }
+
+    async function saveWizardPhotoNow() {
+      if (wizardPostSendBusy || !wizardPendingPhotoSave) return;
+      const pending = wizardPendingPhotoSave;
+      if (pending.saveConfirmed) return;
+      setWizardPhotoBusy(true);
+      const button = document.getElementById("wizardConfirmPhotoTitleButton");
+      startAnimatedDots("wizardPhotoTitleCandidate", "写真を保存中");
+      try {
+        const photoInfo = pending.photoInfo;
+        // Freeze the exact request for retry, including the collage and title.
+        if (!pending.requestBody) {
+          const collage = await makeWizardPhotoCollage(pending.files, photoInfo);
+          const action = photoInfo.photoType === "irregular"
+            ? "saveIrregularRegistration"
+            : photoInfo.photoType === "shipment" ? "saveShipmentPhoto" : "saveReturnPhoto";
+          const extraPayload = photoInfo.photoType === "irregular"
+            ? {record:photoInfo.irregularRecord, irregularCaseId:photoInfo.irregularCaseId}
+            : {};
+          pending.requestBody = JSON.stringify({
+            action:action,
+            photoRequestId:pending.photoRequestId,
+            photoBase64:collage,
+            photoInfo:photoInfo,
+            slipInfo:photoInfo.slipInfo,
+            saveTitleCandidate:photoInfo.confirmedTitle,
+            confirmedTitle:photoInfo.confirmedTitle,
+            ...extraPayload
+          });
+        }
+        pending.saveAttempted = true;
+        // Explicit retries use the same frozen request. No automatic resend.
+        const controller = new AbortController();
+        const timeout = setTimeout(function() { controller.abort(); }, 60000);
+        let response, text;
+        try {
+          response = await fetch(GAS_URL, {
+            method:"POST", headers:{"Content-Type":"text/plain"},
+            signal:controller.signal, body:pending.requestBody
+          });
+          text = await response.text();
+        } finally {
+          clearTimeout(timeout);
+        }
+        let result;
+        try { result = JSON.parse(text); } catch (parseError) {
+          throw new Error("保存結果を確認できませんでした");
+        }
+        if (!response.ok || !result || result.ok !== true) {
+          throw new Error(result && result.message ? result.message : "写真の保存結果を確認できませんでした");
+        }
+        pending.saveConfirmed = true;
+        stopAnimatedDots("wizardPhotoTitleCandidate");
+        document.getElementById("wizardPhotoTitleCandidate").innerText = "写真保存完了 ✔";
+        await finishWizardSavedPhoto(pending);
+        alert(photoInfo.photoType === "irregular" ? "イレギュラー受付を保存しました" : photoInfo.mode + "写真を保存しました");
+      } catch (error) {
+        stopAnimatedDots("wizardPhotoTitleCandidate");
+        if (pending.saveConfirmed) {
+          document.getElementById("wizardPhotoArea").hidden = true;
+          document.getElementById("wizardPhotoTitleArea").hidden = true;
+          console.error("保存済み写真の完了表示に失敗しました", error);
+          alert("写真は保存済みです。再送信は不要です。受付画面に戻れない場合は再読み込みしてください。");
+          return;
+        }
+        const message = pending.saveAttempted
+          ? "写真の保存完了を確認できませんでした。\n保存済みの可能性があります。下のボタンから同じ内容で再試行できます。"
+          : "写真の準備に失敗しました。下のボタンから再試行してください。";
+        document.getElementById("wizardPhotoTitleCandidate").innerText =
+          message + "\n" + (error.message || String(error));
+        button.innerText = "同じ内容で保存を再試行";
       } finally {
         stopAnimatedDots("wizardPhotoTitleCandidate");
-        wizardPostSendBusy = false;
-        button.disabled = false;
+        setWizardPhotoBusy(false);
       }
     }
 
     async function prepareWizardPhotoSave() {
       if (!wizardPostSendContext || !wizardSelectedPhotos.length || wizardPostSendBusy) return;
-      wizardPostSendBusy = true;
-      document.getElementById("wizardSavePhotosButton").disabled = true;
+      if (wizardPendingPhotoSave && wizardPendingPhotoSave.saveAttempted) {
+        return await saveWizardPhotoNow();
+      }
+      setWizardPhotoBusy(true);
       try {
         const isIrregular = Boolean(wizardPostSendContext.isIrregular);
         const hasSlip = !isIrregular || wizardPostSendContext.irregularRecord.slipStatus === "伝票あり";
-        if (hasSlip) {
-          await analyzeWizardSlipPhoto(
-            wizardSelectedPhotos[0],
-            isIrregular ? "irregular" :
-              wizardPostSendContext.mode === "出庫" ? "shipment" : "return"
-          );
-        } else {
+        const firstPhoto = wizardSelectedPhotos[0];
+        if (hasSlip && wizardSlipAnalysisSource !== firstPhoto) {
+          wizardSlipAnalysisSource = firstPhoto;
+          await analyzeWizardSlipPhoto(firstPhoto, isIrregular ? "irregular" :
+            wizardPostSendContext.mode === "出庫" ? "shipment" : "return");
+        }
+        if (!hasSlip || !wizardCurrentSlipInfo) {
           wizardCurrentSlipInfo = {
             customerName:"", siteName:"", originalSiteName:"",
-            acquisitionMethod:"manual_no_slip", siteNameEdited:true,
-            confirmedTitle:"", acquiredAt:new Date().toISOString()
+            acquisitionMethod:hasSlip ? "manual_after_analysis_failure" : "manual_no_slip",
+            siteNameEdited:true, confirmedTitle:"", acquiredAt:new Date().toISOString()
           };
         }
         const photoInfo = buildWizardPhotoInfo(wizardPostSendContext);
         wizardPendingPhotoSave = {
           files:wizardSelectedPhotos.slice(), photoInfo:photoInfo,
-          photoRequestId:createWizardPhotoRequestId()
+          photoRequestId:wizardPendingPhotoSave ? wizardPendingPhotoSave.photoRequestId : createWizardPhotoRequestId(),
+          saveAttempted:false, saveConfirmed:false, requestBody:null
         };
-        if (!wizardCurrentSlipInfo && !isIrregular) {
-          /* AI失敗時はタイトル確認を飛ばし、従来タイトルで保存を継続する。 */
-          wizardPostSendBusy = false;
-          await saveWizardPhotoNow();
-          return;
-        }
-        if (!wizardCurrentSlipInfo) {
-          wizardCurrentSlipInfo = {
-            customerName:"", siteName:"", originalSiteName:"",
-            acquisitionMethod:"manual_after_analysis_failure", siteNameEdited:true,
-            confirmedTitle:"", acquiredAt:new Date().toISOString()
-          };
-          wizardPendingPhotoSave.photoInfo.slipInfo = wizardCurrentSlipInfo;
-        }
         document.getElementById("wizardPhotoCustomerName").value = wizardCurrentSlipInfo.customerName || "";
         document.getElementById("wizardPhotoSiteName").value = wizardCurrentSlipInfo.siteName || "";
-        document.getElementById("wizardPhotoTitleCandidate").innerText = wizardCurrentSlipInfo.confirmedTitle;
+        document.getElementById("wizardPhotoTitleCandidate").innerText =
+          wizardCurrentSlipInfo.acquisitionMethod === "manual_after_analysis_failure"
+            ? "AIで読み取れませんでした。顧客名・現場名を入力してください。写真は保持しています。"
+            : wizardCurrentSlipInfo.confirmedTitle || "顧客名・現場名を入力してください。";
+        document.getElementById("wizardConfirmPhotoTitleButton").innerText = "この内容で保存";
         document.getElementById("wizardPhotoArea").hidden = true;
         document.getElementById("wizardPhotoTitleArea").hidden = false;
         scrollToWizardPostSend("wizardPhotoTitleArea");
+      } catch (error) {
+        document.getElementById("wizardPhotoPreview").innerText =
+          "写真の準備に失敗しました。もう一度操作してください。\n" + (error.message || String(error));
       } finally {
-        wizardPostSendBusy = false;
-        document.getElementById("wizardSavePhotosButton").disabled = false;
+        setWizardPhotoBusy(false);
       }
     }
 
     async function confirmWizardPhotoTitle() {
-      if (!wizardPendingPhotoSave || !wizardCurrentSlipInfo) return;
+      if (wizardPostSendBusy || !wizardPendingPhotoSave || !wizardCurrentSlipInfo) return;
+      if (wizardPendingPhotoSave.saveAttempted) return await saveWizardPhotoNow();
 
       const customerName = sanitizeWizardPhotoTitlePart(
         document.getElementById("wizardPhotoCustomerName").value
@@ -4088,6 +4124,7 @@ function changePreviousSettings() {
       wizardPostSendContext = null;
       wizardSelectedPhotos = [];
       wizardCurrentSlipInfo = null;
+      wizardSlipAnalysisSource = null;
       wizardPendingPhotoSave = null;
       document.getElementById("wizardPostSendArea").hidden = true;
       document.getElementById("wizardIrregularArea").hidden = true;
@@ -5953,6 +5990,7 @@ function changePreviousSettings() {
     }
 
    function goBackFromCurrentStep() {
+     if (wizardPostSendBusy || (wizardPendingPhotoSave && wizardPendingPhotoSave.saveAttempted && !wizardPendingPhotoSave.saveConfirmed)) return;
   const currentStep =
     wizardState.currentStep;
 
@@ -6093,6 +6131,7 @@ function changePreviousSettings() {
   wizardPostSendContext = null;
   wizardSelectedPhotos = [];
   wizardCurrentSlipInfo = null;
+  wizardSlipAnalysisSource = null;
   wizardPendingPhotoSave = null;
   
   document.getElementById("wizardIrregularArea").hidden = true;
@@ -6207,6 +6246,7 @@ document
   .addEventListener(
     "click",
     function() {
+      if (wizardPostSendBusy || (wizardPendingPhotoSave && wizardPendingPhotoSave.saveAttempted && !wizardPendingPhotoSave.saveConfirmed)) return;
       if (
         wizardState.currentStep ===
         "reception"
@@ -6334,11 +6374,17 @@ document.getElementById("wizardPhotoLibraryInput").addEventListener("change", fu
 document.getElementById("wizardClearPhotosButton").addEventListener("click", clearWizardPhotos);
 document.getElementById("wizardSavePhotosButton").addEventListener("click", prepareWizardPhotoSave);
 document.getElementById("wizardSkipPhotosButton").addEventListener("click", function() {
+  if (wizardPostSendBusy || (wizardPendingPhotoSave && wizardPendingPhotoSave.saveAttempted)) return;
   resumeWizardContinuousScan("写真なしで完了 ✔\n続けてQRを読み取れます");
 });
 document.getElementById("wizardConfirmPhotoTitleButton").addEventListener("click", confirmWizardPhotoTitle);
 document.getElementById("wizardBackToPhotosButton").addEventListener("click", function() {
-  wizardPendingPhotoSave = null;
+  if (wizardPostSendBusy || (wizardPendingPhotoSave && wizardPendingPhotoSave.saveAttempted)) return;
+  if (wizardCurrentSlipInfo) {
+    wizardCurrentSlipInfo.customerName = document.getElementById("wizardPhotoCustomerName").value;
+    wizardCurrentSlipInfo.siteName = document.getElementById("wizardPhotoSiteName").value;
+    wizardCurrentSlipInfo.confirmedTitle = buildWizardPhotoTitle(wizardCurrentSlipInfo.customerName, wizardCurrentSlipInfo.siteName);
+  }
   document.getElementById("wizardPhotoTitleArea").hidden = true;
   document.getElementById("wizardPhotoArea").hidden = false;
   scrollToWizardPostSend("wizardPhotoArea");
