@@ -3387,6 +3387,86 @@ function changePreviousSettings() {
       }
     }
 
+const BATCH_ERROR_PREFIX = "qrBatchErrorV1:";
+let batchErrorFlushBusy_ = false;
+let batchErrorFlushTimer_ = null;
+function queueBatchErrors_(payload, result, transportError) {
+  try {
+    const records = Array.isArray(payload.records) ? payload.records : [];
+    const results = result && Array.isArray(result.results) ? result.results : null;
+    const byIndex = new Map();
+    if (results) results.forEach((item) => {
+      if (item && Number.isInteger(item.index) && item.index >= 0 && item.index < records.length) byIndex.set(item.index, item);
+    });
+    const failures = results ? [...byIndex.entries()].filter(([,item]) => item.ok === false) : [];
+    // 結果不明は「失敗」と断定しない。管理番号ごとに結果不明として記録する。
+    // 結果配列が不完全な場合、未確認レコードは「結果不明」で残す。
+    const complete = results && results.length === records.length && byIndex.size === records.length &&
+      results.every(item => item && typeof item.ok === "boolean");
+    const indexes = complete ? failures.map(([index]) => index)
+      : records.map((_,index) => index);
+    const now = new Date().toISOString();
+    indexes.forEach((index) => {
+      const record = records[index] || {};
+      const item = byIndex.get(index);
+      const eventId = String(payload.sendId || payload.batchId || "") + ":" + index;
+      const event = {
+        eventId, sendId:String(payload.sendId || payload.batchId || ""),
+        recordIndex:index, managementId:String(record.qr || record.managementId || record.id || ""),
+        mode:String(record.mode || ""), user:String(record.user || ""),
+        location:String(record.location || ""), userAgent:String(navigator.userAgent || "").slice(0,500),
+        failedAt:now, status:complete && item && item.ok === false ? "失敗" : "結果不明",
+        message:String(item && (item.message || item.error) || (transportError && transportError.message) || (result && result.message) || "送信結果不明").slice(0,3000)
+      };
+      localStorage.setItem(BATCH_ERROR_PREFIX + eventId, JSON.stringify(event));
+    });
+    scheduleBatchErrorFlush_();
+  } catch (_) { /* 記録失敗が在庫登録結果に影響しない */ }
+}
+function scheduleBatchErrorFlush_() {
+  if (batchErrorFlushTimer_) return;
+  batchErrorFlushTimer_ = setTimeout(() => {
+    batchErrorFlushTimer_ = null;
+    void flushBatchErrors_();
+  }, 5000);
+}
+async function flushBatchErrors_() {
+  if (batchErrorFlushBusy_ || navigator.onLine === false) return;
+  const entries = [];
+  try {
+    for (let i=0;i<localStorage.length;i++) {
+      const key=localStorage.key(i);
+      if (key && key.startsWith(BATCH_ERROR_PREFIX)) {
+        try { entries.push(JSON.parse(localStorage.getItem(key))); } catch (_) {}
+      }
+    }
+  } catch (_) { return; }
+  if (!entries.length) return;
+  batchErrorFlushBusy_ = true;
+  const events=entries.slice(0,20);
+  const controller=new AbortController();
+  const timeout=setTimeout(() => controller.abort(),10000);
+  try {
+    const response=await fetch(GAS_URL,{
+      method:"POST",headers:{"Content-Type":"text/plain"},signal:controller.signal,
+      body:JSON.stringify({action:"recordBatchErrors",events})
+    });
+    const result=await response.json();
+    if (response.ok && result && result.ok === true && Array.isArray(result.acceptedIds)) {
+      result.acceptedIds.forEach((id) => {
+        const event=events.find(e => e.eventId === id);
+        if (event && localStorage.getItem(BATCH_ERROR_PREFIX + id) === JSON.stringify(event)) {
+          localStorage.removeItem(BATCH_ERROR_PREFIX + id);
+        }
+      });
+    }
+  } catch (_) { /* 次回再送。登録本体は再送しない */ }
+  finally {clearTimeout(timeout);batchErrorFlushBusy_=false;}
+  if (entries.length) batchErrorFlushTimer_=setTimeout(() => {batchErrorFlushTimer_=null;void flushBatchErrors_();},60000);
+}
+window.addEventListener("online",scheduleBatchErrorFlush_);
+scheduleBatchErrorFlush_();
+
     function sendBatchRecords(records, options) {
       const batchId = createBatchId();
       lastPendingSendId = batchId;
@@ -3463,7 +3543,13 @@ function changePreviousSettings() {
           result.sendId = batchId;
         }
 
+        if (result.ok === false || Number(result.failedCount) > 0) {
+          queueBatchErrors_(payload, result, null);
+        }
         return result;
+      }).catch(function(error) {
+        queueBatchErrors_(payload, null, error);
+        throw error;
       });
     }
 
@@ -6474,3 +6560,39 @@ resetWizard();
 restoreLastSuccessfulSend();
 initializeInventoryDataFoundation();
 startAppVersionCheckTimer();
+
+/*
+ * 一時的な実機通信テスト。URLに ?errorLogTest=1 があるときだけ表示。
+ * 在庫登録APIは呼ばず、エラー記録専用APIのみ送信する。
+ */
+if (new URLSearchParams(window.location.search).get("errorLogTest") === "1") {
+  const testArea = document.createElement("section");
+  testArea.style.cssText = "margin:24px 12px;padding:16px;border:2px solid #777;border-radius:10px";
+  const testButton = document.createElement("button");
+  testButton.type = "button";
+  testButton.textContent = "エラーログ通信テスト（在庫変更なし）";
+  testButton.style.cssText = "display:block;width:100%;padding:14px;font-size:16px";
+  const testStatus = document.createElement("p");
+  testStatus.textContent = "このテストでは出庫・返却を登録しません。";
+  testButton.addEventListener("click", async function() {
+    testButton.disabled = true;
+    const sendId = "MOBILE-ERROR-TEST-" + Date.now();
+    const payload = {
+      sendId,
+      records:[{qr:"TEST-ONLY",mode:"通信テスト",user:"実機テスト",location:"テスト"}]
+    };
+    queueBatchErrors_(payload, {
+      ok:false,failedCount:1,
+      results:[{index:0,ok:false,message:"実機テスト用の意図的な失敗"}]
+    }, null);
+    testStatus.textContent = "記録ID: " + sendId + ":0 ／送信中。記録の成否はシートで確認します。";
+    try {
+      await flushBatchErrors_();
+    } finally {
+      testButton.disabled = false;
+    }
+  });
+  testArea.appendChild(testButton);
+  testArea.appendChild(testStatus);
+  document.body.appendChild(testArea);
+}
