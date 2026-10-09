@@ -1220,6 +1220,41 @@
   </div>
 
   <div id="inventoryRuntime" hidden></div>
+  <section id="errorLogTestPanel" hidden style="margin:18px;padding:18px;border:2px solid #555;border-radius:10px;background:#fff;color:#111;position:relative;z-index:99999">
+    <strong>エラーログ通信テスト</strong>
+    <p>在庫データは変更しません。</p>
+    <button id="errorLogTestButton" type="button" style="font-size:17px;padding:14px;width:100%">テスト送信（在庫変更なし）</button>
+    <p id="errorLogTestResult">未送信</p>
+  </section>
+  <script>
+  (function(){
+    if (new URLSearchParams(location.search).get("errorLogTest") !== "1") return;
+    var panel=document.getElementById("errorLogTestPanel");
+    panel.hidden=false;
+    panel.style.display="block";
+    document.getElementById("errorLogTestButton").addEventListener("click",async function(){
+      var button=this, output=document.getElementById("errorLogTestResult");
+      button.disabled=true;
+      var id="MOBILE-HTML-TEST-"+Date.now();
+      output.textContent="送信中: "+id;
+      try {
+        var response=await fetch("https://script.google.com/macros/s/AKfycbztguQj2mLmDPaddFF_upjvGOqlIUqXNcdvr3ILbORFbrJYQmm6Hopc_uPRNPEGofJ-0Q/exec",{
+          method:"POST",headers:{"Content-Type":"text/plain"},
+          body:JSON.stringify({action:"recordBatchErrors",events:[{
+            eventId:id,sendId:id,recordIndex:0,managementId:"TEST-ONLY",
+            mode:"通信テスト",message:"iPhoneブラウザ実通信テスト",
+            status:"テスト",failedAt:new Date().toISOString(),
+            userAgent:navigator.userAgent
+          }]})
+        });
+        var result=await response.json();
+        output.textContent="HTTP "+response.status+" / "+JSON.stringify(result)+" / ID: "+id;
+      } catch(e) {
+        output.textContent="通信結果を確認できません: "+e.message+" / ID: "+id;
+      } finally {button.disabled=false;}
+    });
+  })();
+  </script>
   <script src="./scanner-try-harder-dev.js?v=50"></script>
   <script src="./manual-refresh-ui-dev.js?v=103"></script>
   <script src="./app.js?v=90"></script>
