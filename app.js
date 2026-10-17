@@ -5090,6 +5090,24 @@ scheduleBatchErrorFlush_();
         );
     }
 
+    function formatShipmentDate(value) {
+      if (typeof value !== "string" || !value.trim()) {
+        return "不明";
+      }
+
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) {
+        return "不明";
+      }
+
+      return new Intl.DateTimeFormat("ja-JP", {
+        timeZone:"Asia/Tokyo",
+        year:"numeric",
+        month:"2-digit",
+        day:"2-digit"
+      }).format(date);
+    }
+
     function getShipmentDestinationDisplay(
       managementId
     ) {
@@ -5115,7 +5133,7 @@ scheduleBatchErrorFlush_();
           hasDestination:false,
           customerName:"",
           siteName:"",
-          text:"出庫先データがありません"
+          text:"出庫日：不明\n出庫先データがありません"
         };
       }
 
@@ -5136,35 +5154,26 @@ scheduleBatchErrorFlush_();
           siteName
         );
 
+      const lines = [
+        "出庫日：" + formatShipmentDate(item.shippedAt)
+      ];
+
       if (!hasDestination) {
-        return {
-          hasDestination:false,
-          customerName:"",
-          siteName:"",
-          text:"出庫先データがありません"
-        };
-      }
+        lines.push("出庫先データがありません");
+      } else {
+        if (customerName) {
+          lines.push("客先名：" + customerName);
+        }
 
-      const lines = [];
-
-      if (customerName) {
-        lines.push(
-          "客先名：" +
-          customerName
-        );
-      }
-
-      if (siteName) {
-        lines.push(
-          "現場名：" +
-          siteName
-        );
+        if (siteName) {
+          lines.push("現場名：" + siteName);
+        }
       }
 
       return {
-        hasDestination:true,
-        customerName:customerName,
-        siteName:siteName,
+        hasDestination:hasDestination,
+        customerName:hasDestination ? customerName : "",
+        siteName:hasDestination ? siteName : "",
         text:lines.join("\n")
       };
     }
