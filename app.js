@@ -3822,11 +3822,14 @@ scheduleBatchErrorFlush_();
       wizardCurrentSlipInfo = null;
       wizardSlipAnalysisSource = null;
       document.getElementById("wizardPhotoHeading").innerText = "イレギュラー受付写真";
+      document.getElementById("wizardIrregularSlipChoice").hidden = false;
+      document.querySelectorAll('input[name="wizardIrregularSlipChoice"]').forEach(function(radio) {
+        radio.checked = radio.value === "伝票あり";
+      });
       document.getElementById("wizardPhotoSummary").innerText =
-        (record.slipStatus === "伝票あり"
-          ? "1枚目は伝票写真を選択してください。"
-          : "機械全体・管理番号・QRラベル・状態が分かる写真を選択してください。") +
-        "\n写真は1枚以上必須・最大6枚です。";
+        "伝票がある場合は1枚目に伝票写真を選択してください。\n" +
+        "伝票がない場合は機械全体・管理番号・状態などの写真を選択してください。\n" +
+        "写真は1枚以上必須・最大6枚です。";
       document.getElementById("wizardPhotoPreview").innerText = "写真はまだ選択されていません。";
       document.getElementById("wizardSavePhotosButton").hidden = true;
       document.getElementById("wizardSkipPhotosButton").hidden = true;
@@ -4113,7 +4116,13 @@ scheduleBatchErrorFlush_();
       setWizardPhotoBusy(true);
       try {
         const isIrregular = Boolean(wizardPostSendContext.isIrregular);
-        const hasSlip = !isIrregular || wizardPostSendContext.irregularRecord.slipStatus === "伝票あり";
+        const slipChoice = isIrregular
+          ? document.querySelector('input[name="wizardIrregularSlipChoice"]:checked')
+          : null;
+        const hasSlip = !isIrregular || !slipChoice || slipChoice.value === "伝票あり";
+        if (isIrregular) {
+          wizardPostSendContext.irregularRecord.slipStatus = hasSlip ? "伝票あり" : "伝票なし";
+        }
         const firstPhoto = wizardSelectedPhotos[0];
         if (hasSlip && wizardSlipAnalysisSource !== firstPhoto) {
           wizardSlipAnalysisSource = firstPhoto;
@@ -4142,6 +4151,7 @@ scheduleBatchErrorFlush_();
         document.getElementById("wizardConfirmPhotoTitleButton").innerText = "この内容で保存";
         document.getElementById("wizardPhotoArea").hidden = true;
         document.getElementById("wizardPhotoTitleArea").hidden = false;
+        document.getElementById("wizardIrregularSlipChoice").hidden = true;
         scrollToWizardPostSend("wizardPhotoTitleArea");
       } catch (error) {
         document.getElementById("wizardPhotoPreview").innerText =
