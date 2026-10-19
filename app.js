@@ -4121,7 +4121,12 @@ scheduleBatchErrorFlush_();
           : null;
         const hasSlip = !isIrregular || !slipChoice || slipChoice.value === "伝票あり";
         if (isIrregular) {
-          wizardPostSendContext.irregularRecord.slipStatus = hasSlip ? "伝票あり" : "伝票なし";
+          const selectedSlipStatus = hasSlip ? "伝票あり" : "伝票なし";
+          if (wizardPostSendContext.irregularRecord.slipStatus !== selectedSlipStatus) {
+            wizardSlipAnalysisSource = null;
+            wizardCurrentSlipInfo = null;
+          }
+          wizardPostSendContext.irregularRecord.slipStatus = selectedSlipStatus;
         }
         const firstPhoto = wizardSelectedPhotos[0];
         if (hasSlip && wizardSlipAnalysisSource !== firstPhoto) {
@@ -4151,7 +4156,6 @@ scheduleBatchErrorFlush_();
         document.getElementById("wizardConfirmPhotoTitleButton").innerText = "この内容で保存";
         document.getElementById("wizardPhotoArea").hidden = true;
         document.getElementById("wizardPhotoTitleArea").hidden = false;
-        document.getElementById("wizardIrregularSlipChoice").hidden = true;
         scrollToWizardPostSend("wizardPhotoTitleArea");
       } catch (error) {
         document.getElementById("wizardPhotoPreview").innerText =
