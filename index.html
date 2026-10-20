@@ -1158,6 +1158,12 @@
       <h3 id="wizardPhotoHeading">写真の添付</h3>
       <p>1枚目は伝票写真を選択してください。顧客名・現場名の自動取得に使用します。</p>
       <div id="wizardPhotoSummary" class="wizardPostSummary"></div>
+      <div id="wizardIrregularSlipChoice" class="wizardPostSummary" hidden>
+        <strong>伝票の有無を選択してください</strong>
+        <label style="display:block;margin:10px 0"><input type="radio" name="wizardIrregularSlipChoice" value="伝票あり" checked> 伝票あり（AI解析する）</label>
+        <label style="display:block;margin:10px 0"><input type="radio" name="wizardIrregularSlipChoice" value="伝票なし"> 伝票なし（手入力する）</label>
+        <span>AI解析が失敗しても、写真を保持したまま手入力できます。</span>
+      </div>
       <input id="wizardPhotoCameraInput" type="file" accept="image/*" capture="environment" hidden>
       <input id="wizardPhotoLibraryInput" type="file" accept="image/*" multiple hidden>
       <button type="button" id="wizardPhotoCameraButton">カメラで撮影</button>
