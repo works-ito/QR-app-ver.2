@@ -3467,6 +3467,136 @@ async function flushBatchErrors_() {
 window.addEventListener("online",scheduleBatchErrorFlush_);
 scheduleBatchErrorFlush_();
 
+// 端末計測だけを端末に退避し、在庫送信とは別に再送する。
+const CLIENT_METRIC_PREFIX = "qrClientMetricV1:";
+const CLIENT_METRIC_MAX = 200;
+const CLIENT_METRIC_RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
+let clientMetricBusy_ = false;
+let clientMetricTimer_ = null;
+let clientInventoryRequests_ = 0;
+function clientMetricEntries_() {
+  const entries = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith(CLIENT_METRIC_PREFIX)) continue;
+      try {
+        const e = JSON.parse(localStorage.getItem(key));
+        const age = Date.now() - Date.parse(e && e.startedAt);
+        if (!e || !e.eventId || !Number.isFinite(age) ||
+            age > CLIENT_METRIC_RETENTION_MS) {
+          localStorage.removeItem(key);
+          i--;
+          continue;
+        }
+        entries.push(e);
+      } catch (_) { localStorage.removeItem(key); i--; }
+    }
+  } catch (_) { /* 診断失敗は在庫操作に影響させない */ }
+  return entries.sort((a,b) => String(a.startedAt).localeCompare(String(b.startedAt)));
+}
+function saveClientMetric_(event) {
+  try {
+    localStorage.setItem(CLIENT_METRIC_PREFIX + event.eventId, JSON.stringify(event));
+    const entries = clientMetricEntries_();
+    entries.slice(0, Math.max(0, entries.length - CLIENT_METRIC_MAX))
+      .forEach(e => localStorage.removeItem(CLIENT_METRIC_PREFIX + e.eventId));
+  } catch (_) { /* 保存できない端末でも在庫送信を継続 */ }
+}
+function scheduleClientMetrics_() {
+  if (clientMetricTimer_) return;
+  clientMetricTimer_ = setTimeout(() => {
+    clientMetricTimer_ = null;
+    void flushClientMetrics_();
+  }, 5000);
+}
+async function flushClientMetrics_() {
+  if (clientMetricBusy_ || clientInventoryRequests_ || navigator.onLine === false) {
+    if (clientMetricEntries_().length && !clientMetricTimer_) {
+      clientMetricTimer_ = setTimeout(() => {
+        clientMetricTimer_ = null;
+        void flushClientMetrics_();
+      }, 60000);
+    }
+    return;
+  }
+  const entries = clientMetricEntries_();
+  const events = entries.filter(e => !e.pending ||
+    Date.now() - Date.parse(e.startedAt) > 600000).slice(0, 20);
+  if (!events.length) return;
+  clientMetricBusy_ = true;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  try {
+    const response = await fetch(GAS_URL, {
+      method:"POST", headers:{"Content-Type":"text/plain"},
+      signal:controller.signal,
+      body:JSON.stringify({action:"recordClientTelemetry",events})
+    });
+    const result = await response.json();
+    if (response.ok && result && result.ok === true &&
+        Array.isArray(result.acceptedIds)) {
+      result.acceptedIds.forEach(id => {
+        const event = events.find(e => e.eventId === id);
+        if (event && localStorage.getItem(CLIENT_METRIC_PREFIX + id) ===
+            JSON.stringify(event)) {
+          localStorage.removeItem(CLIENT_METRIC_PREFIX + id);
+        }
+      });
+    }
+  } catch (_) { /* 結果不明でも診断IDを維持して後日再送 */ }
+  finally { clearTimeout(timeout); clientMetricBusy_ = false; }
+  if (clientMetricEntries_().length && !clientMetricTimer_) {
+    clientMetricTimer_ = setTimeout(() => {
+      clientMetricTimer_ = null;
+      void flushClientMetrics_();
+    }, 60000);
+  }
+}
+async function measureClientBatch_(payload, send) {
+  const body = JSON.stringify(payload);
+  const first = (payload.records || [])[0] || {};
+  const event = {
+    eventId:"CT-" + (globalThis.crypto && crypto.randomUUID ?
+      crypto.randomUUID() : Date.now() + "-" + Math.random().toString(36).slice(2)),
+    startedAt:new Date().toISOString(), sendId:payload.sendId || payload.batchId || "",
+    user:String(first.user || ""), location:String(first.location || ""),
+    mode:String(first.mode || ""), recordCount:(payload.records || []).length,
+    bodyBytes:new Blob([body]).size, elapsedMs:null,
+    outcome:"結果未確定（画面終了など）", successCount:null, failedCount:null,
+    detail:"", online:navigator.onLine === false ? "offline" : "online（電波品質は不明）",
+    userAgent:String(navigator.userAgent || "").slice(0,250),
+    version:"client-v1", source:"batchWrite", pending:true
+  };
+  saveClientMetric_(event);
+  const started = performance.now();
+  clientInventoryRequests_++;
+  try {
+    const result = await send();
+    event.successCount = Number.isFinite(Number(result.successCount)) ?
+      Number(result.successCount) : null;
+    event.failedCount = Number.isFinite(Number(result.failedCount)) ?
+      Number(result.failedCount) : null;
+    event.outcome = event.failedCount > 0 ?
+      (event.successCount > 0 ? "一部失敗" : "GAS拒否・エラー") :
+      (result.ok === false ? "GAS拒否・エラー" : "成功");
+    event.detail = String(result.message || "").slice(0,1500);
+    return result;
+  } catch (error) {
+    event.outcome = "通信・応答エラー（登録結果不明）";
+    event.detail = String(error && error.message || error).slice(0,1500);
+    throw error;
+  } finally {
+    event.elapsedMs = Math.max(0, Math.round(performance.now() - started));
+    event.pending = false;
+    saveClientMetric_(event);
+    clientInventoryRequests_--;
+    scheduleClientMetrics_();
+  }
+}
+window.addEventListener("online", scheduleClientMetrics_);
+scheduleClientMetrics_();
+
     function sendBatchRecords(records, options) {
       const batchId = createBatchId();
       lastPendingSendId = batchId;
@@ -3498,7 +3628,7 @@ scheduleBatchErrorFlush_();
        * GASで登録済みなのに応答だけ失われた場合の
        * 二重登録を避けるため、結果不明として止める。
        */
-      return fetch(GAS_URL, {
+      return measureClientBatch_(payload, () => fetch(GAS_URL, {
         method:"POST",
         headers:{
           "Content-Type":"text/plain"
@@ -3550,7 +3680,7 @@ scheduleBatchErrorFlush_();
       }).catch(function(error) {
         queueBatchErrors_(payload, null, error);
         throw error;
-      });
+      }));
     }
 
     function setWizardSendStatus(message, state) {
