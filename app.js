@@ -3523,7 +3523,16 @@ async function flushClientMetrics_() {
   const entries = clientMetricEntries_();
   const events = entries.filter(e => !e.pending ||
     Date.now() - Date.parse(e.startedAt) > 600000).slice(0, 20);
-  if (!events.length) return;
+  if (!events.length) {
+    // 画面終了でpendingのまま残った記録も10分後に回収する。
+    if (entries.length && !clientMetricTimer_) {
+      clientMetricTimer_ = setTimeout(() => {
+        clientMetricTimer_ = null;
+        void flushClientMetrics_();
+      }, 60000);
+    }
+    return;
+  }
   clientMetricBusy_ = true;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);
