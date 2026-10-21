@@ -200,11 +200,27 @@
   }
 
   function draftHasMeaningfulWork(draft) {
-    if (!draft) return false;
-    if (Array.isArray(draft.scannedEntries) && draft.scannedEntries.length > 0) return true;
-    if (draft.postSendPhase) return true;
-    if (draft.irregularNumber || draft.irregularNote) return true;
-    if (draft.returnMemo) return true;
+    if (!draft || !draft.wizardState) return false;
+
+    // The reception screen is an idle/new-session state. Hidden form fields may
+    // retain values from a completed session; those values are not unfinished work.
+    const step = String(draft.wizardState.currentStep || "reception");
+    if (step === "reception") return false;
+
+    // Scanned, unsent entries must survive reloads, including uncertain sends.
+    if (Array.isArray(draft.scannedEntries) && draft.scannedEntries.length > 0) {
+      return true;
+    }
+
+    // A genuinely active post-send flow can be resumed. The cancel-send button
+    // alone does not count: its five-minute state is stored separately.
+    if (
+      draft.postSendPhase &&
+      (draft.postSendContext || draft.postSendPhase === "irregular")
+    ) return true;
+
+    // Hidden values left behind by completed workflows are intentionally ignored.
+    // An unfinished irregular entry is only meaningful while its panel is active.
     return false;
   }
 
