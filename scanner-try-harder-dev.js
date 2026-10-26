@@ -266,7 +266,20 @@
     };
 
     try {
-      if (draftHasMeaningfulWork(draft)) {
+      // On the visible initial screen, stale post-send form values must not
+      // recreate a draft after a completed workflow. Never discard unsent
+      // scans or a send whose result is still unknown.
+      const receptionPanel = byId("receptionStep");
+      const receptionIsVisible = Boolean(
+        receptionPanel && receptionPanel.classList.contains("isActive")
+      );
+      const hasUnsentEntries = draft.scannedEntries.length > 0;
+      const sendResultUnknown =
+        typeof wizardSendResultUnknown !== "undefined" &&
+        Boolean(wizardSendResultUnknown);
+      if (receptionIsVisible && !hasUnsentEntries && !sendResultUnknown) {
+        localStorage.removeItem(DRAFT_KEY);
+      } else if (draftHasMeaningfulWork(draft)) {
         localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
       } else {
         localStorage.removeItem(DRAFT_KEY);
