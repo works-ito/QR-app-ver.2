@@ -94,12 +94,25 @@
     panel.style.display = 'block';
     load();
   });
-  back.addEventListener('click',()=>{
+  const closeCustomerSearch = () => {
     panel.hidden = true;
     panel.style.display = 'none';
     home.hidden = false;
     home.style.display = '';
-  });
+  };
+  back.addEventListener('click', closeCustomerSearch);
+  // 「最初から」は既存の resetWizard() を妨げず、検索画面だけ先に閉じる。
+  // captureで既存app.jsのclick処理より先に実行する。
+  document.getElementById('restartButton')?.addEventListener('click', () => {
+    if (!panel.hidden) {
+      closeCustomerSearch();
+      input.value = '';
+      chosen = '';
+      mode = 'kana';
+      renderButtons();
+      render();
+    }
+  }, true);
   input.addEventListener('input',render);
   tabs.forEach(t=>t.addEventListener('click',()=>{
     mode=t.dataset.customerTab;chosen='';renderButtons();render();
