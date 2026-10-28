@@ -6,6 +6,16 @@
   <title>QR在庫管理｜ver.2.2</title>
   <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
   <link rel="stylesheet" href="./styles.css?v=24">
+  <style>
+    .customerSearchChips {display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+    .customerSearchChips[hidden] {display:none!important}
+    .customerSearchChip {padding:10px 12px;min-width:63px;background:#fff;border:1px solid #8b969e;border-radius:8px;font-size:15px;color:#172b37}
+    .customerSearchChip.isSelected {background:#1458aa;color:#fff;border-color:#1458aa}
+    .customerSearchResult {border-bottom:1px solid #ddd;padding:13px 4px;overflow-wrap:anywhere}
+    .customerSearchResult strong {display:block;font-size:17px}
+    .customerSearchPerson {font-size:14px;color:#53626a;margin-top:4px}
+    #customerSearchPanel [aria-pressed="true"] {background:#1458aa;color:white}
+  </style>
 </head>
 <body>
 <main class="app">
@@ -136,6 +146,7 @@
             仕入れた販売品の在庫を増やす
           </span>
         </button>
+        <button id="customerSearchEntry" class="choiceButton" type="button">取引先検索<span class="choiceSubText">正式名称・営業担当者を確認</span></button>
       </div>
 
     </section>
@@ -1195,6 +1206,20 @@
 
   </section>
 
+    <section id="customerSearchPanel" class="panel" hidden style="display:none">
+      <button type="button" id="customerSearchBack" class="secondaryButton">← 初期画面へ戻る</button>
+      <h1 class="question">取引先検索</h1>
+      <p class="questionHint">正式名称と営業担当者を確認できます</p>
+      <input id="customerSearchInput" type="search" placeholder="取引先名・略称・カナ名" aria-label="取引先を検索" style="width:100%;padding:13px;font-size:16px;border:1px solid #aaa;border-radius:8px;box-sizing:border-box">
+      <div style="display:flex;gap:8px;margin:14px 0">
+        <button type="button" data-customer-tab="kana" aria-pressed="true" class="secondaryButton">かな検索</button>
+        <button type="button" data-customer-tab="staff" aria-pressed="false" class="secondaryButton">担当者別</button>
+      </div>
+      <div id="customerSearchKana" class="customerSearchChips"></div>
+      <div id="customerSearchStaff" class="customerSearchChips" hidden></div>
+      <p id="customerSearchStatus" role="status" aria-live="polite"></p>
+      <div id="customerSearchResults"></div>
+    </section>
   </main>
 
   <div id="legacySelectionBridge" hidden>
@@ -1264,6 +1289,7 @@
   <script src="./scanner-try-harder-dev.js?v=52"></script>
   <script src="./manual-refresh-ui-dev.js?v=103"></script>
   <script src="./app.js?v=92"></script>
+  <script src="./customer-search.js?v=1"></script>
   <script src="./ai-slip-analysis.js?v=2"></script>
   <script src="./sales-stockin.js?v=167"></script>
 </body>
