@@ -5,14 +5,13 @@
   const entry = document.getElementById('customerSearchEntry');
   const home = document.getElementById('receptionStep');
   const panel = document.getElementById('customerSearchPanel');
-  const back = document.getElementById('customerSearchBack');
   const input = document.getElementById('customerSearchInput');
   const kana = document.getElementById('customerSearchKana');
   const staff = document.getElementById('customerSearchStaff');
   const results = document.getElementById('customerSearchResults');
   const status = document.getElementById('customerSearchStatus');
   const tabs = [...panel.querySelectorAll('[data-customer-tab]')];
-  if (!entry || !home || !panel || !back || !input || !kana || !staff || !results || !status) return;
+  if (!entry || !home || !panel || !input || !kana || !staff || !results || !status) return;
   let rows = null, mode = 'kana', chosen = '', pending = null;
   const normalize = value => String(value ?? '').normalize('NFKC')
     .replace(/[\u3041-\u3096]/g, ch => String.fromCharCode(ch.charCodeAt(0) + 96))
@@ -100,7 +99,6 @@
     home.hidden = false;
     home.style.display = '';
   };
-  back.addEventListener('click', closeCustomerSearch);
   // 「最初から」は既存の resetWizard() を妨げず、検索画面だけ先に閉じる。
   // captureで既存app.jsのclick処理より先に実行する。
   document.getElementById('restartButton')?.addEventListener('click', () => {
