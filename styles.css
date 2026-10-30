@@ -2025,13 +2025,15 @@
 }
 
 /* ===== 販売品入庫受付：実装準備中オーバーレイ ===== */
-#salesStockInEntryButton.salesComingSoon {
+#salesStockInEntryButton.salesComingSoon,
+#azukariEntryButton.salesComingSoon {
   position: relative;
   overflow: hidden;
   cursor: not-allowed;
 }
 
-#salesStockInEntryButton.salesComingSoon::after {
+#salesStockInEntryButton.salesComingSoon::after,
+#azukariEntryButton.salesComingSoon::after {
   content: "※ ただいま実装準備中";
   position: absolute;
   inset: 0;
@@ -2051,7 +2053,8 @@
   pointer-events: none;
 }
 
-#salesStockInEntryButton.salesComingSoon:disabled {
+#salesStockInEntryButton.salesComingSoon:disabled,
+#azukariEntryButton.salesComingSoon:disabled {
   opacity: 1;
 }
 
