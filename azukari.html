@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>預かり品管理｜三郷</title><link rel="stylesheet" href="./azukari.css?v=1"></head>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>預かり品管理｜三郷</title><link rel="stylesheet" href="./azukari.css?v=2"></head>
 <body><main class="app"><header><a href="./index.html" class="back">← 在庫管理へ</a><div><h1>預かり品管理</h1><small>三郷／専用管理</small></div></header>
 <nav aria-label="操作選択"><button data-view="in" aria-pressed="true">入庫</button><button data-view="out" aria-pressed="false">出庫</button><button data-view="list" aria-pressed="false">一覧</button></nav>
-<p class="notice">現在は画面確認用です。入庫・出庫の保存はまだ有効になっていません。</p>
+<p class="notice"><strong>操作確認モード</strong>：この画面での入庫・出庫はお試しです。スプレッドシートには保存されず、画面を閉じると消えます。</p>
 <section id="in" class="pane"><h2>預かり品 入庫</h2><form id="inForm">
 <label>取引先（必須）<select name="customer" required><option value="">選択してください</option><option>ＴＡＮＡＫＥＮ 株式会社</option><option>株式会社 大岩</option><option>三貴 株式会社</option></select></label>
 <label>現場名<input name="site" maxlength="150" placeholder="現場名／未確認でも可"></label>
@@ -12,7 +12,8 @@
 <label id="unitWrap" hidden>単位<input name="unit" maxlength="12" placeholder="個・本・箱など"></label>
 <label>備考<textarea name="memo" rows="2" maxlength="500"></textarea></label>
 <label>入庫写真（必須）<input name="photo" id="photo" type="file" accept="image/*" capture="environment" required></label><img id="preview" alt="選択写真" hidden>
-<button type="button" id="check">入力内容を確認</button><p id="checkResult" role="status"></p><button type="submit" disabled>入庫を保存（準備中）</button></form></section>
-<section id="out" class="pane" hidden><h2>預かり品 出庫</h2><p>入庫データの保存機能が完成すると、顧客・現場・預かり品を選び、残数の範囲で一部出庫できます。</p><button disabled>出庫を保存（準備中）</button></section>
-<section id="list" class="pane" hidden><h2>預かり品 一覧</h2><p>入庫日時・顧客・現場・品名・数量・残数・写真を表示する予定です。</p><p>保存機能が未接続のため、現在は一覧データを取得しません。</p></section>
-</main><script src="./azukari.js?v=1"></script></body></html>
+<button type="button" id="check">入力内容を確認</button><p id="checkResult" role="status"></p>
+<div id="confirmation" hidden><p>内容を確認して、下のボタンでお試し登録できます。</p><button type="submit" class="primary">この内容で入庫（お試し）</button></div></form></section>
+<section id="out" class="pane" hidden><h2>預かり品 出庫</h2><p class="hint">お試し入庫した品物を選び、残数の範囲で出庫します。</p><label>取引先<select id="outCustomer"><option value="">すべて</option><option>ＴＡＮＡＫＥＮ 株式会社</option><option>株式会社 大岩</option><option>三貴 株式会社</option></select></label><label>対象の預かり品<select id="outItem"><option value="">預かり品を選択</option></select></label><div id="outDetail" class="detail" hidden></div><form id="outForm"><label>出庫数量<input id="outQty" type="number" min="1" step="1" value="1" required></label><button type="submit" class="primary">出庫する（お試し）</button></form><p id="outMessage" role="status"></p></section>
+<section id="list" class="pane" hidden><h2>預かり品 一覧</h2><label>取引先で絞り込み<select id="listCustomer"><option value="">すべて</option><option>ＴＡＮＡＫＥＮ 株式会社</option><option>株式会社 大岩</option><option>三貴 株式会社</option></select></label><label class="checkline"><input type="checkbox" id="showEmpty"> 出庫済み（残数0）も表示</label><div id="listItems" aria-live="polite"></div></section>
+</main><script src="./azukari.js?v=2"></script></body></html>
