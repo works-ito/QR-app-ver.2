@@ -71,7 +71,14 @@ function azukariCheckout_(ss,data) {
       if(existing){
         const row=hs.getRange(existing.getRow(),1,1,11).getValues()[0];
         if(String(row[1])!==id||Number(row[3])!==qty)throw new Error('同じ送信IDで異なる出庫内容です');
-        const ds0=azukariSheet_(ss,'預かり品データ',AZ_DATA_HEADERS_);\n        const f0=ds0.getLastRow()>1?ds0.getRange(2,1,ds0.getLastRow()-1,1).createTextFinder(id).matchEntireCell(true).findNext():null;\n        if(!f0)return {ok:false,code:'RECONCILE_REQUIRED',message:'履歴あり・対象行なし。管理者確認が必要です'};\n        const current=Number(ds0.getRange(f0.getRow(),7).getValue());\n        const before=Number(row[4]),after=Number(row[5]);\n        if(current===before){ds0.getRange(f0.getRow(),7).setValue(after);ds0.getRange(f0.getRow(),8).setValue(after===0?'出庫済み':'保管中');ds0.getRange(f0.getRow(),10).setValue(new Date());}\n        else if(current!==after)return {ok:false,code:'RECONCILE_REQUIRED',message:'履歴と残数に差異があります。管理者確認が必要です'};\n        return {ok:true,duplicate:true,remaining:after,message:'登録済みの出庫です'};
+        const ds0=azukariSheet_(ss,'預かり品データ',AZ_DATA_HEADERS_);
+        const f0=ds0.getLastRow()>1?ds0.getRange(2,1,ds0.getLastRow()-1,1).createTextFinder(id).matchEntireCell(true).findNext():null;
+        if(!f0)return {ok:false,code:'RECONCILE_REQUIRED',message:'履歴あり・対象行なし。管理者確認が必要です'};
+        const current=Number(ds0.getRange(f0.getRow(),7).getValue());
+        const before=Number(row[4]),after=Number(row[5]);
+        if(current===before){ds0.getRange(f0.getRow(),7).setValue(after);ds0.getRange(f0.getRow(),8).setValue(after===0?'出庫済み':'保管中');ds0.getRange(f0.getRow(),10).setValue(new Date());}
+        else if(current!==after)return {ok:false,code:'RECONCILE_REQUIRED',message:'履歴と残数に差異があります。管理者確認が必要です'};
+        return {ok:true,duplicate:true,remaining:after,message:'登録済みの出庫です'};
       }
     }
     const last=ds.getLastRow();
