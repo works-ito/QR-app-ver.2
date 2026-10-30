@@ -7,7 +7,7 @@ const tabs=[...document.querySelectorAll('[data-view]')];
 function open(view){tabs.forEach(t=>{const active=t.dataset.view===view;t.setAttribute('aria-pressed',String(active));$(t.dataset.view).hidden=!active;});if(view==='out')renderOut();if(view==='list')renderList();}
 tabs.forEach(t=>t.addEventListener('click',()=>open(t.dataset.view)));
 $('kind').addEventListener('change',()=>{const other=$('kind').value==='other';$('itemWrap').hidden=!other;$('unitWrap').hidden=!other;invalidate();});
-const form=$('inForm');
+document.querySelectorAll('[data-step]').forEach(button=>button.addEventListener('click',()=>{const [mode,delta]=button.dataset.step.split(':');const field=mode==='in'?document.querySelector('#inForm [name=qty]'):$('outQty');const min=1,max=mode==='in'?9999:Number(field.max)||9999;const current=Number.isFinite(field.valueAsNumber)?field.valueAsNumber:1;field.value=String(Math.min(max,Math.max(min,current+Number(delta))));field.dispatchEvent(new Event('input',{bubbles:true}));}));const form=$('inForm');
 form.addEventListener('input',invalidate);form.addEventListener('change',invalidate);
 function invalidate(){$('confirmation').hidden=true;$('checkResult').textContent='';}
 $('photo').addEventListener('change',()=>{const file=$('photo').files[0];$('preview').hidden=!file;if(photoUrl)URL.revokeObjectURL(photoUrl);photoUrl=file?URL.createObjectURL(file):null;if(photoUrl)$('preview').src=photoUrl;else $('preview').removeAttribute('src');});
