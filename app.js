@@ -4429,7 +4429,7 @@ scheduleClientMetrics_();
      */
     let accessoryConfirmationOpen = false;
 
-    function confirmWizardShipmentAccessories() {
+    function confirmWizardShipmentAccessories(recordCount) {
       if (accessoryConfirmationOpen) {
         return Promise.resolve(false);
       }
@@ -4451,7 +4451,9 @@ scheduleClientMetrics_();
           "background:#fff;color:#222;border-radius:14px;padding:22px 18px;" +
           "box-shadow:0 10px 36px rgba(0,0,0,.3);font-size:16px;line-height:1.6;";
         dialog.innerHTML = [
-          '<h2 id="accessoryConfirmTitle" style="font-size:21px;text-align:center;margin:0 0 16px;">付属品は良いですか？</h2>',
+          '<h2 id="accessoryConfirmTitle" style="font-size:21px;text-align:center;margin:0 0 8px;">出庫前の最終確認</h2>',
+          '<p style="text-align:center;font-weight:bold;margin:0 0 16px;">' + recordCount + '件まとめて出庫します。</p>',
+          '<p style="font-size:18px;text-align:center;font-weight:bold;margin:0 0 14px;">付属品は良いですか？</p>',
           '<div style="background:#f4f5f7;padding:12px;border-radius:8px;margin-bottom:18px;">',
           '<div style="font-size:13px;margin-bottom:6px;">確認例</div>',
           '<div>発電機 → アース棒</div>',
@@ -4558,7 +4560,7 @@ scheduleClientMetrics_();
       }
 
       if (wizardState.mode === "出庫") {
-        if (!await confirmWizardShipmentAccessories()) {
+        if (!await confirmWizardShipmentAccessories(records.length)) {
           return false;
         }
       } else if (!confirm(
