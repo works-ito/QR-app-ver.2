@@ -4423,6 +4423,95 @@ scheduleClientMetrics_();
       }
     }
 
+    /*
+     * 出庫時の付属品確認。未選択では送信できない。
+     * 「いいえ」や閉じる操作では既存の読取内容を保持する。
+     */
+    let accessoryConfirmationOpen = false;
+
+    function confirmWizardShipmentAccessories() {
+      if (accessoryConfirmationOpen) {
+        return Promise.resolve(false);
+      }
+      accessoryConfirmationOpen = true;
+
+      return new Promise(function(resolve) {
+        const overlay = document.createElement("div");
+        overlay.setAttribute("role", "presentation");
+        overlay.style.cssText =
+          "position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.65);" +
+          "display:flex;align-items:center;justify-content:center;padding:16px;";
+
+        const dialog = document.createElement("div");
+        dialog.setAttribute("role", "dialog");
+        dialog.setAttribute("aria-modal", "true");
+        dialog.setAttribute("aria-labelledby", "accessoryConfirmTitle");
+        dialog.style.cssText =
+          "box-sizing:border-box;width:min(100%,420px);max-height:90dvh;overflow:auto;" +
+          "background:#fff;color:#222;border-radius:14px;padding:22px 18px;" +
+          "box-shadow:0 10px 36px rgba(0,0,0,.3);font-size:16px;line-height:1.6;";
+        dialog.innerHTML = [
+          '<h2 id="accessoryConfirmTitle" style="font-size:21px;text-align:center;margin:0 0 16px;">付属品は良いですか？</h2>',
+          '<div style="background:#f4f5f7;padding:12px;border-radius:8px;margin-bottom:18px;">',
+          '<div style="font-size:13px;margin-bottom:6px;">確認例</div>',
+          '<div>発電機 → アース棒</div>',
+          '<div>洗浄機類 → ガン・ホース類</div>',
+          '<div>ポンプ類 → 吸水ホース類</div>',
+          '</div>',
+          '<div role="radiogroup" aria-label="付属品確認" style="display:flex;justify-content:space-around;gap:16px;margin:16px 0;">',
+          '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="radio" name="accessoryConfirmAnswer" value="yes" style="width:22px;height:22px;">はい</label>',
+          '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="radio" name="accessoryConfirmAnswer" value="no" style="width:22px;height:22px;">いいえ</label>',
+          '</div>',
+          '<button type="button" disabled style="width:100%;padding:12px;border:0;border-radius:8px;background:#1769aa;color:white;font-size:16px;font-weight:bold;opacity:.45;">選択してください</button>'
+        ].join("");
+
+        const radios = Array.from(dialog.querySelectorAll('input[type="radio"]'));
+        const proceedButton = dialog.querySelector("button");
+        const previouslyFocused = document.activeElement;
+        let settled = false;
+
+        function finish(accepted) {
+          if (settled) return;
+          settled = true;
+          document.removeEventListener("keydown", onKeyDown, true);
+          overlay.remove();
+          accessoryConfirmationOpen = false;
+          if (previouslyFocused && previouslyFocused.isConnected &&
+              typeof previouslyFocused.focus === "function") {
+            previouslyFocused.focus();
+          }
+          resolve(accepted);
+        }
+
+        function onKeyDown(event) {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            finish(false);
+          }
+        }
+
+        radios.forEach(function(radio) {
+          radio.addEventListener("change", function() {
+            proceedButton.disabled = false;
+            proceedButton.style.opacity = "1";
+            proceedButton.textContent =
+              radio.value === "yes" ? "確認して送信へ進む" : "送信せず戻る";
+          });
+        });
+
+        proceedButton.addEventListener("click", function() {
+          const selected = dialog.querySelector('input[name="accessoryConfirmAnswer"]:checked');
+          if (!selected) return;
+          finish(selected.value === "yes");
+        });
+
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+        document.addEventListener("keydown", onKeyDown, true);
+        radios[0].focus();
+      });
+    }
+
     async function sendWizardBatch(options) {
       const sendOptions =
         options && typeof options === "object"
@@ -4468,7 +4557,11 @@ scheduleClientMetrics_();
         return false;
       }
 
-      if (!confirm(
+      if (wizardState.mode === "出庫") {
+        if (!await confirmWizardShipmentAccessories()) {
+          return false;
+        }
+      } else if (!confirm(
         wizardState.modeLabel + "を " +
         records.length +
         "件まとめて送信します。よろしいですか？"
