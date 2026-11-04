@@ -7,7 +7,7 @@
  *    AZUKARI_SPREADSHEET_ID = 対象スプレッドシートID
  *    AZUKARI_PHOTO_FOLDER_ID = 写真保存先DriveフォルダID
  * 3) ウェブアプリとしてデプロイ（実行ユーザー: 自分）
- * ※ 既存のdoPostは一切変更しない
+ * 4) AZUKARI_API_KEY に十分長いランダムな秘密キーを設定する。\n *    秘密キーは公開GitHubやHTML/JSに書かない。\n * ※ 既存のQR在庫管理側のdoPostは一切変更しない
  */
 function azukariSpreadsheet_() {
   const id = PropertiesService.getScriptProperties().getProperty('AZUKARI_SPREADSHEET_ID');
@@ -18,6 +18,16 @@ function azukariJson_(result) {
   return ContentService.createTextOutput(JSON.stringify(result))
     .setMimeType(ContentService.MimeType.JSON);
 }
+/** 公開Webアプリの書込み・一覧取得を既定で拒否する。 */
+function azukariAuthorized_(data) {
+  const expected = PropertiesService.getScriptProperties().getProperty('AZUKARI_API_KEY');
+  const provided = String(data && data.apiKey || '');
+  // 未設定時は必ず拒否。短いPINや画面埋込みのキーは使わない。
+  if (!expected || expected.length < 32 || !provided || provided.length !== expected.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < expected.length; i++) mismatch |= expected.charCodeAt(i) ^ provided.charCodeAt(i);
+  return mismatch === 0;
+}
 function doPost(e) {
   try {
     if (!e || !e.postData || !e.postData.contents) {
@@ -25,6 +35,13 @@ function doPost(e) {
     }
     const data = JSON.parse(e.postData.contents);
     const action = String(data.action || '');
+    if (action === 'azukariList') {
+      if (!azukariAuthorized_(data)) return azukariJson_({ok:false,code:'UNAUTHORIZED',message:'認証が必要です'});
+      return azukariJson_(azukariList_(azukariSpreadsheet_()));
+    }
+    if (!['azukariDeposit','azukariCheckout'].includes(action))
+      return azukariJson_({ok:false,code:'UNKNOWN_ACTION',message:'未対応の操作です'});
+    if (!azukariAuthorized_(data)) return azukariJson_({ok:false,code:'UNAUTHORIZED',message:'認証が必要です'});
     if (action === 'azukariDeposit') return azukariJson_(azukariDeposit_(azukariSpreadsheet_(),data));
     if (action === 'azukariCheckout') return azukariJson_(azukariCheckout_(azukariSpreadsheet_(),data));
     return azukariJson_({ok:false,code:'UNKNOWN_ACTION',message:'未対応の操作です'});
@@ -35,7 +52,7 @@ function doPost(e) {
 function doGet(e) {
   try {
     const action = String(e && e.parameter && e.parameter.action || '');
-    if (action === 'azukariList') return azukariJson_(azukariList_(azukariSpreadsheet_()));
+    // GETでは顧客・現場・写真URLを返さない。認証情報をURLにも載せない。\n    if (action === 'azukariList') return azukariJson_({ok:false,code:'POST_REQUIRED',message:'一覧は認証付きPOSTで取得してください'});
     return azukariJson_({ok:true,service:'azukari',message:'預かり品専用GAS'});
   } catch (err) {
     return azukariJson_({ok:false,code:'SERVER_ERROR',message:String(err.message||err)});
